@@ -18,8 +18,12 @@ class Signal(BaseModel):
     symbol: str = Field(..., description="Trading symbol")
     signal_type: str = Field(..., description="Signal type: LONG, SHORT, CLOSE")
     strategy: str = Field(..., description="Strategy name that generated the signal")
-    confidence: float = Field(default=1.0, ge=0.0, le=1.0, description="Signal confidence (0-1)")
-    entry_price: Optional[float] = Field(default=None, description="Suggested entry price")
+    confidence: float = Field(
+        default=1.0, ge=0.0, le=1.0, description="Signal confidence (0-1)"
+    )
+    entry_price: Optional[float] = Field(
+        default=None, description="Suggested entry price"
+    )
     stop_loss: Optional[float] = Field(default=None, description="Stop loss price")
     take_profit: Optional[float] = Field(default=None, description="Take profit price")
     metadata: Dict[str, Any] = Field(
@@ -27,7 +31,10 @@ class Signal(BaseModel):
     )
 
     def __str__(self) -> str:
-        return f"Signal({self.strategy}: {self.signal_type} {self.symbol} @ {self.timestamp})"
+        return (
+            f"Signal({self.strategy}: {self.signal_type} "
+            f"{self.symbol} @ {self.timestamp})"
+        )
 
 
 class StrategyConfig(BaseModel):

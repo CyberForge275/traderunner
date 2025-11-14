@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Nov 14 17:59:19 2025
-
-@author: mirko
-"""
-
 """Inside Bar Pattern Trading Strategy.
 
 This strategy detects inside bar patterns and generates trading signals based on
