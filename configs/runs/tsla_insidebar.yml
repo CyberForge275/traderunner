@@ -1,0 +1,11 @@
+name: tsla_insidebar_m5
+engine: replay
+mode: insidebar_intraday
+orders_source_csv: artifacts/orders/current_orders.csv
+data:
+  path: artifacts/data_m5
+  tz: America/New_York
+costs:
+  fees_bps: 2.0
+  slippage_bps: 1.0
+initial_cash: 100000.0

@@ -63,8 +63,8 @@ class InsideBarStrategy(BaseStrategy):
                 },
                 "inside_bar_mode": {
                     "type": "string",
-                    "enum": ["single", "sequence"],
-                    "default": "single",
+                    "enum": ["inclusive", "strict", "sequence", "single"],
+                    "default": "inclusive",
                     "description": "Mode for inside bar detection",
                 },
                 "min_mother_bar_size": {
@@ -119,7 +119,9 @@ class InsideBarStrategy(BaseStrategy):
         # Extract configuration
         atr_period = config.get("atr_period", 14)
         rrr = config.get("risk_reward_ratio", 2.0)
-        inside_bar_mode = config.get("inside_bar_mode", "single")
+        inside_bar_mode = config.get("inside_bar_mode", "inclusive")
+        if inside_bar_mode == "single":
+            inside_bar_mode = "inclusive"
         min_mother_size = config.get("min_mother_bar_size", 0.0)
         breakout_confirm = config.get("breakout_confirmation", True)
         session_filter = config.get("session_filter", {"enabled": False})
@@ -167,6 +169,9 @@ class InsideBarStrategy(BaseStrategy):
         df["mother_bar_low"] = np.nan
         df["mother_bar_index"] = -1
 
+        strict_mode = mode == "strict"
+        sequence_mode = mode == "sequence"
+
         for i in range(1, len(df)):
             prev_high = df.iloc[i - 1]["high"]
             prev_low = df.iloc[i - 1]["low"]
@@ -175,7 +180,10 @@ class InsideBarStrategy(BaseStrategy):
             atr = df.iloc[i]["atr"]
 
             # Check if current bar is inside previous bar
-            is_inside = (curr_high <= prev_high) and (curr_low >= prev_low)
+            if strict_mode:
+                is_inside = (curr_high < prev_high) and (curr_low > prev_low)
+            else:
+                is_inside = (curr_high <= prev_high) and (curr_low >= prev_low)
 
             # Check minimum mother bar size if specified
             if is_inside and min_mother_size > 0 and not pd.isna(atr):
@@ -190,7 +198,7 @@ class InsideBarStrategy(BaseStrategy):
                 df.iloc[i, df.columns.get_loc("mother_bar_index")] = i - 1
 
                 # For sequence mode, check if previous bar was also an inside bar
-                if mode == "sequence" and i >= 2:
+                if sequence_mode and i >= 2:
                     if df.iloc[i - 1]["is_inside_bar"]:
                         # Use the original mother bar, not the previous inside bar
                         orig_mother_idx = df.iloc[i - 1]["mother_bar_index"]

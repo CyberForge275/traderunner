@@ -70,16 +70,22 @@ class StrategyFactory:
                 )
 
             # Apply configuration if the strategy supports it
+            if hasattr(strategy_instance, "_config") and hasattr(
+                strategy_instance._config, "name"
+            ):
+                strategy_instance._config.name = name
+
             if hasattr(strategy_instance, "configure"):
                 strategy_instance.configure(config)
             elif hasattr(strategy_instance, "_config"):
-                # Update internal config if available
                 if hasattr(strategy_instance._config, "parameters"):
                     strategy_instance._config.parameters.update(config)
 
             logger.info(f"Created strategy instance: {name}")
             return strategy_instance
 
+        except ValueError:
+            raise
         except Exception as e:
             logger.error(f"Failed to create strategy '{name}': {e}")
             raise RuntimeError(f"Strategy instantiation failed: {e}") from e

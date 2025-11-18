@@ -1,0 +1,11 @@
+name: insidebar_demo
+engine: replay
+mode: insidebar_intraday
+orders_source_csv: artifacts/demo/orders.csv
+data:
+  path: artifacts/demo/data
+  tz: UTC
+costs:
+  fees_bps: 2.0
+  slippage_bps: 1.0
+initial_cash: 100000.0

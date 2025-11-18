@@ -238,11 +238,22 @@ class BaseStrategy(ABC):
         Returns:
             Signal object
         """
+        timestamp_value = timestamp
+        if not isinstance(timestamp_value, str):
+            if isinstance(timestamp_value, (datetime, pd.Timestamp)):
+                timestamp_value = pd.to_datetime(timestamp_value).isoformat()
+            else:
+                timestamp_value = str(timestamp_value)
+
+        strategy_name = self.name
+        if hasattr(self, "_config") and getattr(self._config, "name", None):
+            strategy_name = self._config.name
+
         return Signal(
-            timestamp=timestamp,
+            timestamp=timestamp_value,
             symbol=symbol,
             signal_type=signal_type,
-            strategy=self.name,
+            strategy=strategy_name,
             confidence=confidence,
             entry_price=entry_price,
             stop_loss=stop_loss,
