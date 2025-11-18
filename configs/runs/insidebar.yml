@@ -8,4 +8,4 @@ data:
 costs:
   fees_bps: 2.0
   slippage_bps: 1.0
-initial_cash: 100000.0
+initial_cash: 10000.0

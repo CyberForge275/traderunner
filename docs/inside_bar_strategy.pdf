@@ -1,0 +1,94 @@
+%PDF-1.4
+1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj
+2 0 obj <</Type /Pages /Kids [3 0 R] /Count 1>> endobj
+3 0 obj <</Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] /Contents 5 0 R>> endobj
+4 0 obj <</Type /Font /Subtype /Type1 /BaseFont /Helvetica>> endobj
+5 0 obj <</Length 1949>> stream
+BT
+/F1 12 Tf
+72 750 Td
+14 TL
+(Inside Bar Strategy – Technical Summary) Tj
+T*
+( ) Tj
+T*
+(Core Concept:) Tj
+T*
+(- Identify candles fully contained within the prior bar \(inside bars\).) Tj
+T*
+(- Track mother-bar range and wait for breakout close beyond the range.) Tj
+T*
+(- Supports inclusive/strict detection and multi-inside-bar sequences.) Tj
+T*
+( ) Tj
+T*
+(Configuration Highlights:) Tj
+T*
+(- atr_period \(default 14\): ATR window for volatility sizing.) Tj
+T*
+(- risk_reward_ratio \(default 2.0\): target multiples of risk.) Tj
+T*
+(- inside_bar_mode: inclusive, strict, sequence, or single.) Tj
+T*
+(- min_mother_bar_size: ATR multiple gate for mother-bar significance.) Tj
+T*
+(- breakout_confirmation: require close outside mother-bar \(True by default\).) Tj
+T*
+(- session_filter: optional hour window \(start/end\) for trades.) Tj
+T*
+( ) Tj
+T*
+(Signal Generation:) Tj
+T*
+(1. Preprocess OHLCV data; compute ATR and true range features.) Tj
+T*
+(2. Detect valid inside bars, linking each to its mother bar.) Tj
+T*
+(3. Optional session check; skip bars outside defined window.) Tj
+T*
+(4. Breakout logic:) Tj
+T*
+(   • Long: close/high pierces mother high \(with confirmation\).) Tj
+T*
+(   • Short: close/low breaks below mother low.) Tj
+T*
+(5. For each breakout create Signal with entry, stop, take profit via RRR.) Tj
+T*
+( ) Tj
+T*
+(Risk Management:) Tj
+T*
+(- Entry = mother high \(long\) or mother low \(short\).) Tj
+T*
+(- Stop = opposite mother-bar extreme.) Tj
+T*
+(- Take profit = entry ± \(risk * risk_reward_ratio\).) Tj
+T*
+(- ATR stored for downstream sizing; dashboard risk% sizing enforces equity cap.) Tj
+T*
+( ) Tj
+T*
+(Implementation Notes:) Tj
+T*
+(- Strategy name: inside_bar_v1; default timezone Europe/Berlin.) Tj
+T*
+(- Required columns: timestamp, open, high, low, close, volume.) Tj
+T*
+(- Duplicate timestamps removed; data sorted before processing.) Tj
+T*
+(- Session filter handles overnight windows by wrapping hours.) Tj
+T*
+ET
+endstream endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000056 00000 n 
+0000000111 00000 n 
+0000000235 00000 n 
+0000000303 00000 n 
+trailer <</Size 6 /Root 1 0 R>>
+startxref
+2302
+%%EOF

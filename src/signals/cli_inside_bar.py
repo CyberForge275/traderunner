@@ -10,10 +10,14 @@ import numpy as np
 import pandas as pd
 
 from strategies import factory, registry
+from core.settings import (
+    INSIDE_BAR_SESSIONS,
+    INSIDE_BAR_TIMEZONE,
+)
 
 
 SIGNALS_DIR = Path("artifacts/signals")
-BERLIN_TZ = "Europe/Berlin"
+BERLIN_TZ = INSIDE_BAR_TIMEZONE
 
 
 def _parse_sessions(raw: str) -> List[Tuple[time, time]]:
@@ -139,7 +143,7 @@ def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--symbols", help="Comma-separated symbols; defaults to all files in --data-path")
     parser.add_argument("--data-path", default="artifacts/data_m5")
     parser.add_argument("--tz", default=BERLIN_TZ)
-    parser.add_argument("--sessions", default="15:00-16:00,16:00-17:00")
+    parser.add_argument("--sessions", default=",".join(INSIDE_BAR_SESSIONS))
     parser.add_argument("--trade-type", choices=["LONG", "SHORT", "BOTH"], default="BOTH")
     parser.add_argument("--ib-mode", choices=["inclusive", "strict"], default="inclusive")
     parser.add_argument("--min-master-body", type=float, default=0.5)

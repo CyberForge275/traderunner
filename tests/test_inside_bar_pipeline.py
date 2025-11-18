@@ -7,6 +7,7 @@ from axiom_bt.cli_data import cmd_ensure_intraday
 from axiom_bt.demo import generate_demo_data
 from signals.cli_inside_bar import main as signals_main
 from trade.cli_export_orders import main as orders_main
+from core.settings import DEFAULT_INITIAL_CASH
 
 
 def test_pipeline_generates_orders(tmp_path, monkeypatch):
@@ -69,6 +70,9 @@ def test_pipeline_generates_orders(tmp_path, monkeypatch):
         "--source", str(signals_file),
         "--sessions", "00:00-23:59",
         "--tz", "UTC",
+        "--sizing", "risk",
+        "--equity", str(DEFAULT_INITIAL_CASH),
+        "--risk-pct", "1.0",
     ])
 
     orders_file = Path("artifacts/orders/current_orders.csv")
@@ -84,8 +88,16 @@ def test_pipeline_generates_orders(tmp_path, monkeypatch):
         "stop_loss",
         "take_profit",
         "qty",
+        "notional",
+        "total_buy_value",
+        "total_sell_value",
         "tif",
         "oco_group",
         "source",
     ]
     assert list(orders_df.columns) == expected_order_cols
+
+    if not orders_df.empty:
+        assert (orders_df["total_buy_value"] >= 0).all()
+        assert (orders_df["total_sell_value"] >= 0).all()
+        assert (orders_df["notional"] <= DEFAULT_INITIAL_CASH + 1e-6).all()

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Literal, Optional, Tuple
 
 import pandas as pd
+
+from core.settings import DEFAULT_INITIAL_CASH
 
 Side = Literal["BUY", "SELL"]
 
@@ -109,12 +111,40 @@ def _exit_after_entry(
     return last_ts, last_close, "EOD"
 
 
+def _derive_m1_dir(data_path: Path) -> Optional[Path]:
+    name = data_path.name.lower()
+    if "m5" in name:
+        candidate = data_path.with_name(data_path.name.replace("m5", "m1"))
+        if candidate.exists():
+            return candidate
+    if "m15" in name:
+        candidate = data_path.with_name(data_path.name.replace("m15", "m1"))
+        if candidate.exists():
+            return candidate
+    sibling = data_path.parent / "data_m1"
+    if sibling.exists():
+        return sibling
+    return None
+
+
+def _resolve_symbol_path(symbol: str, m1_dir: Optional[Path], fallback_dir: Path) -> Tuple[Optional[Path], bool]:
+    if m1_dir is not None:
+        candidate = m1_dir / f"{symbol}.parquet"
+        if candidate.exists():
+            return candidate, True
+    fallback = fallback_dir / f"{symbol}.parquet"
+    if fallback.exists():
+        return fallback, False
+    return None, False
+
+
 def simulate_insidebar_from_orders(
     orders_csv: Path,
     data_path: Path,
     tz: str,
     costs: Costs,
-    initial_cash: float = 100_000.0,
+    initial_cash: float = DEFAULT_INITIAL_CASH,
+    data_path_m1: Optional[Path] = None,
 ) -> Dict[str, Any]:
     orders = pd.read_csv(orders_csv)
     orders["valid_from"] = pd.to_datetime(orders.get("valid_from"), utc=True, errors="coerce")
@@ -142,19 +172,27 @@ def simulate_insidebar_from_orders(
             "trades": empty,
             "equity": empty,
             "metrics": {"num_trades": 0, "pnl": 0.0},
+            "orders": ib_orders,
         }
+
+    data_path = Path(data_path)
+    m1_dir = Path(data_path_m1) if data_path_m1 is not None else _derive_m1_dir(data_path)
 
     filled = []
     trades = []
     cash = initial_cash
     equity_points = []
+    filled_indices: list[int] = []
+    fill_ts_map: dict[int, pd.Timestamp] = {}
 
     for symbol, group in ib_orders.groupby("symbol"):
-        file_path = data_path / f"{symbol}.parquet"
-        if not file_path.exists():
+        file_path, _ = _resolve_symbol_path(symbol, m1_dir, data_path)
+        if file_path is None:
             continue
         ohlcv = pd.read_parquet(file_path)
         ohlcv = _ensure_dtindex_and_ohlcv(ohlcv, tz)
+        # ensure chronological order when switching between sources
+        ohlcv = ohlcv.sort_index()
         group = group.sort_values("valid_from")
 
         for oco_group, oco_orders in group.groupby("oco_group"):
@@ -168,7 +206,9 @@ def simulate_insidebar_from_orders(
                     continue
 
                 quantity = float(row.get("qty", 1.0))
-                fill_entry_price = _apply_slippage(entry_price, side, costs.slippage_bps)
+                adjusted_entry = _apply_slippage(entry_price, side, costs.slippage_bps)
+                fill_entry_price = adjusted_entry
+                slippage_entry = quantity * (fill_entry_price - entry_price)
                 fees_entry = _fees(quantity, fill_entry_price, costs.fees_bps)
                 stop_loss = float(row["stop_loss"]) if not pd.isna(row["stop_loss"]) else None
                 take_profit = float(row["take_profit"]) if not pd.isna(row["take_profit"]) else None
@@ -178,13 +218,17 @@ def simulate_insidebar_from_orders(
                 )
 
                 opposite_side: Side = "SELL" if side == "BUY" else "BUY"
-                fill_exit_price = _apply_slippage(raw_exit_price, opposite_side, costs.slippage_bps)
+                adjusted_exit = _apply_slippage(raw_exit_price, opposite_side, costs.slippage_bps)
+                fill_exit_price = adjusted_exit
+                slippage_exit = quantity * (fill_exit_price - raw_exit_price)
                 fees_exit = _fees(quantity, fill_exit_price, costs.fees_bps)
 
                 pnl = quantity * (fill_exit_price - fill_entry_price)
                 if side == "SELL":
                     pnl = quantity * (fill_entry_price - fill_exit_price)
-                pnl -= fees_entry + fees_exit
+                total_fees = fees_entry + fees_exit
+                total_slippage = slippage_entry + slippage_exit
+                pnl -= total_fees
                 cash += pnl
 
                 filled.append(
@@ -196,6 +240,12 @@ def simulate_insidebar_from_orders(
                         "exit_ts": exit_ts.isoformat(),
                         "exit_price": fill_exit_price,
                         "pnl": pnl,
+                        "fees_entry": fees_entry,
+                        "fees_exit": fees_exit,
+                        "slippage_entry": slippage_entry,
+                        "slippage_exit": slippage_exit,
+                        "fees_total": total_fees,
+                        "slippage_total": total_slippage,
                         "exit_reason": exit_reason,
                         "oco_group": oco_group,
                         "qty": quantity,
@@ -212,9 +262,17 @@ def simulate_insidebar_from_orders(
                         "exit_price": fill_exit_price,
                         "pnl": pnl,
                         "reason": exit_reason,
+                        "fees_entry": fees_entry,
+                        "fees_exit": fees_exit,
+                        "fees_total": total_fees,
+                        "slippage_entry": slippage_entry,
+                        "slippage_exit": slippage_exit,
+                        "slippage_total": total_slippage,
                     }
                 )
                 equity_points.append({"ts": exit_ts.isoformat(), "equity": cash})
+                filled_indices.append(int(row.name))
+                fill_ts_map[int(row.name)] = entry_ts
                 break
 
     filled_df = pd.DataFrame(filled)
@@ -231,11 +289,24 @@ def simulate_insidebar_from_orders(
         "num_trades": num_trades,
         "win_rate": win_rate,
     }
+    annotated_orders = ib_orders.copy()
+    if not annotated_orders.empty:
+        annotated_orders["filled"] = False
+        annotated_orders["fill_timestamp"] = None
+        for idx in filled_indices:
+            if idx in annotated_orders.index:
+                annotated_orders.at[idx, "filled"] = True
+                annotated_orders.at[idx, "fill_timestamp"] = fill_ts_map.get(idx)
+        annotated_orders["fill_timestamp"] = annotated_orders["fill_timestamp"].apply(
+            lambda ts: ts.isoformat() if isinstance(ts, pd.Timestamp) else None
+        )
+
     return {
         "filled_orders": filled_df,
         "trades": trades_df,
         "equity": equity_df,
         "metrics": metrics,
+        "orders": annotated_orders,
     }
 
 
@@ -244,7 +315,7 @@ def simulate_daily_moc_from_orders(
     data_path: Path,
     tz: str,
     costs: Costs,
-    initial_cash: float = 100_000.0,
+    initial_cash: float = DEFAULT_INITIAL_CASH,
 ) -> Dict[str, Any]:
     orders = pd.read_csv(orders_csv)
     orders["valid_from"] = pd.to_datetime(orders.get("valid_from"), utc=True, errors="coerce")

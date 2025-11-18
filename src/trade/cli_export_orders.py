@@ -8,13 +8,20 @@ from typing import List
 import numpy as np
 import pandas as pd
 
+from core.settings import (
+    DEFAULT_INITIAL_CASH,
+    DEFAULT_MIN_QTY,
+    DEFAULT_RISK_PCT,
+    INSIDE_BAR_SESSIONS,
+    INSIDE_BAR_TIMEZONE,
+)
 from trade.position_sizing import qty_fixed, qty_pct_of_equity, qty_risk_based
 
 
 ARTIFACTS = Path("artifacts")
 SIGNALS_DIR = ARTIFACTS / "signals"
 ORDERS_DIR = ARTIFACTS / "orders"
-BERLIN_TZ = "Europe/Berlin"
+BERLIN_TZ = INSIDE_BAR_TIMEZONE
 
 
 @dataclass
@@ -68,7 +75,7 @@ def _session_end(ts: pd.Timestamp, sessions: List[Session], tz: str) -> pd.Times
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Export OCO orders from inside-bar signals")
     parser.add_argument("--source", default=str(SIGNALS_DIR / "current_signals_ib.csv"))
-    parser.add_argument("--sessions", default="15:00-16:00,16:00-17:00")
+    parser.add_argument("--sessions", default=",".join(INSIDE_BAR_SESSIONS))
     parser.add_argument("--tick-size", type=float, default=0.01)
     parser.add_argument("--round-mode", choices=["nearest", "floor", "ceil"], default="nearest")
     parser.add_argument("--tif", default="DAY")
@@ -76,11 +83,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--sizing", choices=["fixed", "pct_of_equity", "risk"], default="fixed")
     parser.add_argument("--qty", type=float, default=1.0)
-    parser.add_argument("--equity", type=float, default=10000.0)
+    parser.add_argument("--equity", type=float, default=DEFAULT_INITIAL_CASH)
     parser.add_argument("--pos-pct", type=float, default=10.0)
-    parser.add_argument("--risk-pct", type=float, default=1.0)
-    parser.add_argument("--min-qty", type=int, default=1)
-    parser.add_argument("--tz", default=BERLIN_TZ)
+    parser.add_argument("--risk-pct", type=float, default=DEFAULT_RISK_PCT)
+    parser.add_argument("--min-qty", type=int, default=DEFAULT_MIN_QTY)
+    parser.add_argument("--max-notional", type=float, default=None, help="Maximum notional per order (default: equity)")
+    parser.add_argument("--tz", default=INSIDE_BAR_TIMEZONE)
     return parser
 
 
@@ -172,8 +180,15 @@ def main(argv: List[str] | None = None) -> int:
                     tick_size=args.tick_size,
                     round_mode=args.round_mode,
                     min_qty=min_qty,
+                    max_notional=args.max_notional or args.equity,
                 )
             qty = max(int(qty), 0)
+            if qty == 0:
+                return
+
+            notional = float(price * qty)
+            total_buy = notional if side == "BUY" else 0.0
+            total_sell = notional if side == "SELL" else 0.0
 
             orders.append(
                 {
@@ -186,6 +201,9 @@ def main(argv: List[str] | None = None) -> int:
                     "stop_loss": stop_price,
                     "take_profit": take_profit,
                     "qty": qty,
+                    "notional": notional,
+                    "total_buy_value": total_buy,
+                    "total_sell_value": total_sell,
                     "tif": args.tif,
                     "oco_group": oco,
                     "source": source_tag,
@@ -206,6 +224,9 @@ def main(argv: List[str] | None = None) -> int:
         "stop_loss",
         "take_profit",
         "qty",
+        "notional",
+        "total_buy_value",
+        "total_sell_value",
         "tif",
         "oco_group",
         "source",

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from apps.streamlit.app import (
+from apps.streamlit.state import (
     FetchConfig,
     collect_symbols,
     parse_yaml_config,
@@ -46,8 +46,10 @@ def test_fetch_config_symbols_to_fetch(tmp_path):
         use_sample=False,
         force_refresh=False,
         data_dir=data_dir,
+        data_dir_m1=data_dir,
     )
     assert cfg.symbols_to_fetch() == []
+    assert cfg.needs_force_refresh() is False
 
     cfg_missing = FetchConfig(
         symbols=["TSLA"],
@@ -57,8 +59,10 @@ def test_fetch_config_symbols_to_fetch(tmp_path):
         use_sample=False,
         force_refresh=False,
         data_dir=data_dir,
+        data_dir_m1=data_dir,
     )
     assert cfg_missing.symbols_to_fetch() == ["TSLA"]
+    assert cfg_missing.needs_force_refresh() is True
 
     cfg_force = FetchConfig(
         symbols=["TSLA"],
@@ -68,5 +72,7 @@ def test_fetch_config_symbols_to_fetch(tmp_path):
         use_sample=False,
         force_refresh=True,
         data_dir=data_dir,
+        data_dir_m1=data_dir,
     )
     assert cfg_force.symbols_to_fetch() == ["TSLA"]
+    assert cfg_force.needs_force_refresh() is True

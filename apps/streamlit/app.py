@@ -2,28 +2,44 @@ from __future__ import annotations
 
 import json
 import os
-import re
-import shlex
-import subprocess
 import sys
-import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
 import streamlit as st
-import yaml
-
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
-BT_DIR = ROOT / "artifacts" / "backtests"
+if str(SRC) not in sys.path:
+    sys.path.append(str(SRC))
 os.environ.setdefault("PYTHONPATH", str(SRC))
 
+from core.settings import INSIDE_BAR_TIMEZONE
+
+from state import (
+    FetchConfig,
+    PipelineConfig,
+    STRATEGY_REGISTRY,
+    collect_symbols,
+    STRATEGY_DOCS,
+    parse_yaml_config,
+    validate_date_range,
+    INSIDE_BAR_METADATA,
+)
+from pipeline import execute_pipeline
+
+BT_DIR = ROOT / "artifacts" / "backtests"
+
 DATA_DIRECTORIES = {
-    "M5": ROOT / "artifacts" / "data_m5",
-    "M15": ROOT / "artifacts" / "data_m15",
+    "M5": {
+        "data": ROOT / "artifacts" / "data_m5",
+        "m1": ROOT / "artifacts" / "data_m1",
+    },
+    "M15": {
+        "data": ROOT / "artifacts" / "data_m15",
+        "m1": ROOT / "artifacts" / "data_m1",
+    },
 }
 
 
@@ -41,297 +57,6 @@ def list_symbols(data_dir: str) -> list[str]:
     if not path.exists():
         return []
     return sorted({p.stem.upper() for p in path.glob("*.parquet")})
-
-
-def _format_command(cmd: list[str]) -> str:
-    return " ".join(shlex.quote(part) for part in cmd)
-
-
-def _combine_output(stdout: str | None, stderr: str | None) -> str:
-    parts = []
-    if stdout:
-        parts.append(stdout.strip())
-    if stderr:
-        parts.append(stderr.strip())
-    return "\n".join(part for part in parts if part)
-
-
-def show_step(title: str, cmd: list[str], rc: int, output: str) -> None:
-    with st.expander(title, expanded=True):
-        st.code(_format_command(cmd) or "(no command)")
-        if rc == 0:
-            st.success("OK")
-        else:
-            st.error(f"[ERROR] rc={rc}")
-        if output:
-            st.text(output)
-    if rc != 0:
-        raise RuntimeError(title)
-
-
-def show_step_message(title: str, message: str, status: str = "info") -> None:
-    with st.expander(title, expanded=True):
-        st.code("(skipped)")
-        display = getattr(st, status, st.info)
-        display(message)
-
-
-SYMBOL_PATTERN = re.compile(r"^[A-Z0-9._-]+$")
-
-
-def collect_symbols(selection: Iterable[str], free_text: str) -> Tuple[List[str], List[str]]:
-    """Normalize and validate symbol inputs."""
-    symbols = {sym.strip().upper() for sym in selection if sym}
-    if free_text:
-        tokens = [token.strip().upper() for token in free_text.replace("\n", ",").split(",") if token.strip()]
-        symbols.update(tokens)
-
-    errors: List[str] = []
-    invalid = sorted(sym for sym in symbols if not SYMBOL_PATTERN.fullmatch(sym))
-    if invalid:
-        errors.append(f"Invalid symbol format: {', '.join(invalid)}")
-    valid_symbols = sorted(sym for sym in symbols if sym not in invalid)
-    if not valid_symbols:
-        errors.append("Select or enter at least one valid symbol.")
-    return valid_symbols, errors
-
-
-def validate_date_range(start: Optional[str], end: Optional[str]) -> List[str]:
-    errors: List[str] = []
-    if start and end:
-        try:
-            start_ts = pd.Timestamp(start)
-            end_ts = pd.Timestamp(end)
-            if start_ts > end_ts:
-                errors.append(f"Date range invalid: start {start} is after end {end}.")
-        except Exception as exc:  # pragma: no cover - defensive
-            errors.append(f"Invalid date range ({start} → {end}): {exc}")
-    return errors
-
-
-def parse_yaml_config(path_str: str) -> Tuple[Optional[str], Optional[Dict], List[str]]:
-    errors: List[str] = []
-    payload: Optional[Dict] = None
-    if not path_str:
-        errors.append("Provide a YAML config path.")
-        return None, None, errors
-
-    path = Path(path_str)
-    if not path.is_absolute():
-        path = (ROOT / path).resolve()
-    if not path.exists():
-        errors.append(f"Config file not found: {path}")
-        return str(path), None, errors
-
-    try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except yaml.YAMLError as exc:
-        errors.append(f"Failed to parse YAML: {exc}")
-        return str(path), None, errors
-
-    if not isinstance(raw, dict):
-        errors.append("YAML root must be a mapping of parameters.")
-    else:
-        payload = raw
-
-    return str(path), payload, errors
-
-
-def _timestamp_to_date(ts: pd.Timestamp) -> pd.Timestamp.date:
-    if ts.tzinfo is not None:
-        ts = ts.tz_convert("UTC")
-    return ts.date()
-
-
-def _index_date_bounds(index: pd.DatetimeIndex) -> Tuple[pd.Timestamp.date, pd.Timestamp.date]:
-    return _timestamp_to_date(index.min()), _timestamp_to_date(index.max())
-
-
-@dataclass
-class FetchConfig:
-    symbols: List[str]
-    timeframe: str
-    start: Optional[str]
-    end: Optional[str]
-    use_sample: bool
-    force_refresh: bool
-    data_dir: Path
-
-    def symbols_to_fetch(self) -> List[str]:
-        if self.force_refresh:
-            return list(self.symbols)
-        missing = [sym for sym in self.symbols if not self._has_coverage(sym)]
-        return missing
-
-    def _has_coverage(self, symbol: str) -> bool:
-        path = self.data_dir / f"{symbol}.parquet"
-        if not path.exists():
-            return False
-        if not self.start and not self.end:
-            return True
-        try:
-            index = pd.read_parquet(path, columns=["Close"]).index
-        except Exception:
-            return False
-        if index.empty:
-            return False
-
-        min_date, max_date = _index_date_bounds(index)
-        if self.start:
-            start_date = pd.Timestamp(self.start).date()
-            if min_date > start_date:
-                return False
-        if self.end:
-            end_date = pd.Timestamp(self.end).date()
-            if max_date < end_date:
-                return False
-        return True
-
-
-@dataclass
-class StrategyMetadata:
-    name: str
-    label: str
-    timezone: str
-    sessions: List[str]
-    signal_module: str
-    orders_source: Path
-    default_payload: Dict
-
-
-INSIDE_BAR_METADATA = StrategyMetadata(
-    name="insidebar_intraday",
-    label="Inside Bar Intraday",
-    timezone="Europe/Berlin",
-    sessions=["15:00-16:00", "16:00-17:00"],
-    signal_module="signals.cli_inside_bar",
-    orders_source=ROOT / "artifacts" / "signals" / "current_signals_ib.csv",
-    default_payload={
-        "engine": "replay",
-        "mode": "insidebar_intraday",
-        "data": {"tz": "Europe/Berlin"},
-        "costs": {"fees_bps": 2.0, "slippage_bps": 1.0},
-        "initial_cash": 100_000.0,
-    },
-)
-
-
-STRATEGY_REGISTRY: Dict[str, StrategyMetadata] = {
-    INSIDE_BAR_METADATA.name: INSIDE_BAR_METADATA,
-}
-
-
-@dataclass
-class PipelineConfig:
-    run_name: str
-    fetch: FetchConfig
-    symbols: List[str]
-    strategy: StrategyMetadata
-    config_path: Optional[str]
-    config_payload: Optional[Dict]
-
-
-def execute_pipeline(pipeline: PipelineConfig) -> str:
-    fetch_targets = pipeline.fetch.symbols_to_fetch()
-    if fetch_targets:
-        fetch_args = [
-            "axiom_bt.cli_data",
-            "ensure-intraday",
-            "--symbols",
-            ",".join(fetch_targets),
-            "--tz",
-            "America/New_York",
-        ]
-        if pipeline.fetch.start:
-            fetch_args.extend(["--start", pipeline.fetch.start])
-        if pipeline.fetch.end:
-            fetch_args.extend(["--end", pipeline.fetch.end])
-        if pipeline.fetch.force_refresh:
-            fetch_args.append("--force")
-        if pipeline.fetch.timeframe.upper() == "M15":
-            fetch_args.append("--generate-m15")
-        if pipeline.fetch.use_sample:
-            fetch_args.append("--use-sample")
-        run_cli_step("0) ensure-intraday", fetch_args)
-        st.cache_data.clear()
-    else:
-        show_step_message("0) ensure-intraday", "Skipped (cached data)")
-
-    signal_args = [
-        pipeline.strategy.signal_module,
-        "--symbols",
-        ",".join(pipeline.symbols),
-        "--data-path",
-        str(pipeline.fetch.data_dir),
-    ]
-    run_cli_step("1) signals.cli_inside_bar", signal_args)
-
-    orders_args = [
-        "trade.cli_export_orders",
-        "--source",
-        str(pipeline.strategy.orders_source),
-        "--sessions",
-        ",".join(pipeline.strategy.sessions),
-        "--tz",
-        pipeline.strategy.timezone,
-    ]
-    run_cli_step("2) trade.cli_export_orders", orders_args)
-
-    return run_backtest(pipeline.config_path, pipeline.run_name, pipeline.config_payload, log_title="3) axiom_bt.runner")
-
-
-def run_cli_step(title: str, module_args: list[str]) -> subprocess.CompletedProcess[str]:
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(SRC)
-    cmd = [sys.executable, "-m", *module_args]
-    result = subprocess.run(cmd, cwd=str(ROOT), env=env, capture_output=True, text=True)
-    output = _combine_output(result.stdout, result.stderr)
-    show_step(title, cmd, result.returncode, output)
-    return result
-
-
-def run_backtest(
-    config_path: str | None,
-    run_name: str,
-    config_payload: dict | None = None,
-    log_title: str | None = None,
-) -> str:
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(SRC)
-    if config_payload is not None:
-        tmp_file = tempfile.NamedTemporaryFile("w", suffix=".yml", delete=False, encoding="utf-8")
-        with tmp_file as handle:
-            yaml.safe_dump(config_payload, handle)
-        config_path = tmp_file.name
-
-    if not config_path:
-        raise ValueError("Configuration path is required")
-
-    path_obj = Path(config_path)
-    if not path_obj.is_absolute():
-        path_obj = (ROOT / path_obj).resolve()
-    config_path = str(path_obj)
-
-    cmd = [
-        sys.executable,
-        "-m",
-        "axiom_bt.runner",
-        "--config",
-        config_path,
-        "--name",
-        run_name,
-    ]
-    result = subprocess.run(cmd, cwd=str(ROOT), env=env, capture_output=True, text=True)
-    output = _combine_output(result.stdout, result.stderr)
-    if log_title:
-        show_step(log_title, cmd, result.returncode, output)
-    elif result.returncode != 0:
-        st.error(output or "Runner failed")
-        raise RuntimeError("Backtest failed")
-
-    runs = [d for d in BT_DIR.glob("run_*") if d.is_dir()]
-    runs.sort(key=lambda directory: directory.stat().st_mtime, reverse=True)
-    return runs[0].name if runs else run_name
 
 
 def _read_json(path: Path) -> dict:
@@ -362,6 +87,7 @@ def load_run(run_name: str) -> dict:
         "equity_csv": _read_csv(run_dir / "equity_curve.csv"),
         "fills_csv": _read_csv(run_dir / "filled_orders.csv"),
         "trades_csv": _read_csv(run_dir / "trades.csv"),
+        "orders_csv": _read_csv(run_dir / "orders.csv"),
         "manifest": _read_json(run_dir / "manifest.json"),
     }
 
@@ -373,7 +99,9 @@ selected_run: str | None = None
 with st.sidebar:
     st.header("Run configuration")
     timeframe = st.selectbox("Timeframe", tuple(DATA_DIRECTORIES.keys()), index=0)
-    data_directory = DATA_DIRECTORIES[timeframe]
+    timeframe_paths = DATA_DIRECTORIES[timeframe]
+    data_directory = timeframe_paths["data"]
+    data_directory_m1 = timeframe_paths["m1"]
     cached_symbols = list_symbols(str(data_directory))
     cached_selection = st.multiselect(
         "Select cached symbols for this run",
@@ -461,16 +189,40 @@ with st.sidebar:
                 "Data directory",
                 str(data_directory),
             )
+            data_path_m1 = st.text_input(
+                "M1 data directory",
+                str(data_directory_m1),
+            )
             tz_value = st.text_input("Timezone", INSIDE_BAR_METADATA.timezone)
             fees_bps = st.number_input("Fees (bps)", value=float(INSIDE_BAR_METADATA.default_payload["costs"]["fees_bps"]), step=0.1)
             slippage_bps = st.number_input("Slippage (bps)", value=float(INSIDE_BAR_METADATA.default_payload["costs"]["slippage_bps"]), step=0.1)
             initial_cash = st.number_input("Initial cash", value=float(INSIDE_BAR_METADATA.default_payload["initial_cash"]), step=1_000.0)
-            mode_value = st.selectbox(
-                "Strategy mode",
-                list(STRATEGY_REGISTRY.keys()),
-                index=0,
-                format_func=lambda key: STRATEGY_REGISTRY[key].label,
+            risk_pct_value = st.number_input(
+                "Risk % per trade",
+                value=float(INSIDE_BAR_METADATA.default_sizing.get("risk_pct", 1.0)),
+                step=0.1,
+                min_value=0.1,
+                max_value=10.0,
             )
+            mode_col, doc_col = st.columns([3, 1])
+            with mode_col:
+                mode_value = st.selectbox(
+                    "Strategy mode",
+                    list(STRATEGY_REGISTRY.keys()),
+                    index=0,
+                    format_func=lambda key: STRATEGY_REGISTRY[key].label,
+                )
+            with doc_col:
+                doc_path = STRATEGY_DOCS.get(mode_value)
+                if doc_path and doc_path.exists():
+                    pdf_bytes = doc_path.read_bytes()
+                    st.download_button(
+                        label="📄 Spec",
+                        data=pdf_bytes,
+                        file_name=doc_path.name,
+                        mime="application/pdf",
+                        key=f"doc_{mode_value}",
+                    )
 
             date_mode = st.radio(
                 "Date selection",
@@ -531,6 +283,7 @@ with st.sidebar:
                 "orders_source_csv": orders_csv,
                 "data": {
                     "path": data_path,
+                    "path_m1": data_path_m1,
                     "tz": tz_value,
                 },
                 "costs": {
@@ -538,6 +291,7 @@ with st.sidebar:
                     "slippage_bps": float(slippage_bps),
                 },
                 "initial_cash": float(initial_cash),
+                "risk_pct": float(risk_pct_value),
             }
             config_path_for_run = None
 
@@ -569,6 +323,7 @@ with st.sidebar:
                 use_sample=use_sample,
                 force_refresh=force_refresh,
                 data_dir=data_directory,
+                data_dir_m1=data_directory_m1,
             )
 
             strategy_meta = STRATEGY_REGISTRY.get(mode_value, INSIDE_BAR_METADATA)
@@ -583,7 +338,7 @@ with st.sidebar:
             )
 
             new_run = execute_pipeline(pipeline)
-            finished_at = pd.Timestamp.now(tz="Europe/Berlin").isoformat()
+            finished_at = pd.Timestamp.now(tz=INSIDE_BAR_TIMEZONE).isoformat()
             st.success(f"Run finished → {new_run} at {finished_at}")
             st.session_state[run_name_key] = f"ui_{timeframe.lower()}_{int(pd.Timestamp.utcnow().timestamp())}"
             st.session_state[run_name_scope_key] = timeframe
@@ -661,17 +416,38 @@ else:
     st.info("No metrics available for this run yet.")
 
 
-tabs = st.tabs(["filled_orders.csv", "trades.csv"])
+tabs = st.tabs(["Orders", "Filled Orders", "Trades"])
+orders_df = run["orders_csv"]
 with tabs[0]:
+    if orders_df is not None and not orders_df.empty:
+        display_orders = orders_df.copy()
+        for column in ["price", "stop_loss", "take_profit"]:
+            if column in display_orders.columns:
+                display_orders[column] = display_orders[column].astype(float).round(2)
+        st.dataframe(display_orders, width="stretch", height=360)
+    else:
+        st.info("No orders available.")
+
+with tabs[1]:
     filled_df = run["fills_csv"]
     if filled_df is not None and not filled_df.empty:
-        st.dataframe(filled_df, width="stretch", height=360)
+        display_fills = filled_df.copy()
+        if {"entry_price", "qty"}.issubset(display_fills.columns):
+            display_fills["entry_notional"] = (display_fills["entry_price"].astype(float) * display_fills["qty"].astype(float)).round(2)
+        for column in ["fees_entry", "fees_exit", "fees_total", "slippage_entry", "slippage_exit", "slippage_total"]:
+            if column in display_fills.columns:
+                display_fills[column] = display_fills[column].astype(float).round(2)
+        st.dataframe(display_fills, width="stretch", height=360)
     else:
         st.info("No fills available.")
 
-with tabs[1]:
+with tabs[2]:
     trades_df = run["trades_csv"]
     if trades_df is not None and not trades_df.empty:
-        st.dataframe(trades_df, width="stretch", height=360)
+        display_trades = trades_df.copy()
+        for column in ["fees_entry", "fees_exit", "fees_total", "slippage_entry", "slippage_exit", "slippage_total"]:
+            if column in display_trades.columns:
+                display_trades[column] = display_trades[column].astype(float).round(2)
+        st.dataframe(display_trades, width="stretch", height=360)
     else:
         st.info("No trades available.")

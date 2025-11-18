@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP, ROUND_CEILING, ROUND_FLOOR
-from typing import Literal
+from typing import Literal, Optional
 
 RoundMode = Literal["nearest", "floor", "ceil"]
 
@@ -39,6 +39,7 @@ def qty_risk_based(
     tick_size: float | None = None,
     round_mode: RoundMode = "nearest",
     min_qty: int = 1,
+    max_notional: Optional[float] = None,
 ) -> int:
     if entry_price is None or stop_price is None or equity is None or risk_pct is None:
         return 0
@@ -67,5 +68,11 @@ def qty_risk_based(
 
     if min_qty > 0 and qty_int < min_qty:
         qty_int = min_qty
+
+    if max_notional is not None and entry > 0:
+        cap = int((Decimal(str(max_notional)) / entry).to_integral_value(rounding=ROUND_FLOOR))
+        if cap < min_qty:
+            return 0
+        qty_int = min(qty_int, cap)
 
     return qty_int

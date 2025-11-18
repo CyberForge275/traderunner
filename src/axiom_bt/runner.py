@@ -10,6 +10,8 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from core.settings import DEFAULT_INITIAL_CASH
+
 from axiom_bt.fs import ensure_layout, new_run_dir
 from axiom_bt.metrics import compose_metrics
 from axiom_bt.report import save_drawdown_png, save_equity_png
@@ -24,6 +26,22 @@ def _as_path(path: str | Path | None) -> Path | None:
     if path is None:
         return None
     return Path(path).expanduser()
+
+
+def _derive_m1_dir(data_path: Path) -> Path | None:
+    name = data_path.name.lower()
+    if "m5" in name:
+        candidate = data_path.with_name(data_path.name.replace("m5", "m1"))
+        if candidate.exists():
+            return candidate
+    if "m15" in name:
+        candidate = data_path.with_name(data_path.name.replace("m15", "m1"))
+        if candidate.exists():
+            return candidate
+    sibling = data_path.parent / "data_m1"
+    if sibling.exists():
+        return sibling
+    return None
 
 
 def main() -> int:
@@ -51,16 +69,18 @@ def main() -> int:
     orders_csv_cfg = cfg.get("orders_source_csv")
     data_cfg = cfg.get("data", {}) or {}
     data_path_cfg = data_cfg.get("path")
+    data_path_m1_cfg = data_cfg.get("path_m1")
     tz_value = data_cfg.get("tz", "UTC")
 
     costs_cfg = cfg.get("costs", {}) or {}
     fees_bps = float(costs_cfg.get("fees_bps", 0.0))
     slippage_bps = float(costs_cfg.get("slippage_bps", 0.0))
 
-    initial_cash = float(cfg.get("initial_cash", 100_000.0))
+    initial_cash = float(cfg.get("initial_cash", DEFAULT_INITIAL_CASH))
 
     orders_csv = _as_path(orders_csv_cfg)
     data_path = _as_path(data_path_cfg)
+    data_path_m1 = _as_path(data_path_m1_cfg)
 
     if orders_csv is None or data_path is None:
         print("[ERROR] orders_source_csv and data.path are required in config", file=sys.stderr)
@@ -71,6 +91,12 @@ def main() -> int:
     if not data_path.exists():
         print(f"[ERROR] data.path not found: {data_path}", file=sys.stderr)
         return 2
+
+    if data_path_m1 is None:
+        data_path_m1 = _derive_m1_dir(data_path)
+
+    if data_path_m1 is not None and not data_path_m1.exists():
+        data_path_m1 = _derive_m1_dir(data_path)
 
     from axiom_bt.engines import replay_engine
 
@@ -98,6 +124,9 @@ def main() -> int:
     else:
         print(f"[ERROR] Engine missing 'data_path' param. Has: {sorted(accepted)}", file=sys.stderr)
         return 2
+
+    if "data_path_m1" in accepted:
+        kwargs["data_path_m1"] = data_path_m1
 
     if "tz" in accepted:
         kwargs["tz"] = tz_value
@@ -134,6 +163,8 @@ def main() -> int:
         trades.to_csv(run_dir / "trades.csv", index=False)
     if isinstance(equity, pd.DataFrame):
         equity.to_csv(run_dir / "equity_curve.csv", index=False)
+    if "orders" in result and isinstance(result["orders"], pd.DataFrame):
+        result["orders"].to_csv(run_dir / "orders.csv", index=False)
 
     if isinstance(trades, pd.DataFrame) and isinstance(equity, pd.DataFrame):
         metrics = compose_metrics(trades, equity, initial_cash)
