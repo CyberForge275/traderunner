@@ -62,7 +62,8 @@ def main() -> int:
     if engine != "replay":
         print(f"[ERROR] unsupported engine: {engine}", file=sys.stderr)
         return 2
-    if mode != "insidebar_intraday":
+    supported_modes = {"insidebar_intraday", "insidebar_intraday_v2"}
+    if mode not in supported_modes:
         print(f"[ERROR] unsupported mode for replay: {mode}", file=sys.stderr)
         return 2
 

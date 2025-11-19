@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
+import traceback
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import List
 
 import pandas as pd
 import streamlit as st
@@ -15,14 +17,13 @@ if str(SRC) not in sys.path:
     sys.path.append(str(SRC))
 os.environ.setdefault("PYTHONPATH", str(SRC))
 
-from core.settings import INSIDE_BAR_TIMEZONE
+from core.settings import DEFAULT_INITIAL_CASH, INSIDE_BAR_TIMEZONE
 
 from state import (
     FetchConfig,
     PipelineConfig,
     STRATEGY_REGISTRY,
     collect_symbols,
-    STRATEGY_DOCS,
     parse_yaml_config,
     validate_date_range,
     INSIDE_BAR_METADATA,
@@ -137,6 +138,13 @@ with st.sidebar:
     run_name_scope_key = "run_name_scope"
     generated_default = f"ui_{timeframe.lower()}_{int(pd.Timestamp.utcnow().timestamp())}"
 
+    pending_run_name_key = "run_name_pending"
+    pending_scope_key = "run_name_pending_scope"
+    if pending_run_name_key in st.session_state:
+        st.session_state[run_name_key] = st.session_state.pop(pending_run_name_key)
+        if pending_scope_key in st.session_state:
+            st.session_state[run_name_scope_key] = st.session_state.pop(pending_scope_key)
+
     if run_name_key not in st.session_state:
         st.session_state[run_name_key] = generated_default
         st.session_state[run_name_scope_key] = timeframe
@@ -160,6 +168,8 @@ with st.sidebar:
 
         yaml_preview_errors: List[str] = []
         manual_date_errors: List[str] = []
+        selected_meta = INSIDE_BAR_METADATA
+        mode_value = selected_meta.name
 
         if config_mode == "Use YAML file":
             yaml_input = st.text_input("YAML config", "configs/runs/insidebar.yml")
@@ -179,8 +189,36 @@ with st.sidebar:
                         st.json(yaml_payload)
                     else:
                         st.json({choice: yaml_payload.get(choice)})
+                    payload_mode = yaml_payload.get("mode") if isinstance(yaml_payload, dict) else None
+                    if isinstance(payload_mode, str) and payload_mode in STRATEGY_REGISTRY:
+                        mode_value = payload_mode
+                        selected_meta = STRATEGY_REGISTRY[mode_value]
         else:
             st.caption("Override core replay parameters directly.")
+            mode_col, doc_col = st.columns([3, 1])
+            modes = list(STRATEGY_REGISTRY.values())
+            mode_labels = [meta.label for meta in modes]
+            default_idx = next((i for i, meta in enumerate(modes) if meta.name == INSIDE_BAR_METADATA.name), 0)
+            with mode_col:
+                selected_label = st.selectbox(
+                    "Strategy mode",
+                    mode_labels,
+                    index=default_idx,
+                )
+                selected_meta = next(meta for meta in modes if meta.label == selected_label)
+                mode_value = selected_meta.name
+            with doc_col:
+                doc_path = selected_meta.doc_path
+                if doc_path and doc_path.exists():
+                    pdf_bytes = doc_path.read_bytes()
+                    st.download_button(
+                        label="📄 Spec",
+                        data=pdf_bytes,
+                        file_name=doc_path.name,
+                        mime="application/pdf",
+                        key=f"doc_{mode_value}",
+                    )
+
             orders_csv = st.text_input(
                 "Orders CSV",
                 str(ROOT / "artifacts/orders/current_orders.csv"),
@@ -193,36 +231,26 @@ with st.sidebar:
                 "M1 data directory",
                 str(data_directory_m1),
             )
-            tz_value = st.text_input("Timezone", INSIDE_BAR_METADATA.timezone)
-            fees_bps = st.number_input("Fees (bps)", value=float(INSIDE_BAR_METADATA.default_payload["costs"]["fees_bps"]), step=0.1)
-            slippage_bps = st.number_input("Slippage (bps)", value=float(INSIDE_BAR_METADATA.default_payload["costs"]["slippage_bps"]), step=0.1)
-            initial_cash = st.number_input("Initial cash", value=float(INSIDE_BAR_METADATA.default_payload["initial_cash"]), step=1_000.0)
+            tz_value = st.text_input("Timezone", selected_meta.timezone)
+
+            costs_defaults = selected_meta.default_payload.get("costs", {})
+            fees_default = float(costs_defaults.get("fees_bps", 0.0))
+            slippage_default = float(costs_defaults.get("slippage_bps", 0.0))
+            initial_cash_default = float(selected_meta.default_payload.get("initial_cash", DEFAULT_INITIAL_CASH))
+
+            fees_bps = st.number_input("Fees (bps)", value=fees_default, step=0.1)
+            slippage_bps = st.number_input("Slippage (bps)", value=slippage_default, step=0.1)
+            initial_cash = st.number_input("Initial cash", value=initial_cash_default, step=1_000.0)
+
+            default_sizing = selected_meta.default_sizing or {}
+            risk_pct_default = float(default_sizing.get("risk_pct", 1.0))
             risk_pct_value = st.number_input(
                 "Risk % per trade",
-                value=float(INSIDE_BAR_METADATA.default_sizing.get("risk_pct", 1.0)),
+                value=risk_pct_default,
                 step=0.1,
                 min_value=0.1,
                 max_value=10.0,
             )
-            mode_col, doc_col = st.columns([3, 1])
-            with mode_col:
-                mode_value = st.selectbox(
-                    "Strategy mode",
-                    list(STRATEGY_REGISTRY.keys()),
-                    index=0,
-                    format_func=lambda key: STRATEGY_REGISTRY[key].label,
-                )
-            with doc_col:
-                doc_path = STRATEGY_DOCS.get(mode_value)
-                if doc_path and doc_path.exists():
-                    pdf_bytes = doc_path.read_bytes()
-                    st.download_button(
-                        label="📄 Spec",
-                        data=pdf_bytes,
-                        file_name=doc_path.name,
-                        mime="application/pdf",
-                        key=f"doc_{mode_value}",
-                    )
 
             date_mode = st.radio(
                 "Date selection",
@@ -278,7 +306,7 @@ with st.sidebar:
 
             config_payload = {
                 "name": run_name,
-                **STRATEGY_REGISTRY[mode_value].default_payload,
+                **selected_meta.default_payload,
                 "mode": mode_value,
                 "orders_source_csv": orders_csv,
                 "data": {
@@ -326,7 +354,7 @@ with st.sidebar:
                 data_dir_m1=data_directory_m1,
             )
 
-            strategy_meta = STRATEGY_REGISTRY.get(mode_value, INSIDE_BAR_METADATA)
+            strategy_meta = selected_meta
 
             pipeline = PipelineConfig(
                 run_name=run_name,
@@ -340,12 +368,15 @@ with st.sidebar:
             new_run = execute_pipeline(pipeline)
             finished_at = pd.Timestamp.now(tz=INSIDE_BAR_TIMEZONE).isoformat()
             st.success(f"Run finished → {new_run} at {finished_at}")
-            st.session_state[run_name_key] = f"ui_{timeframe.lower()}_{int(pd.Timestamp.utcnow().timestamp())}"
-            st.session_state[run_name_scope_key] = timeframe
+            st.session_state[pending_run_name_key] = f"ui_{timeframe.lower()}_{int(pd.Timestamp.utcnow().timestamp())}"
+            st.session_state[pending_scope_key] = timeframe
             st.cache_data.clear()
             st.session_state["selected_run"] = new_run
-            st.experimental_rerun()
-        except Exception:
+            st.rerun()
+        except Exception as exc:  # pragma: no cover - UI diagnostic handling
+            logging.exception("Pipeline execution failed")
+            st.error(f"Pipeline execution failed: {exc}")
+            st.code(traceback.format_exc())
             st.stop()
 
     st.markdown("---")

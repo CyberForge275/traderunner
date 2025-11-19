@@ -83,6 +83,8 @@ class StrategyMetadata:
     signal_module: str
     orders_source: Path
     default_payload: Dict
+    strategy_name: str
+    doc_path: Optional[Path] = None
     default_sizing: Optional[Dict] = None
 
 
@@ -99,7 +101,34 @@ INSIDE_BAR_METADATA = StrategyMetadata(
         "data": {"tz": INSIDE_BAR_TIMEZONE},
         "costs": INSIDE_BAR_DEFAULTS.costs,
         "initial_cash": INSIDE_BAR_DEFAULTS.initial_cash,
+        "strategy": "inside_bar_v1",
     },
+    strategy_name="inside_bar_v1",
+    doc_path=ROOT / "docs" / "inside_bar_strategy.pdf",
+    default_sizing={
+        "mode": "risk",
+        "risk_pct": INSIDE_BAR_DEFAULTS.risk_pct,
+        "min_qty": INSIDE_BAR_DEFAULTS.min_qty,
+    },
+)
+
+INSIDE_BAR_V2_METADATA = StrategyMetadata(
+    name="insidebar_intraday_v2",
+    label="Inside Bar Intraday v2",
+    timezone=INSIDE_BAR_DEFAULTS.timezone,
+    sessions=INSIDE_BAR_DEFAULTS.sessions,
+    signal_module="signals.cli_inside_bar",
+    orders_source=ROOT / "artifacts" / "signals" / "current_signals_ib_v2.csv",
+    default_payload={
+        "engine": "replay",
+        "mode": "insidebar_intraday_v2",
+        "data": {"tz": INSIDE_BAR_TIMEZONE},
+        "costs": INSIDE_BAR_DEFAULTS.costs,
+        "initial_cash": INSIDE_BAR_DEFAULTS.initial_cash,
+        "strategy": "inside_bar_v2",
+    },
+    strategy_name="inside_bar_v2",
+    doc_path=ROOT / "docs" / "inside_bar_strategy.pdf",
     default_sizing={
         "mode": "risk",
         "risk_pct": INSIDE_BAR_DEFAULTS.risk_pct,
@@ -109,11 +138,8 @@ INSIDE_BAR_METADATA = StrategyMetadata(
 
 
 STRATEGY_REGISTRY: Dict[str, StrategyMetadata] = {
-    INSIDE_BAR_METADATA.name: INSIDE_BAR_METADATA,
-}
-
-STRATEGY_DOCS: Dict[str, Path] = {
-    INSIDE_BAR_METADATA.name: ROOT / "docs" / "inside_bar_strategy.pdf",
+    meta.name: meta
+    for meta in (INSIDE_BAR_METADATA, INSIDE_BAR_V2_METADATA)
 }
 
 

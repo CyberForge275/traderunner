@@ -18,6 +18,8 @@ if str(SRC) not in sys.path:
     sys.path.append(str(SRC))
 os.environ.setdefault("PYTHONPATH", str(SRC))
 
+BT_DIR = ROOT / "artifacts" / "backtests"
+
 from core.settings import DEFAULT_INITIAL_CASH
 from state import PipelineConfig
 
@@ -198,6 +200,9 @@ def execute_pipeline(pipeline: PipelineConfig) -> str:
         "--data-path",
         str(pipeline.fetch.data_dir),
     ]
+    signal_args.extend(["--tz", pipeline.strategy.timezone])
+    signal_args.extend(["--strategy", pipeline.strategy.strategy_name])
+    signal_args.extend(["--current-snapshot", str(pipeline.strategy.orders_source)])
     run_cli_step("1) signals.cli_inside_bar", signal_args)
 
     equity_value = _resolve_initial_cash(pipeline)

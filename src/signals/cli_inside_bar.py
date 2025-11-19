@@ -71,15 +71,6 @@ def _session_id(ts: pd.Timestamp, sessions: List[Tuple[time, time]]) -> int:
     return 0
 
 
-@dataclass
-class StrategyParams:
-    atr_period: int
-    risk_reward_ratio: float
-    inside_bar_mode: str
-    min_mother_bar_size: float
-    breakout_confirmation: bool
-
-
 def build_config(args: argparse.Namespace) -> Dict[str, object]:
     config: Dict[str, object] = {
         "atr_period": args.atr_period,
@@ -88,6 +79,15 @@ def build_config(args: argparse.Namespace) -> Dict[str, object]:
         "min_mother_bar_size": args.min_master_body,
         "breakout_confirmation": not args.allow_touch_breakout,
     }
+
+    if args.max_master_atr_mult is not None:
+        config["max_master_range_atr_mult"] = args.max_master_atr_mult
+
+    config["min_master_body_ratio"] = args.min_master_body_ratio
+    config["execution_lag_bars"] = max(0, int(args.execution_lag))
+
+    if args.stop_cap is not None and args.stop_cap > 0:
+        config["stop_distance_cap"] = float(args.stop_cap)
 
     if args.session_filter:
         start_hour, end_hour = args.session_filter
@@ -151,6 +151,12 @@ def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--rrr", type=float, default=1.0)
     parser.add_argument("--allow-touch-breakout", action="store_true", help="Allow breakouts on wick touch (disables close confirmation)")
     parser.add_argument("--session-filter", type=int, nargs=2, metavar=("START", "END"), help="Optional inclusive hour range for session filter")
+    parser.add_argument("--strategy", choices=["inside_bar_v1", "inside_bar_v2"], default="inside_bar_v1")
+    parser.add_argument("--max-master-atr-mult", type=float, default=None, help="Suppress signals if master range exceeds this multiple of ATR (v2)")
+    parser.add_argument("--min-master-body-ratio", type=float, default=0.5, help="Minimum master candle body ratio (v2)")
+    parser.add_argument("--execution-lag", type=int, default=0, help="Execution lag in bars before arming breakout orders (v2)")
+    parser.add_argument("--stop-cap", type=float, default=None, help="Maximum stop distance; target retargeted to maintain RRR (v2)")
+    parser.add_argument("--current-snapshot", default=str(SIGNALS_DIR / "current_signals_ib.csv"), help="Path for latest snapshot CSV")
     parser.add_argument("--output", default=None, help="Optional explicit output path")
     return parser.parse_args(argv)
 
@@ -171,9 +177,9 @@ def main(argv: List[str] | None = None) -> int:
 
     sessions = _parse_sessions(args.sessions)
     config = build_config(args)
-    if "inside_bar_v1" not in registry.list_strategies():
+    if args.strategy not in registry.list_strategies():
         registry.auto_discover("strategies")
-    strategy = factory.create_strategy("inside_bar_v1", config)
+    strategy = factory.create_strategy(args.strategy, config)
 
     rows: List[Dict[str, object]] = []
 
@@ -260,7 +266,8 @@ def main(argv: List[str] | None = None) -> int:
     output = Path(args.output) if args.output else SIGNALS_DIR / f"signals_ib_{timestamp}.csv"
     result.to_csv(output, index=False)
 
-    current = SIGNALS_DIR / "current_signals_ib.csv"
+    current = Path(args.current_snapshot)
+    current.parent.mkdir(parents=True, exist_ok=True)
     result.to_csv(current, index=False)
 
     print(f"[OK] Signals → {output} (rows={len(result)})")
