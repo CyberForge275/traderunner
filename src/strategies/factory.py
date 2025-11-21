@@ -86,9 +86,17 @@ class StrategyFactory:
 
         except ValueError:
             raise
-        except Exception as e:
-            logger.error(f"Failed to create strategy '{name}': {e}")
-            raise RuntimeError(f"Strategy instantiation failed: {e}") from e
+        except TypeError as exc:
+            logger.error(
+                "Failed to instantiate strategy '%s': %s",
+                name,
+                exc,
+                exc_info=True,
+            )
+            raise RuntimeError(f"Strategy instantiation failed: {exc}") from exc
+        except Exception as exc:
+            logger.exception("Unexpected error creating strategy '%s'", name)
+            raise RuntimeError(f"Strategy instantiation failed: {exc}") from exc
 
     @staticmethod
     def create_strategy_with_defaults(
@@ -127,8 +135,17 @@ class StrategyFactory:
 
             return StrategyFactory.create_strategy(name, final_config)
 
-        except Exception as e:
-            logger.error(f"Failed to create strategy with defaults '{name}': {e}")
+        except (TypeError, ValueError) as exc:
+            logger.error(
+                "Failed to create strategy with defaults '%s': %s",
+                name,
+                exc,
+            )
+            raise
+        except Exception as exc:
+            logger.exception(
+                "Unexpected error building defaults for strategy '%s'", name
+            )
             raise
 
     @staticmethod
@@ -170,10 +187,14 @@ class StrategyFactory:
 
                 logger.info(f"Created strategy instance: {instance_name}")
 
-            except Exception as e:
-                error_msg = f"Failed to create strategy {i}: {e}"
+            except (TypeError, ValueError) as exc:
+                error_msg = f"Failed to create strategy {i}: {exc}"
                 failed.append(error_msg)
                 logger.error(error_msg)
+            except Exception as exc:
+                error_msg = f"Unexpected error creating strategy {i}: {exc}"
+                failed.append(error_msg)
+                logger.exception(error_msg)
 
         if failed:
             raise ValueError(f"Failed to create {len(failed)} strategies: {failed}")
@@ -209,8 +230,17 @@ class StrategyFactory:
         try:
             instance = strategy_class()
             return instance.config_schema
-        except Exception as e:
-            logger.error(f"Failed to get schema for strategy '{name}': {e}")
+        except (TypeError, ValueError) as exc:
+            logger.error(
+                "Failed to get schema for strategy '%s': %s",
+                name,
+                exc,
+            )
+            raise
+        except Exception as exc:
+            logger.exception(
+                "Unexpected error while retrieving schema for '%s'", name
+            )
             raise
 
     @staticmethod
@@ -234,8 +264,17 @@ class StrategyFactory:
         try:
             instance = strategy_class()
             return instance.validate_config(config)
-        except Exception as e:
-            logger.error(f"Failed to validate config for strategy '{name}': {e}")
+        except (TypeError, ValueError) as exc:
+            logger.error(
+                "Failed to validate config for strategy '%s': %s",
+                name,
+                exc,
+            )
+            return False
+        except Exception as exc:
+            logger.exception(
+                "Unexpected error while validating config for '%s'", name
+            )
             return False
 
     @staticmethod
@@ -269,8 +308,17 @@ class StrategyFactory:
                 "metadata": metadata,
             }
 
-        except Exception as e:
-            logger.error(f"Failed to get info for strategy '{name}': {e}")
+        except (TypeError, ValueError) as exc:
+            logger.error(
+                "Failed to get info for strategy '%s': %s",
+                name,
+                exc,
+            )
+            raise
+        except Exception as exc:
+            logger.exception(
+                "Unexpected error retrieving info for strategy '%s'", name
+            )
             raise
 
     @staticmethod
@@ -336,9 +384,17 @@ class StrategyFactory:
 
             return StrategyFactory.create_strategy(strategy_name, strategy_config)
 
-        except Exception as e:
+        except (TypeError, ValueError) as exc:
             logger.error(
-                f"Failed to create strategy from config file '{config_file_path}': {e}"
+                "Failed to create strategy from config file '%s': %s",
+                config_file_path,
+                exc,
+            )
+            raise
+        except Exception as exc:
+            logger.exception(
+                "Unexpected error creating strategy from '%s'",
+                config_file_path,
             )
             raise
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
 import yaml
@@ -32,6 +32,7 @@ class FetchConfig:
     data_dir: Path
     data_dir_m1: Path
     _needs_force: bool = field(default=False, init=False, repr=False)
+    _stale_reasons: Dict[str, List[str]] = field(default_factory=dict, init=False, repr=False)
 
     def symbols_to_fetch(self) -> List[str]:
         if self.force_refresh:
@@ -39,11 +40,14 @@ class FetchConfig:
             return list(self.symbols)
 
         self._needs_force = False
+        self._stale_reasons.clear()
         pending: List[str] = []
         for symbol in self.symbols:
-            status = self._coverage_status(symbol)
+            status, reason = self._coverage_status(symbol)
             if status in {"missing", "stale"}:
                 pending.append(symbol)
+                if reason:
+                    self._stale_reasons.setdefault(symbol, []).append(reason)
                 if status == "stale":
                     self._needs_force = True
         return pending
@@ -51,27 +55,38 @@ class FetchConfig:
     def needs_force_refresh(self) -> bool:
         return self._needs_force
 
-    def _coverage_status(self, symbol: str) -> str:
+    def stale_reasons(self) -> Dict[str, List[str]]:
+        return self._stale_reasons
+
+    def _coverage_status(self, symbol: str) -> Tuple[str, Optional[str]]:
         primary = self.data_dir_m1 / f"{symbol}.parquet"
         path = primary if primary.exists() else self.data_dir / f"{symbol}.parquet"
         if not path.exists():
-            return "missing"
+            return "missing", "cached parquet not found"
         if not self.start and not self.end:
-            return "ok"
+            return "ok", None
         try:
             index = pd.read_parquet(path, columns=["Close"]).index
         except Exception:
-            return "stale"
+            return "stale", "failed to read cached parquet"
         if index.empty:
-            return "stale"
+            return "stale", "cached parquet empty"
 
         min_date = index.min().date()
         max_date = index.max().date()
-        if self.start and min_date > pd.Timestamp(self.start).date():
-            return "stale"
-        if self.end and max_date < pd.Timestamp(self.end).date():
-            return "stale"
-        return "ok"
+        tolerance_days = 1
+
+        if self.start:
+            start_date = pd.Timestamp(self.start).date()
+            if min_date > start_date:
+                return "stale", f"cached start {min_date} after requested {start_date}"
+
+        if self.end:
+            end_date = pd.Timestamp(self.end).date()
+            if max_date + pd.Timedelta(days=tolerance_days) < end_date:
+                return "stale", f"cached end {max_date} before requested {end_date}"
+
+        return "ok", None
 
 
 @dataclass
@@ -86,6 +101,7 @@ class StrategyMetadata:
     strategy_name: str
     doc_path: Optional[Path] = None
     default_sizing: Optional[Dict] = None
+    default_strategy_config: Dict[str, Any] = field(default_factory=dict)
 
 
 INSIDE_BAR_METADATA = StrategyMetadata(
@@ -136,10 +152,39 @@ INSIDE_BAR_V2_METADATA = StrategyMetadata(
     },
 )
 
+RUDOMETKIN_UNIVERSE_DEFAULT = ROOT / "data" / "universe" / "rudometkin.parquet"
+
+RUDOMETKIN_METADATA = StrategyMetadata(
+    name="rudometkin_moc_mode",
+    label="Rudometkin MOC",
+    timezone="Europe/Berlin",
+    sessions=["15:30-22:00"],
+    signal_module="signals.cli_rudometkin_moc",
+    orders_source=ROOT / "artifacts" / "signals" / "current_signals_rudometkin.csv",
+    default_payload={
+        "engine": "replay",
+        "mode": "rudometkin_moc_mode",
+        "data": {"tz": "America/New_York"},
+        "costs": INSIDE_BAR_DEFAULTS.costs,
+        "initial_cash": INSIDE_BAR_DEFAULTS.initial_cash,
+        "strategy": "rudometkin_moc",
+    },
+    strategy_name="rudometkin_moc",
+    doc_path=ROOT / "docs" / "rudometkin_moc_long_short_translation.md",
+    default_sizing={
+        "mode": "risk",
+        "risk_pct": INSIDE_BAR_DEFAULTS.risk_pct,
+        "min_qty": INSIDE_BAR_DEFAULTS.min_qty,
+    },
+    default_strategy_config={
+        "universe_path": str(RUDOMETKIN_UNIVERSE_DEFAULT)
+    },
+)
+
 
 STRATEGY_REGISTRY: Dict[str, StrategyMetadata] = {
     meta.name: meta
-    for meta in (INSIDE_BAR_METADATA, INSIDE_BAR_V2_METADATA)
+    for meta in (INSIDE_BAR_METADATA, INSIDE_BAR_V2_METADATA, RUDOMETKIN_METADATA)
 }
 
 

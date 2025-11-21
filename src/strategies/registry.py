@@ -143,9 +143,23 @@ class StrategyRegistry:
                 if ispkg:  # Strategy packages (e.g., strategies.inside_bar)
                     try:
                         discovered += self._discover_strategy_package(modname)
-                    except Exception as e:
+                    except ImportError as exc:
                         logger.warning(
-                            f"Failed to discover strategies in {modname}: {e}"
+                            "Failed to import strategy package %s: %s",
+                            modname,
+                            exc,
+                        )
+                    except TypeError as exc:
+                        logger.warning(
+                            "Invalid strategy signature in %s: %s",
+                            modname,
+                            exc,
+                        )
+                    except ValueError as exc:
+                        logger.warning(
+                            "Strategy validation failed in %s: %s",
+                            modname,
+                            exc,
                         )
 
         except ImportError as e:
@@ -200,8 +214,13 @@ class StrategyRegistry:
                             self.register(strategy_name, attr, metadata)
                             discovered += 1
 
-                    except Exception as e:
-                        logger.warning(f"Failed to register strategy {attr_name}: {e}")
+                    except (TypeError, ValueError) as exc:
+                        logger.warning(
+                            "Failed to register strategy %s from %s: %s",
+                            attr_name,
+                            strategy_module_name,
+                            exc,
+                        )
 
         except ImportError:
             # Try alternative naming (e.g., strategies.inside_bar.inside_bar)
@@ -234,9 +253,12 @@ class StrategyRegistry:
                                 self.register(instance.name, attr, metadata)
                                 discovered += 1
 
-                        except Exception as e:
+                        except (TypeError, ValueError) as exc:
                             logger.warning(
-                                f"Failed to register strategy {attr_name}: {e}"
+                                "Failed to register strategy %s from %s: %s",
+                                attr_name,
+                                alt_module_name,
+                                exc,
                             )
 
             except ImportError:

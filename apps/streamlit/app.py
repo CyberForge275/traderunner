@@ -27,6 +27,8 @@ from state import (
     parse_yaml_config,
     validate_date_range,
     INSIDE_BAR_METADATA,
+    RUDOMETKIN_METADATA,
+    RUDOMETKIN_UNIVERSE_DEFAULT,
 )
 from pipeline import execute_pipeline
 
@@ -64,7 +66,9 @@ def _read_json(path: Path) -> dict:
     if path.exists():
         try:
             return json.loads(path.read_text())
-        except Exception:
+        except json.JSONDecodeError:
+            return {}
+        except OSError:
             return {}
     return {}
 
@@ -74,7 +78,7 @@ def _read_csv(path: Path) -> pd.DataFrame | None:
         return None
     try:
         return pd.read_csv(path)
-    except Exception:
+    except (pd.errors.ParserError, OSError):
         return None
 
 
@@ -233,6 +237,18 @@ with st.sidebar:
             )
             tz_value = st.text_input("Timezone", selected_meta.timezone)
 
+            rudometkin_universe_path: str | None = None
+            if selected_meta.name == RUDOMETKIN_METADATA.name:
+                default_universe = selected_meta.default_strategy_config.get(
+                    "universe_path", str(RUDOMETKIN_UNIVERSE_DEFAULT)
+                )
+                rudometkin_universe_path = st.text_input(
+                    "Rudometkin universe parquet",
+                    default_universe,
+                    help="Parquet file listing symbols when running the Rudometkin MOC strategy.",
+                    key="rudometkin_universe_path",
+                )
+
             costs_defaults = selected_meta.default_payload.get("costs", {})
             fees_default = float(costs_defaults.get("fees_bps", 0.0))
             slippage_default = float(costs_defaults.get("slippage_bps", 0.0))
@@ -321,6 +337,16 @@ with st.sidebar:
                 "initial_cash": float(initial_cash),
                 "risk_pct": float(risk_pct_value),
             }
+            if rudometkin_universe_path is not None:
+                rudometkin_path_clean = rudometkin_universe_path.strip()
+                if rudometkin_path_clean:
+                    config_payload.setdefault("strategy_config", {})[
+                        "universe_path"
+                    ] = rudometkin_path_clean
+            elif selected_meta.default_strategy_config:
+                config_payload.setdefault("strategy_config", {}).update(
+                    selected_meta.default_strategy_config
+                )
             config_path_for_run = None
 
     if st.button("Start backtest", type="primary", width="stretch"):
@@ -365,6 +391,7 @@ with st.sidebar:
                 config_payload=config_payload,
             )
 
+            st.session_state["pipeline_log"] = []
             new_run = execute_pipeline(pipeline)
             finished_at = pd.Timestamp.now(tz=INSIDE_BAR_TIMEZONE).isoformat()
             st.success(f"Run finished → {new_run} at {finished_at}")
@@ -378,6 +405,35 @@ with st.sidebar:
             st.error(f"Pipeline execution failed: {exc}")
             st.code(traceback.format_exc())
             st.stop()
+
+    log_entries = st.session_state.get("pipeline_log", [])
+    if log_entries:
+        st.markdown("### Last run output")
+        for idx, entry in enumerate(log_entries, start=1):
+            title = entry.get("title") or f"Step {idx}"
+            with st.expander(f"{idx}) {title}", expanded=False):
+                status = entry.get("status")
+                if status:
+                    st.write(f"Status: `{status}`")
+                if entry.get("kind") == "command":
+                    cmd_display = entry.get("command") or "(no command)"
+                    st.code(cmd_display)
+                    rc = entry.get("return_code")
+                    if rc is not None:
+                        st.write(f"Return code: `{rc}`")
+                    duration = entry.get("duration")
+                    if duration is not None:
+                        st.write(f"Duration: `{duration:.2f}s`")
+                    output = entry.get("output")
+                    if output:
+                        st.text(output)
+                else:
+                    message = entry.get("message")
+                    if message:
+                        st.write(message)
+                    duration = entry.get("duration")
+                    if duration is not None:
+                        st.write(f"Duration: `{duration:.2f}s`")
 
     st.markdown("---")
     st.subheader("Past runs")
@@ -417,8 +473,8 @@ with chart_columns[0]:
             chart_df["ts"] = pd.to_datetime(chart_df["ts"], errors="coerce")
             chart_df = chart_df.dropna(subset=["ts"]).set_index("ts")
             st.line_chart(chart_df["equity"])
-        except Exception:
-            st.info("Equity data could not be plotted.")
+        except (KeyError, ValueError, TypeError) as exc:
+            st.info(f"Equity data could not be plotted ({exc}).")
     else:
         st.info("No equity data found.")
 
@@ -432,8 +488,8 @@ with chart_columns[1]:
             chart_df["ts"] = pd.to_datetime(chart_df["ts"], errors="coerce")
             chart_df = chart_df.dropna(subset=["ts"]).set_index("ts")
             st.line_chart(chart_df["drawdown_pct"])
-        except Exception:
-            st.info("Drawdown data could not be plotted.")
+        except (KeyError, ValueError, TypeError) as exc:
+            st.info(f"Drawdown data could not be plotted ({exc}).")
     else:
         st.info("No drawdown plot found.")
 

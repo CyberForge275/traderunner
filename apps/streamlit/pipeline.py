@@ -5,8 +5,9 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import streamlit as st
@@ -24,6 +25,22 @@ from core.settings import DEFAULT_INITIAL_CASH
 from state import PipelineConfig
 
 
+def _store_log(entry: dict) -> None:
+    try:
+        log = st.session_state.setdefault("pipeline_log", [])
+        log.append(entry)
+    except Exception:  # pragma: no cover - defensive
+        pass
+
+
+def _set_last_duration(value: float) -> None:
+    st.session_state["pipeline_last_duration"] = value
+
+
+def _get_last_duration() -> float | None:
+    return st.session_state.pop("pipeline_last_duration", None)
+
+
 def _format_command(cmd: List[str]) -> str:
     return " ".join(shlex.quote(part) for part in cmd)
 
@@ -38,6 +55,15 @@ def _combine_output(stdout: str | None, stderr: str | None) -> str:
 
 
 def show_step(title: str, cmd: List[str], rc: int, output: str) -> None:
+    _store_log({
+        "kind": "command",
+        "title": title,
+        "command": _format_command(cmd),
+        "return_code": rc,
+        "output": output,
+        "status": "success" if rc == 0 else "error",
+        "duration": _get_last_duration(),
+    })
     with st.expander(title, expanded=True):
         st.code(_format_command(cmd) or "(no command)")
         if rc == 0:
@@ -51,6 +77,13 @@ def show_step(title: str, cmd: List[str], rc: int, output: str) -> None:
 
 
 def show_step_message(title: str, message: str, status: str = "info") -> None:
+    _store_log({
+        "kind": "message",
+        "title": title,
+        "message": message,
+        "status": status,
+        "duration": _get_last_duration(),
+    })
     with st.expander(title, expanded=True):
         st.code("(skipped)")
         display = getattr(st, status, st.info)
@@ -61,7 +94,10 @@ def run_cli_step(title: str, module_args: List[str]) -> subprocess.CompletedProc
     env = os.environ.copy()
     env["PYTHONPATH"] = str(SRC)
     cmd = [sys.executable, "-m", *module_args]
+    start = time.perf_counter()
     result = subprocess.run(cmd, cwd=str(ROOT), env=env, capture_output=True, text=True)
+    duration = time.perf_counter() - start
+    _set_last_duration(duration)
     output = _combine_output(result.stdout, result.stderr)
     show_step(title, cmd, result.returncode, output)
     return result
@@ -79,7 +115,7 @@ def _resolve_initial_cash(pipeline: PipelineConfig) -> float:
                 payload = yaml.safe_load(handle)
             if isinstance(payload, dict) and "initial_cash" in payload:
                 return float(payload["initial_cash"])
-        except Exception:
+        except (OSError, yaml.YAMLError, ValueError, TypeError):
             pass
     default_cash = pipeline.strategy.default_payload.get("initial_cash", DEFAULT_INITIAL_CASH)
     try:
@@ -154,9 +190,12 @@ def run_backtest(
         "--name",
         run_name,
     ]
+    start = time.perf_counter()
     result = subprocess.run(cmd, cwd=str(ROOT), env=env, capture_output=True, text=True)
+    duration = time.perf_counter() - start
     output = _combine_output(result.stdout, result.stderr)
     if log_title:
+        _set_last_duration(duration)
         show_step(log_title, cmd, result.returncode, output)
     elif result.returncode != 0:
         st.error(output or "Runner failed")
@@ -169,6 +208,7 @@ def run_backtest(
 
 def execute_pipeline(pipeline: PipelineConfig) -> str:
     fetch_targets = pipeline.fetch.symbols_to_fetch()
+    reasons = pipeline.fetch.stale_reasons()
     if fetch_targets:
         fetch_args = [
             "axiom_bt.cli_data",
@@ -188,6 +228,13 @@ def execute_pipeline(pipeline: PipelineConfig) -> str:
             fetch_args.append("--generate-m15")
         if pipeline.fetch.use_sample:
             fetch_args.append("--use-sample")
+        if reasons and not pipeline.fetch.force_refresh:
+            messages = []
+            for symbol, entries in reasons.items():
+                joined = "; ".join(entries)
+                messages.append(f"{symbol}: {joined}")
+            if messages:
+                show_step_message("0) data coverage", "\n".join(messages), status="warning")
         run_cli_step("0) ensure-intraday", fetch_args)
         st.cache_data.clear()
     else:
@@ -203,7 +250,16 @@ def execute_pipeline(pipeline: PipelineConfig) -> str:
     signal_args.extend(["--tz", pipeline.strategy.timezone])
     signal_args.extend(["--strategy", pipeline.strategy.strategy_name])
     signal_args.extend(["--current-snapshot", str(pipeline.strategy.orders_source)])
-    run_cli_step("1) signals.cli_inside_bar", signal_args)
+    strategy_config: Dict[str, Any] = {}
+    if pipeline.config_payload and isinstance(pipeline.config_payload, dict):
+        strategy_config = pipeline.config_payload.get("strategy_config", {}) or {}
+    if not strategy_config and pipeline.strategy.default_strategy_config:
+        strategy_config = dict(pipeline.strategy.default_strategy_config)
+    universe_path = strategy_config.get("universe_path")
+    if universe_path:
+        signal_args.extend(["--universe-path", str(universe_path)])
+
+    run_cli_step(f"1) {pipeline.strategy.signal_module}", signal_args)
 
     equity_value = _resolve_initial_cash(pipeline)
     risk_pct_override = None

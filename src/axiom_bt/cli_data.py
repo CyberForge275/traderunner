@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import UTC, datetime, timedelta
+import time
 from pathlib import Path
 from typing import List
 
@@ -43,10 +44,16 @@ def cmd_ensure_intraday(args: argparse.Namespace) -> int:
     start = args.start or (now - timedelta(days=2)).date().isoformat()
     end = args.end or now.date().isoformat()
 
+    overall_start = time.perf_counter()
     for symbol in symbols:
+        symbol_start = time.perf_counter()
+        fetch_duration = None
+        resample_m5_duration = None
+        resample_m15_duration = None
         m1_path = DATA_M1 / f"{symbol}.parquet"
         if args.force or not m1_path.exists():
             print(f"[FETCH] {symbol} M1 {start}..{end}")
+            fetch_start = time.perf_counter()
             fetch_intraday_1m_to_parquet(
                 symbol,
                 args.exchange,
@@ -56,17 +63,33 @@ def cmd_ensure_intraday(args: argparse.Namespace) -> int:
                 tz=args.tz,
                 use_sample=args.use_sample,
             )
+            fetch_duration = time.perf_counter() - fetch_start
         else:
             print(f"[SKIP] {symbol} M1 exists: {m1_path}")
 
         print(f"[RESAMPLE] {symbol} -> M5")
+        resample_m5_start = time.perf_counter()
         resample_m1(m1_path, DATA_M5, interval="5min", tz=args.tz)
+        resample_m5_duration = time.perf_counter() - resample_m5_start
 
         if args.generate_m15:
             print(f"[RESAMPLE] {symbol} -> M15")
+            resample_m15_start = time.perf_counter()
             resample_m1(m1_path, DATA_M15, interval="15min", tz=args.tz)
+            resample_m15_duration = time.perf_counter() - resample_m15_start
 
-    print("[DONE] ensure-intraday")
+        symbol_total = time.perf_counter() - symbol_start
+        parts = [f"total={symbol_total:.2f}s"]
+        if fetch_duration is not None:
+            parts.append(f"fetch={fetch_duration:.2f}s")
+        if resample_m5_duration is not None:
+            parts.append(f"resample_m5={resample_m5_duration:.2f}s")
+        if resample_m15_duration is not None:
+            parts.append(f"resample_m15={resample_m15_duration:.2f}s")
+        print(f"[TIMING] {symbol} " + ", ".join(parts))
+
+    total_elapsed = time.perf_counter() - overall_start
+    print(f"[DONE] ensure-intraday total={total_elapsed:.2f}s symbols={len(symbols)}")
     return 0
 
 
