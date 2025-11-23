@@ -36,10 +36,12 @@ Data:
 	// common universe
 	universe:	InRUI and C >= 10 and Avg(V, 50) >= 1000000 
 	
+	// LONG strategy
 	setup1:	universe and C > sma200 and adx5 > 35 and (O - C) / O > 0.03
 	score1:	atr10 / C
 	price1:	C * (1 - entry_stretch1)
 	
+	// SHORT strategy
 	setup2:	universe and adx5 > 35 and crsi2 > 70 and atr40/c >= 0.01 and atr40/c <= 0.1 and  atr2/c >= 0.01 and atr2/c <= 0.2
 	score2:	roc5
 	price2:	C * (1 + entry_stretch2)

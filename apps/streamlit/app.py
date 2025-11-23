@@ -32,6 +32,355 @@ from state import (
 )
 from pipeline import execute_pipeline
 
+
+def _render_strategy_selector() -> tuple["StrategyMetadata", str]:
+    st.header("1. Strategy Selection")
+
+    modes = list(STRATEGY_REGISTRY.values())
+    mode_labels = [meta.label for meta in modes]
+    default_idx = next((i for i, meta in enumerate(modes) if meta.name == RUDOMETKIN_METADATA.name), 0)
+
+    selected_label = st.selectbox(
+        "Strategy",
+        mode_labels,
+        index=default_idx,
+        key="strategy_select_main",
+    )
+    selected_meta = next(meta for meta in modes if meta.label == selected_label)
+    mode_value = selected_meta.name
+
+    doc_path = selected_meta.doc_path
+    if doc_path and doc_path.exists():
+        pdf_bytes = doc_path.read_bytes()
+        st.download_button(
+            label="📄 Download Strategy Spec",
+            data=pdf_bytes,
+            file_name=doc_path.name,
+            mime="application/pdf" if doc_path.suffix == ".pdf" else "text/markdown",
+            key=f"doc_{mode_value}",
+        )
+
+    return selected_meta, mode_value
+
+
+def _render_universe_and_symbols(
+    selected_meta,
+    data_directory: Path,
+) -> tuple[list[str], list[str], list[str], str | None]:
+    symbol_preview: List[str] = []
+    symbol_preview_errors: List[str] = []
+    universe_symbols: List[str] = []
+    rudometkin_universe_path: str | None = None
+
+    if selected_meta.name == RUDOMETKIN_METADATA.name:
+        st.subheader("Universe Selection")
+        default_universe = selected_meta.default_strategy_config.get(
+            "universe_path", str(RUDOMETKIN_UNIVERSE_DEFAULT)
+        )
+        rudometkin_universe_path = st.text_input(
+            "Universe Parquet File",
+            default_universe,
+            help=(
+                "Path to parquet file. Must contain symbols either as a column "
+                "(e.g., 'symbol', 'ticker') or in MultiIndex level 0."
+            ),
+            key="rudometkin_universe_path",
+        )
+
+        load_universe = st.checkbox("Load symbols from Universe", value=True)
+        if load_universe and rudometkin_universe_path:
+            u_path = Path(rudometkin_universe_path)
+            if not u_path.is_absolute():
+                u_path = ROOT / u_path
+
+            if u_path.exists():
+                try:
+                    u_df = pd.read_parquet(u_path)
+                    u_cols = u_df.columns
+
+                    sym_col = next((c for c in ["symbol", "Symbol", "ticker", "Ticker"] if c in u_cols), None)
+                    if not sym_col:
+                        sym_col = next(
+                            (
+                                c
+                                for c in u_cols
+                                if u_df[c].dtype == object or pd.api.types.is_string_dtype(u_df[c])
+                            ),
+                            None,
+                        )
+
+                    if sym_col:
+                        universe_symbols = (
+                            u_df[sym_col]
+                            .dropna()
+                            .astype(str)
+                            .str.strip()
+                            .str.upper()
+                            .unique()
+                            .tolist()
+                        )
+                        universe_symbols = sorted(universe_symbols)
+                        st.success(f"Loaded {len(universe_symbols)} symbols from universe columns.")
+                    elif isinstance(u_df.index, pd.MultiIndex):
+                        level_0 = u_df.index.get_level_values(0)
+                        if pd.api.types.is_string_dtype(level_0) or level_0.dtype == object:
+                            universe_symbols = sorted(
+                                level_0.unique().astype(str).str.strip().str.upper().tolist()
+                            )
+                            st.success(f"Loaded {len(universe_symbols)} symbols from universe index.")
+                    elif u_df.index.dtype == object or pd.api.types.is_string_dtype(u_df.index):
+                        universe_symbols = sorted(
+                            u_df.index.unique().astype(str).str.strip().str.upper().tolist()
+                        )
+                        st.success(f"Loaded {len(universe_symbols)} symbols from universe index.")
+
+                    if not universe_symbols:
+                        if "ts_id" in u_cols:
+                            st.error(
+                                "Found 'ts_id' but no 'symbol' column/index. "
+                                "Please provide a file with a symbol column."
+                            )
+                        else:
+                            st.error("Could not identify symbol column in universe file.")
+                except Exception as exc:  # pragma: no cover - defensive
+                    st.error(f"Failed to read universe file: {exc}")
+            else:
+                st.warning(f"Universe file not found: {u_path}")
+
+        with st.expander("Manual Symbol Override (Optional)"):
+            symbol_input = st.text_area(
+                "Additional Symbols",
+                value="",
+                height=60,
+                placeholder="Enter comma separated tickers to add...",
+            ).strip()
+            manual_syms, manual_errors = collect_symbols([], symbol_input)
+            symbol_preview_errors.extend(manual_errors)
+            if manual_syms:
+                universe_symbols = sorted(list(set(universe_symbols) | set(manual_syms)))
+                st.info(f"Total symbols including manual: {len(universe_symbols)}")
+
+    else:
+        st.subheader("Symbol Selection")
+        cached_symbols = list_symbols(str(data_directory))
+        cached_selection = st.multiselect(
+            "Select cached symbols",
+            cached_symbols,
+            help="Symbols already downloaded.",
+        )
+
+        symbol_input = st.text_area(
+            "Manual Entry",
+            value="",
+            height=80,
+            placeholder="Enter comma or newline separated tickers (e.g. TSLA, AAPL)",
+        ).strip()
+
+        symbol_preview, symbol_preview_errors = collect_symbols(cached_selection, symbol_input)
+        if symbol_preview:
+            st.markdown(f"**Selected:** {len(symbol_preview)} symbols")
+            with st.expander("View List"):
+                st.write(", ".join(symbol_preview))
+        else:
+            st.info("No symbols selected.")
+
+        for msg in symbol_preview_errors:
+            st.warning(msg)
+
+    return symbol_preview, symbol_preview_errors, universe_symbols, rudometkin_universe_path
+
+
+def _render_insidebar_parameters(selected_meta) -> dict:
+    st.divider()
+    st.header("📊 InsideBar Parameters")
+
+    defaults = selected_meta.default_strategy_config or {}
+
+    with st.expander("Entry & Exit Settings", expanded=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            initial_cash = selected_meta.default_payload.get("initial_cash")
+            risk_cfg = selected_meta.default_sizing or {}
+            st.caption(
+                f"Initial cash: {initial_cash}, risk mode: {risk_cfg.get('mode', 'risk')} "
+                f"@ {risk_cfg.get('risk_pct', 1.0)}%"
+            )
+        with col2:
+            st.info("Parameters currently fixed to canonical spec; UI overrides coming soon.")
+
+    if defaults:
+        with st.expander("Effective Defaults", expanded=False):
+            st.json(defaults)
+
+    st.caption("⚙️ Additional settings available in Advanced Parameters below")
+    return defaults
+
+
+def _render_rudometkin_parameters() -> dict:
+    st.divider()
+    st.header("📈 Rudometkin Strategy Parameters")
+
+    rk_config: dict = st.session_state.setdefault("rk_config", {})
+
+    with st.expander("Entry & Exit Settings (LONG/SHORT)", expanded=True):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            entry_discount_pct = st.number_input(
+                "Long: Entry Discount %",
+                min_value=0.0,
+                max_value=10.0,
+                value=rk_config.get("entry_stretch1", 0.035) * 100,
+                step=0.1,
+                help="Limit price = Close * (1 - discount). 3.5% → 0.965 * Close.",
+            )
+            rk_config["entry_stretch1"] = entry_discount_pct / 100.0
+        with col2:
+            pullback_pct = st.number_input(
+                "Long: Min Intraday Pullback %",
+                min_value=0.0,
+                max_value=50.0,
+                value=rk_config.get("long_pullback_threshold", 0.03) * 100,
+                step=0.1,
+                help="(Open - Close)/Open threshold for long pullbacks.",
+            )
+            rk_config["long_pullback_threshold"] = pullback_pct / 100.0
+        with col3:
+            entry_premium_pct = st.number_input(
+                "Short: Entry Premium %",
+                min_value=0.0,
+                max_value=10.0,
+                value=rk_config.get("entry_stretch2", 0.05) * 100,
+                step=0.1,
+                help="Limit price = Close * (1 + premium) for shorts.",
+            )
+            rk_config["entry_stretch2"] = entry_premium_pct / 100.0
+
+    with st.expander("Trend & Volatility Filters", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            rk_config["adx_period"] = st.number_input(
+                "ADX Period",
+                min_value=2,
+                max_value=50,
+                value=rk_config.get("adx_period", 5),
+                step=1,
+            )
+            rk_config["adx_threshold"] = st.number_input(
+                "Min ADX",
+                min_value=0.0,
+                max_value=100.0,
+                value=rk_config.get("adx_threshold", 35.0),
+                step=1.0,
+            )
+            rk_config["sma_period"] = st.number_input(
+                "Trend SMA Period",
+                min_value=50,
+                max_value=400,
+                value=rk_config.get("sma_period", 200),
+                step=10,
+            )
+        with col2:
+            # ATR ratios - store as nested dicts for config schema compatibility
+            atr40_bounds = rk_config.get("atr40_ratio_bounds", {"min": 0.01, "max": 0.10})
+            atr40_min = st.number_input(
+                "ATR40/Close Min %",
+                min_value=0.0,
+                max_value=100.0,
+                value=atr40_bounds.get("min", 0.01) * 100,
+                step=0.1,
+                format="%.1f",
+            )
+            atr40_max = st.number_input(
+                "ATR40/Close Max %",
+                min_value=0.0,
+                max_value=100.0,
+                value=atr40_bounds.get("max", 0.10) * 100,
+                step=1.0,
+                format="%.1f",
+            )
+            rk_config["atr40_ratio_bounds"] = {"min": atr40_min / 100.0, "max": atr40_max / 100.0}
+            
+            atr2_bounds = rk_config.get("atr2_ratio_bounds", {"min": 0.01, "max": 0.20})
+            atr2_min = st.number_input(
+                "ATR2/Close Min %",
+                min_value=0.0,
+                max_value=100.0,
+                value=atr2_bounds.get("min", 0.01) * 100,
+                step=0.1,
+                format="%.1f",
+            )
+            atr2_max = st.number_input(
+                "ATR2/Close Max %",
+                min_value=0.0,
+                max_value=100.0,
+                value=atr2_bounds.get("max", 0.20) * 100,
+                step=1.0,
+                format="%.1f",
+            )
+            rk_config["atr2_ratio_bounds"] = {"min": atr2_min / 100.0, "max": atr2_max / 100.0}
+
+    with st.expander("Universe & Daily Finder", expanded=False):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            rk_config["min_price"] = st.number_input(
+                "Min Close Price",
+                min_value=0.0,
+                max_value=1000.0,
+                value=rk_config.get("min_price", 10.0),
+                step=1.0,
+            )
+        with col2:
+            rk_config["min_average_volume"] = st.number_input(
+                "Min 50d Avg Volume",
+                min_value=0,
+                max_value=100_000_000,
+                value=int(rk_config.get("min_average_volume", 1_000_000)),
+                step=50_000,
+            )
+        with col3:
+            rk_config["max_daily_signals"] = st.number_input(
+                "Max Signals per Day (Long/Short)",
+                min_value=1,
+                max_value=100,
+                value=int(rk_config.get("max_daily_signals", 10)),
+                step=1,
+            )
+
+    with st.expander("Advanced Indicator Settings", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            rk_config["crsi_rank_period"] = st.number_input(
+                "ConnorsRSI Rank Lookback",
+                min_value=10,
+                max_value=250,
+                value=int(rk_config.get("crsi_rank_period", 100)),
+                step=5,
+            )
+            rk_config["crsi_price_rsi"] = st.number_input(
+                "ConnorsRSI Price RSI Len",
+                min_value=2,
+                max_value=20,
+                value=int(rk_config.get("crsi_price_rsi", 2)),
+                step=1,
+            )
+        with col2:
+            rk_config["crsi_streak_rsi"] = st.number_input(
+                "ConnorsRSI Streak RSI Len",
+                min_value=2,
+                max_value=20,
+                value=int(rk_config.get("crsi_streak_rsi", 2)),
+                step=1,
+            )
+            rk_config["crsi_threshold"] = st.number_input(
+                "Min ConnorsRSI for Shorts",
+                min_value=0.0,
+                max_value=100.0,
+                value=rk_config.get("crsi_threshold", 70.0),
+                step=1.0,
+            )
+
+    return rk_config
+
 BT_DIR = ROOT / "artifacts" / "backtests"
 
 DATA_DIRECTORIES = {
@@ -102,40 +451,34 @@ st.set_page_config(page_title="TradeRunner Backtest Dashboard", layout="wide")
 selected_run: str | None = None
 
 with st.sidebar:
-    st.header("Run configuration")
+    selected_meta, mode_value = _render_strategy_selector()
+
+    st.divider()
+    st.header("2. Data Configuration")
+
     timeframe = st.selectbox("Timeframe", tuple(DATA_DIRECTORIES.keys()), index=0)
     timeframe_paths = DATA_DIRECTORIES[timeframe]
     data_directory = timeframe_paths["data"]
     data_directory_m1 = timeframe_paths["m1"]
-    cached_symbols = list_symbols(str(data_directory))
-    cached_selection = st.multiselect(
-        "Select cached symbols for this run",
-        cached_symbols,
-        help="Symbols already downloaded; select the ones you want to include in this run.",
-    )
-    if cached_symbols:
-        unused_cached = sorted(set(cached_symbols) - set(cached_selection))
-        st.caption(
-            "Cached (not selected): " + (", ".join(unused_cached) if unused_cached else "—")
-        )
 
-    st.caption("Compose the symbol list for this run")
-    symbol_input = st.text_area(
-        "Symbols to process",
-        value="",
-        height=80,
-        placeholder="Enter comma or newline separated tickers (e.g. TSLA, AAPL, NVDA)",
-    ).strip()
-    symbol_preview, symbol_preview_errors = collect_symbols(cached_selection, symbol_input)
-    if symbol_preview:
-        st.markdown(
-            "**Symbols queued for this run:** " + ", ".join(symbol_preview)
-        )
-    else:
-        st.info("No symbols selected yet.")
-    for msg in symbol_preview_errors:
-        st.warning(msg)
-    use_sample = st.checkbox("Use synthetic data when fetching", value=False)
+    symbol_preview, symbol_preview_errors, universe_symbols, rudometkin_universe_path = _render_universe_and_symbols(
+        selected_meta,
+        data_directory,
+    )
+
+    defaults_for_insidebar: dict = {}
+    rk_config: dict | None = None
+
+    if selected_meta.name in [INSIDE_BAR_METADATA.name, "insidebar_intraday_v2"]:
+        _render_insidebar_parameters(selected_meta)
+    elif selected_meta.name == RUDOMETKIN_METADATA.name:
+        _render_rudometkin_parameters()
+
+
+    st.divider()
+    st.header("3. Run Settings")
+    
+    use_sample = st.checkbox("Use synthetic data", value=False)
     force_refresh = st.checkbox("Force refresh data", value=False)
 
     run_name_key = "run_name_input"
@@ -156,9 +499,9 @@ with st.sidebar:
         st.session_state[run_name_key] = generated_default
         st.session_state[run_name_scope_key] = timeframe
 
-    run_name = st.text_input("Run name", value=st.session_state[run_name_key], key=run_name_key)
+    run_name = st.text_input("Run Name", value=st.session_state[run_name_key], key=run_name_key)
 
-    with st.expander("Strategy & backtest parameters", expanded=True):
+    with st.expander("Advanced Parameters", expanded=False):
         config_mode = st.radio(
             "Configuration source",
             ("Manual", "Use YAML file"),
@@ -172,8 +515,6 @@ with st.sidebar:
 
         yaml_preview_errors: List[str] = []
         manual_date_errors: List[str] = []
-        selected_meta = INSIDE_BAR_METADATA
-        mode_value = selected_meta.name
 
         if config_mode == "Use YAML file":
             yaml_input = st.text_input("YAML config", "configs/runs/insidebar.yml")
@@ -182,46 +523,10 @@ with st.sidebar:
                 for msg in yaml_preview_errors:
                     st.warning(msg)
                 if yaml_payload:
-                    options = ["(Show all)"] + list(yaml_payload.keys())
-                    choice = st.selectbox(
-                        "Inspect YAML parameters",
-                        options,
-                        index=0,
-                        key="yaml_param_select",
-                    )
-                    if choice == "(Show all)":
-                        st.json(yaml_payload)
-                    else:
-                        st.json({choice: yaml_payload.get(choice)})
-                    payload_mode = yaml_payload.get("mode") if isinstance(yaml_payload, dict) else None
-                    if isinstance(payload_mode, str) and payload_mode in STRATEGY_REGISTRY:
-                        mode_value = payload_mode
-                        selected_meta = STRATEGY_REGISTRY[mode_value]
+                    st.json(yaml_payload)
         else:
-            st.caption("Override core replay parameters directly.")
-            mode_col, doc_col = st.columns([3, 1])
-            modes = list(STRATEGY_REGISTRY.values())
-            mode_labels = [meta.label for meta in modes]
-            default_idx = next((i for i, meta in enumerate(modes) if meta.name == INSIDE_BAR_METADATA.name), 0)
-            with mode_col:
-                selected_label = st.selectbox(
-                    "Strategy mode",
-                    mode_labels,
-                    index=default_idx,
-                )
-                selected_meta = next(meta for meta in modes if meta.label == selected_label)
-                mode_value = selected_meta.name
-            with doc_col:
-                doc_path = selected_meta.doc_path
-                if doc_path and doc_path.exists():
-                    pdf_bytes = doc_path.read_bytes()
-                    st.download_button(
-                        label="📄 Spec",
-                        data=pdf_bytes,
-                        file_name=doc_path.name,
-                        mime="application/pdf",
-                        key=f"doc_{mode_value}",
-                    )
+            # Manual Parameters
+            config_payload = {}
 
             orders_csv = st.text_input(
                 "Orders CSV",
@@ -236,18 +541,6 @@ with st.sidebar:
                 str(data_directory_m1),
             )
             tz_value = st.text_input("Timezone", selected_meta.timezone)
-
-            rudometkin_universe_path: str | None = None
-            if selected_meta.name == RUDOMETKIN_METADATA.name:
-                default_universe = selected_meta.default_strategy_config.get(
-                    "universe_path", str(RUDOMETKIN_UNIVERSE_DEFAULT)
-                )
-                rudometkin_universe_path = st.text_input(
-                    "Rudometkin universe parquet",
-                    default_universe,
-                    help="Parquet file listing symbols when running the Rudometkin MOC strategy.",
-                    key="rudometkin_universe_path",
-                )
 
             costs_defaults = selected_meta.default_payload.get("costs", {})
             fees_default = float(costs_defaults.get("fees_bps", 0.0))
@@ -337,24 +630,63 @@ with st.sidebar:
                 "initial_cash": float(initial_cash),
                 "risk_pct": float(risk_pct_value),
             }
-            if rudometkin_universe_path is not None:
-                rudometkin_path_clean = rudometkin_universe_path.strip()
-                if rudometkin_path_clean:
-                    config_payload.setdefault("strategy_config", {})[
-                        "universe_path"
-                    ] = rudometkin_path_clean
-            elif selected_meta.default_strategy_config:
-                config_payload.setdefault("strategy_config", {}).update(
-                    selected_meta.default_strategy_config
-                )
+            
+            # Apply strategy-specific configuration
+            if selected_meta.name == RUDOMETKIN_METADATA.name:
+                # Get config from session state (set in the RK config section above)
+                rk_config = st.session_state.get("rk_config", {})
+                
+                # Strategy-specific params
+                config_payload["strategy_config"] = {
+                    "entry_stretch1": rk_config.get("entry_stretch1", 0.035),
+                    "entry_stretch2": rk_config.get("entry_stretch2", 0.05),
+                    "long_pullback_threshold": rk_config.get("long_pullback_threshold", 0.03),
+                    "crsi_threshold": rk_config.get("crsi_threshold", 70.0),
+                    "adx_threshold": rk_config.get("adx_threshold", 35.0),
+                    "adx_period": rk_config.get("adx_period", 5),
+                    "sma_period": rk_config.get("sma_period", 200),
+                    "atr40_ratio_bounds": rk_config.get("atr40_ratio_bounds", {"min": 0.01, "max": 0.10}),
+                    "atr2_ratio_bounds": rk_config.get("atr2_ratio_bounds", {"min": 0.01, "max": 0.20}),
+                    "min_price": rk_config.get("min_price", 10.0),
+                    "min_average_volume": rk_config.get("min_average_volume", 1_000_000),
+                    "crsi_price_rsi": rk_config.get("crsi_price_rsi", 2),
+                    "crsi_streak_rsi": rk_config.get("crsi_streak_rsi", 2),
+                    "crsi_rank_period": rk_config.get("crsi_rank_period", 100),
+                }
+                
+                # Pipeline-level setting
+                config_payload["max_daily_signals"] = rk_config.get("max_daily_signals", 10)
+                
+                # Universe path
+                if rudometkin_universe_path:
+                    rudometkin_path_clean = rudometkin_universe_path.strip()
+                    if rudometkin_path_clean:
+                        config_payload["strategy_config"]["universe_path"] = rudometkin_path_clean
+            
+            elif selected_meta.name in [INSIDE_BAR_METADATA.name, "insidebar_intraday_v2"]:
+                # InsideBar strategies - use defaults from metadata
+                # Future: Add configurable parameters here
+                if selected_meta.default_strategy_config:
+                    config_payload["strategy_config"] = dict(selected_meta.default_strategy_config)
+            
             config_path_for_run = None
+
+        # Optional: show the final merged configuration for transparency
+        if config_payload is not None:
+            with st.expander("Preview effective config payload", expanded=False):
+                st.json(config_payload)
 
     if st.button("Start backtest", type="primary", width="stretch"):
         try:
             validation_errors: List[str] = []
 
-            symbol_set = symbol_preview
-            validation_errors.extend(symbol_preview_errors)
+            symbol_set = sorted(list(set(symbol_preview) | set(universe_symbols)))
+            if symbol_set:
+                filtered_errors = [msg for msg in symbol_preview_errors if "Select or enter at least one valid symbol." not in msg]
+                validation_errors.extend(filtered_errors)
+            else:
+                validation_errors.append("No symbols selected. Please check your Universe file or add symbols manually.")
+                validation_errors.extend(symbol_preview_errors)
 
             manual_mode = config_mode == "Manual"
             if not manual_mode:

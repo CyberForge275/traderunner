@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 import streamlit as st
 import yaml
+import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
@@ -22,7 +23,8 @@ os.environ.setdefault("PYTHONPATH", str(SRC))
 BT_DIR = ROOT / "artifacts" / "backtests"
 
 from core.settings import DEFAULT_INITIAL_CASH
-from state import PipelineConfig
+from state import FetchConfig, PipelineConfig
+from strategies import factory, registry
 
 
 def _store_log(entry: dict) -> None:
@@ -54,25 +56,30 @@ def _combine_output(stdout: str | None, stderr: str | None) -> str:
     return "\n".join(part for part in parts if part)
 
 
-def show_step(title: str, cmd: List[str], rc: int, output: str) -> None:
+def show_step(title: str, cmd: List[str], rc: int, output: str, *, raise_on_error: bool = True) -> None:
+    status = "success"
+    if rc != 0:
+        status = "error" if raise_on_error else "warning"
     _store_log({
         "kind": "command",
         "title": title,
         "command": _format_command(cmd),
         "return_code": rc,
         "output": output,
-        "status": "success" if rc == 0 else "error",
+        "status": status,
         "duration": _get_last_duration(),
     })
     with st.expander(title, expanded=True):
         st.code(_format_command(cmd) or "(no command)")
         if rc == 0:
             st.success("OK")
-        else:
+        elif raise_on_error:
             st.error(f"[ERROR] rc={rc}")
+        else:
+            st.warning(f"[WARN] rc={rc}")
         if output:
             st.text(output)
-    if rc != 0:
+    if rc != 0 and raise_on_error:
         raise RuntimeError(title)
 
 
@@ -90,7 +97,12 @@ def show_step_message(title: str, message: str, status: str = "info") -> None:
         display(message)
 
 
-def run_cli_step(title: str, module_args: List[str]) -> subprocess.CompletedProcess[str]:
+def run_cli_step(
+    title: str,
+    module_args: List[str],
+    *,
+    raise_on_error: bool = True,
+) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(SRC)
     cmd = [sys.executable, "-m", *module_args]
@@ -99,7 +111,7 @@ def run_cli_step(title: str, module_args: List[str]) -> subprocess.CompletedProc
     duration = time.perf_counter() - start
     _set_last_duration(duration)
     output = _combine_output(result.stdout, result.stderr)
-    show_step(title, cmd, result.returncode, output)
+    show_step(title, cmd, result.returncode, output, raise_on_error=raise_on_error)
     return result
 
 
@@ -206,7 +218,280 @@ def run_backtest(
     return runs[0].name if runs else run_name
 
 
+def _prepare_daily_frame(group: pd.DataFrame, target_tz: str) -> Optional[pd.DataFrame]:
+    frame = group.rename(columns=str.lower).copy()
+    required = {"timestamp", "open", "high", "low", "close", "volume"}
+    if not required.issubset(frame.columns):
+        return None
+    frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True, errors="coerce")
+    frame = frame.dropna(subset=["timestamp"])
+    if frame.empty:
+        return None
+    frame = frame.sort_values("timestamp")
+    frame["timestamp"] = frame["timestamp"].dt.tz_convert(target_tz)
+    return frame[["timestamp", "open", "high", "low", "close", "volume"]]
+
+
+def _run_rudometkin_daily_stage(
+    pipeline: PipelineConfig,
+    max_daily_signals: int = 10,
+) -> List[str]:
+    """Execute daily scan and filtering for Rudometkin strategy."""
+
+    show_step_message("0) Daily Scan", "Starting Stage 1: Daily Universe Scan & Filter")
+
+    strategy_config: Dict[str, Any] = {}
+    if pipeline.config_payload and isinstance(pipeline.config_payload, dict):
+        strategy_config = dict(pipeline.config_payload.get("strategy_config", {}) or {})
+    if not strategy_config and pipeline.strategy.default_strategy_config:
+        strategy_config = dict(pipeline.strategy.default_strategy_config)
+
+    universe_path = strategy_config.get("universe_path")
+    if not universe_path:
+        show_step_message(
+            "0.1) universe",
+            "Universe path not configured for Rudometkin strategy.",
+            status="error",
+        )
+        return []
+
+    universe_path = Path(universe_path)
+    if not universe_path.is_absolute():
+        universe_path = ROOT / universe_path
+
+    if not universe_path.exists():
+        show_step_message(
+            "0.1) universe",
+            f"Universe parquet not found: {universe_path}",
+            status="error",
+        )
+        return []
+
+    try:
+        universe_df = pd.read_parquet(universe_path)
+    except Exception as exc:  # pragma: no cover - defensive
+        show_step_message(
+            "0.1) universe",
+            f"Failed to load universe parquet: {exc}",
+            status="error",
+        )
+        return []
+
+    if isinstance(universe_df.index, pd.MultiIndex):
+        temp_symbol_col = "__symbol_index__"
+        temp_date_col = "__date_index__"
+        universe_df = universe_df.reset_index(names=[temp_symbol_col, temp_date_col])
+        symbol_col = temp_symbol_col
+        date_col = temp_date_col
+    else:
+        symbol_col = "symbol" if "symbol" in universe_df.columns else "Symbol"
+        date_col = "Date" if "Date" in universe_df.columns else "timestamp"
+
+    if symbol_col not in universe_df.columns or date_col not in universe_df.columns:
+        show_step_message(
+            "0.1) universe",
+            "Universe parquet is missing symbol/date columns.",
+            status="error",
+        )
+        return []
+
+    universe_df = universe_df.rename(columns={symbol_col: "symbol", date_col: "timestamp"})
+    universe_df["symbol"] = universe_df["symbol"].astype(str).str.upper()
+    universe_df["timestamp"] = pd.to_datetime(universe_df["timestamp"], utc=True, errors="coerce")
+    universe_df = universe_df.dropna(subset=["timestamp"])
+
+    if universe_df.empty:
+        show_step_message("0.1) universe", "Universe parquet is empty.", status="warning")
+        return []
+
+    if pipeline.fetch.start:
+        start_date = pd.Timestamp(pipeline.fetch.start).date()
+        universe_df = universe_df[universe_df["timestamp"].dt.date >= start_date]
+    if pipeline.fetch.end:
+        end_date = pd.Timestamp(pipeline.fetch.end).date()
+        universe_df = universe_df[universe_df["timestamp"].dt.date <= end_date]
+
+    requested_symbols = {sym.upper() for sym in pipeline.symbols} if pipeline.symbols else set()
+    if requested_symbols:
+        universe_df = universe_df[universe_df["symbol"].isin(requested_symbols)]
+
+    available_symbols = set(universe_df["symbol"].unique())
+    missing_symbols = sorted((requested_symbols or set()) - available_symbols)
+    if missing_symbols:
+        preview = ", ".join(missing_symbols[:20])
+        suffix = " …" if len(missing_symbols) > 20 else ""
+        show_step_message(
+            "0.1) universe coverage",
+            f"Missing daily data for {len(missing_symbols)} symbols: {preview}{suffix}",
+            status="warning",
+        )
+
+    if universe_df.empty:
+        show_step_message(
+            "Stage 1 Aborted",
+            "No daily data available after filtering universe.",
+            status="warning",
+        )
+        return []
+
+    registry.auto_discover("strategies")
+    try:
+        rudometkin_strategy = factory.create_strategy(pipeline.strategy.strategy_name, strategy_config)
+    except Exception as exc:  # pragma: no cover - defensive
+        show_step_message("0.2) strategy", f"Failed to load strategy: {exc}", status="error")
+        return []
+
+    signal_rows: List[Dict[str, Any]] = []
+    for symbol, group in universe_df.groupby("symbol"):
+        prepared = _prepare_daily_frame(group, pipeline.strategy.timezone)
+        if prepared is None:
+            continue
+        try:
+            signals = rudometkin_strategy.generate_signals(prepared, symbol, strategy_config)
+        except Exception:  # pragma: no cover - defensive
+            continue
+        if not signals:
+            continue
+        for sig in signals:
+            ts = pd.Timestamp(sig.timestamp)
+            if ts.tzinfo is None:
+                ts = ts.tz_localize(pipeline.strategy.timezone)
+            else:
+                ts = ts.tz_convert(pipeline.strategy.timezone)
+            record = {
+                "ts": ts.isoformat(),
+                "Symbol": symbol,
+                "long_entry": np.nan,
+                "short_entry": np.nan,
+                "sl_long": np.nan,
+                "sl_short": np.nan,
+                "tp_long": np.nan,
+                "tp_short": np.nan,
+                "setup": sig.metadata.get("setup"),
+                "score": sig.metadata.get("score"),
+            }
+            direction = sig.signal_type.upper()
+            if direction == "LONG":
+                record["long_entry"] = sig.entry_price
+            elif direction == "SHORT":
+                record["short_entry"] = sig.entry_price
+            signal_rows.append(record)
+
+    columns = [
+        "ts",
+        "Symbol",
+        "long_entry",
+        "short_entry",
+        "sl_long",
+        "sl_short",
+        "tp_long",
+        "tp_short",
+        "setup",
+        "score",
+    ]
+
+    signals_df = pd.DataFrame(signal_rows, columns=columns)
+    signals_dir = pipeline.strategy.orders_source.parent
+    signals_dir.mkdir(parents=True, exist_ok=True)
+
+    if signals_df.empty:
+        empty_df = pd.DataFrame(columns=columns)
+        timestamp_file = signals_dir / f"signals_rudometkin_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        empty_df.to_csv(timestamp_file, index=False)
+        empty_df.to_csv(pipeline.strategy.orders_source, index=False)
+        show_step_message("0.3) Filter Signals", "No signals generated.", status="warning")
+        return []
+
+    signals_df["ts"] = pd.to_datetime(signals_df["ts"], errors="coerce")
+    signals_df = signals_df.dropna(subset=["ts"])
+    signals_df["score"] = pd.to_numeric(signals_df["score"], errors="coerce")
+    signals_df["date"] = signals_df["ts"].dt.date
+
+    filtered_chunks: List[pd.DataFrame] = []
+    daily_details: List[str] = []
+
+    for date, group in signals_df.groupby("date"):
+        longs = group[group["long_entry"].notna()].sort_values("score", ascending=False).head(max_daily_signals)
+        shorts = group[group["short_entry"].notna()].sort_values("score", ascending=False).head(max_daily_signals)
+
+        long_syms = longs["Symbol"].tolist() if not longs.empty else []
+        short_syms = shorts["Symbol"].tolist() if not shorts.empty else []
+
+        if long_syms or short_syms:
+            parts = []
+            if long_syms:
+                parts.append(f"LONG({len(long_syms)}): {', '.join(long_syms)}")
+            if short_syms:
+                parts.append(f"SHORT({len(short_syms)}): {', '.join(short_syms)}")
+            daily_details.append(f"{date}: " + " | ".join(parts))
+
+        if not longs.empty:
+            filtered_chunks.append(longs)
+        if not shorts.empty:
+            filtered_chunks.append(shorts)
+
+    if filtered_chunks:
+        filtered_df = pd.concat(filtered_chunks).sort_values(["ts", "Symbol"]).drop(columns=["date"])
+    else:
+        filtered_df = pd.DataFrame(columns=columns)
+
+    timestamp_file = signals_dir / f"signals_rudometkin_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    filtered_df.to_csv(timestamp_file, index=False)
+    filtered_df.to_csv(pipeline.strategy.orders_source, index=False)
+
+    if filtered_df.empty:
+        show_step_message("0.3) Filter Signals", "No signals generated after filtering.", status="warning")
+        return []
+
+    filtered_symbols = sorted(filtered_df["Symbol"].unique())
+    summary_msg = (
+        f"Filtered to {len(filtered_df)} signals ({len(filtered_symbols)} unique symbols). "
+        f"Max/day={max_daily_signals}\n\n"
+    )
+    if daily_details:
+        summary_msg += "Daily Candidates:\n" + "\n".join(daily_details)
+    else:
+        summary_msg += "No day produced qualifying candidates."
+    show_step_message("0.3) Filter Signals", summary_msg)
+
+    return filtered_symbols
+
 def execute_pipeline(pipeline: PipelineConfig) -> str:
+    # --- Two-Stage Pipeline for Rudometkin ---
+    if pipeline.strategy.strategy_name == "rudometkin_moc":
+        max_daily = 10
+        if pipeline.config_payload and "max_daily_signals" in pipeline.config_payload:
+            try:
+                max_daily = int(pipeline.config_payload["max_daily_signals"])
+            except (TypeError, ValueError):
+                pass
+        
+        filtered_symbols = _run_rudometkin_daily_stage(pipeline, max_daily)
+        
+        if filtered_symbols:
+            # Update symbols for intraday stage (creates a new list, no mutation)
+            pipeline = PipelineConfig(
+                run_name=pipeline.run_name,
+                fetch=FetchConfig(
+                    symbols=filtered_symbols,
+                    timeframe=pipeline.fetch.timeframe,
+                    start=pipeline.fetch.start,
+                    end=pipeline.fetch.end,
+                    use_sample=pipeline.fetch.use_sample,
+                    force_refresh=pipeline.fetch.force_refresh,
+                    data_dir=pipeline.fetch.data_dir,
+                    data_dir_m1=pipeline.fetch.data_dir_m1,
+                ),
+                symbols=filtered_symbols,
+                strategy=pipeline.strategy,
+                config_path=pipeline.config_path,
+                config_payload=pipeline.config_payload,
+            )
+        else:
+            show_step_message("Stage 2 Aborted", "No candidates found after filtering.", status="warning")
+            return "No Candidates"
+
+    # --- Standard Pipeline (Intraday) ---
     fetch_targets = pipeline.fetch.symbols_to_fetch()
     reasons = pipeline.fetch.stale_reasons()
     if fetch_targets:
@@ -279,6 +564,7 @@ def execute_pipeline(pipeline: PipelineConfig) -> str:
         pipeline.strategy.timezone,
     ]
     orders_args.extend(_build_sizing_args(pipeline, equity_value, risk_pct_override))
+    orders_args.extend(["--strategy", pipeline.strategy.strategy_name])
     run_cli_step("2) trade.cli_export_orders", orders_args)
 
     if pipeline.config_payload is not None:
