@@ -437,6 +437,70 @@ def execute_pipeline(pipeline: PipelineConfig) -> str:
         else:
             show_step_message("0) ensure-intraday", "Skipped (cached data)")
 
+        # --- v2 Data SLA Check ---
+        try:
+            from axiom_bt.validators import DataQualitySLA
+            from axiom_bt.intraday import IntradayStore, Timeframe
+            
+            sla_store = IntradayStore()
+            sla_results = {}
+            sla_passed_all = True
+            
+            # Check all symbols that will be used
+            symbols_to_check = pipeline.symbols
+            
+            for symbol in symbols_to_check:
+                if sla_store.has_symbol(symbol, timeframe=Timeframe(pipeline.fetch.timeframe)):
+                    df = sla_store.load(symbol, timeframe=Timeframe(pipeline.fetch.timeframe))
+                    results = DataQualitySLA.check_all(df)
+                    
+                    # Convert to dict for JSON serialization
+                    sla_results[symbol] = {k: v.to_dict() for k, v in results.items()}
+                    
+                    if not DataQualitySLA.all_passed(results):
+                        sla_passed_all = False
+                        failures = [k for k, v in results.items() if not v.passed]
+                        _store_log({
+                            "kind": "sla_violation",
+                            "symbol": symbol,
+                            "violations": failures,
+                            "details": str(failures)
+                        })
+            
+            # Save SLA results to artifacts/quality
+            quality_dir = ROOT / "artifacts" / "quality"
+            quality_dir.mkdir(parents=True, exist_ok=True)
+            sla_file = quality_dir / f"{run_name}_data_sla.json"
+            
+            sla_summary = {
+                "run_name": run_name,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "passed_all": sla_passed_all,
+                "results": sla_results
+            }
+            
+            sla_file.write_text(json.dumps(sla_summary, indent=2), encoding="utf-8")
+            
+            if not sla_passed_all:
+                show_step_message("Data SLA Check", "Some data SLAs failed (see logs)", status="warning")
+            else:
+                _store_log({
+                    "kind": "step",
+                    "title": "Data SLA Check",
+                    "status": "success", 
+                    "details": "All data SLAs passed"
+                })
+                
+        except Exception as e:
+            _store_log({
+                "kind": "error",
+                "title": "SLA Check Failed",
+                "message": str(e),
+                "status": "warning"
+            })
+            # Don't fail the pipeline for SLA check errors yet
+            pass
+
         signal_args = [
             pipeline.strategy.signal_module,
             "--symbols",

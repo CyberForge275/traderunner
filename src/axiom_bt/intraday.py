@@ -122,7 +122,20 @@ class IntradayStore:
             raise FileNotFoundError(f"Intraday parquet not found: {path}")
 
         frame = pd.read_parquet(path)
-        return _normalize_ohlcv_frame(frame, target_tz=tz or self._default_tz)
+        df = _normalize_ohlcv_frame(frame, target_tz=tz or self._default_tz)
+
+        # v2 Data Contract Validation
+        import os
+        if os.environ.get("ENABLE_CONTRACTS", "false").lower() == "true":
+            from axiom_bt.contracts import IntradayFrameSpec
+            # Contract expects TitleCase columns, but we use lowercase internally
+            validation_view = df.rename(columns={
+                "open": "Open", "high": "High", "low": "Low", 
+                "close": "Close", "volume": "Volume"
+            })
+            IntradayFrameSpec.assert_valid(validation_view, tz=tz or self._default_tz)
+
+        return df
 
     def has_symbol(self, symbol: str, *, timeframe: Timeframe) -> bool:
         symbol = symbol.strip().upper()

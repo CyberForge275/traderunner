@@ -31,10 +31,10 @@ class SLAResult:
     def to_dict(self) -> dict:
         return {
             'sla_name': self.sla_name,
-            'passed': self.passed,
-            'measured_value': self.measured_value,
-            'threshold': self.threshold,
-            'message': self.message,
+            'passed': bool(self.passed),
+            'measured_value': float(self.measured_value),
+            'threshold': float(self.threshold),
+            'message': str(self.message),
             'timestamp': self.timestamp.isoformat() if self.timestamp else None
         }
 
