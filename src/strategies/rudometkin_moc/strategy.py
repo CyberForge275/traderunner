@@ -138,6 +138,16 @@ class RudometkinMOCStrategy(BaseStrategy):
                     "default": {"min": 0.01, "max": 0.20},
                     "description": "Valid ATR(2)/close range for shorts",
                 },
+                "max_daily_signals": {
+                    "type": "integer",
+                    "default": 20,
+                    "minimum": 5,
+                    "maximum": 100,
+                    "description": (
+                        "Maximum candidates per direction from daily scan. "
+                        "Higher values (20-30) increase intraday signal likelihood."
+                    ),
+                },
             },
         }
 

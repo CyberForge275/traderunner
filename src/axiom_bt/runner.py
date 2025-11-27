@@ -62,7 +62,15 @@ def main() -> int:
     if engine != "replay":
         print(f"[ERROR] unsupported engine: {engine}", file=sys.stderr)
         return 2
-    supported_modes = {"insidebar_intraday", "insidebar_intraday_v2"}
+    # The replay engine currently reuses a single simulation function for
+    # all supported intraday-style strategies. Modes are kept explicit for
+    # validation and manifest clarity rather than as a hard routing
+    # mechanism.
+    supported_modes = {
+        "insidebar_intraday",
+        "insidebar_intraday_v2",
+        "rudometkin_moc_mode",
+    }
     if mode not in supported_modes:
         print(f"[ERROR] unsupported mode for replay: {mode}", file=sys.stderr)
         return 2

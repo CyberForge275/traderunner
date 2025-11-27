@@ -54,16 +54,26 @@ def cmd_ensure_intraday(args: argparse.Namespace) -> int:
         if args.force or not m1_path.exists():
             print(f"[FETCH] {symbol} M1 {start}..{end}")
             fetch_start = time.perf_counter()
-            fetch_intraday_1m_to_parquet(
-                symbol,
-                args.exchange,
-                start,
-                end,
-                DATA_M1,
-                tz=args.tz,
-                use_sample=args.use_sample,
-            )
-            fetch_duration = time.perf_counter() - fetch_start
+            try:
+                fetch_intraday_1m_to_parquet(
+                    symbol,
+                    args.exchange,
+                    start,
+                    end,
+                    DATA_M1,
+                    tz=args.tz,
+                    use_sample=args.use_sample,
+                )
+                fetch_duration = time.perf_counter() - fetch_start
+            except Exception as exc:  # tolerant for symbols with no data
+                msg = str(exc)
+                # EODHD may legitimately return "No data" for some
+                # symbols/windows; log and continue instead of failing
+                # the entire batch.
+                if "No data from EODHD" in msg or "No data" in msg:
+                    print(f"[WARN] Skipping {symbol}: {msg}")
+                    continue
+                raise
         else:
             print(f"[SKIP] {symbol} M1 exists: {m1_path}")
 

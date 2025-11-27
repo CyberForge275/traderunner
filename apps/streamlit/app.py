@@ -120,19 +120,34 @@ def _render_universe_and_symbols(
                             .tolist()
                         )
                         universe_symbols = sorted(universe_symbols)
-                        st.success(f"Loaded {len(universe_symbols)} symbols from universe columns.")
+                        preview = ", ".join(universe_symbols[:15])
+                        suffix = " …" if len(universe_symbols) > 15 else ""
+                        st.success(
+                            f"Loaded {len(universe_symbols)} symbols from universe columns. "
+                            f"Preview (first {min(15, len(universe_symbols))}): {preview}{suffix}"
+                        )
                     elif isinstance(u_df.index, pd.MultiIndex):
                         level_0 = u_df.index.get_level_values(0)
                         if pd.api.types.is_string_dtype(level_0) or level_0.dtype == object:
                             universe_symbols = sorted(
                                 level_0.unique().astype(str).str.strip().str.upper().tolist()
                             )
-                            st.success(f"Loaded {len(universe_symbols)} symbols from universe index.")
+                            preview = ", ".join(universe_symbols[:15])
+                            suffix = " …" if len(universe_symbols) > 15 else ""
+                            st.success(
+                                f"Loaded {len(universe_symbols)} symbols from universe index. "
+                                f"Preview (first {min(15, len(universe_symbols))}): {preview}{suffix}"
+                            )
                     elif u_df.index.dtype == object or pd.api.types.is_string_dtype(u_df.index):
                         universe_symbols = sorted(
                             u_df.index.unique().astype(str).str.strip().str.upper().tolist()
                         )
-                        st.success(f"Loaded {len(universe_symbols)} symbols from universe index.")
+                        preview = ", ".join(universe_symbols[:15])
+                        suffix = " …" if len(universe_symbols) > 15 else ""
+                        st.success(
+                            f"Loaded {len(universe_symbols)} symbols from universe index. "
+                            f"Preview (first {min(15, len(universe_symbols))}): {preview}{suffix}"
+                        )
 
                     if not universe_symbols:
                         if "ts_id" in u_cols:
@@ -142,8 +157,8 @@ def _render_universe_and_symbols(
                             )
                         else:
                             st.error("Could not identify symbol column in universe file.")
-                except Exception as exc:  # pragma: no cover - defensive
-                    st.error(f"Failed to read universe file: {exc}")
+                except (OSError, ValueError, pd.errors.EmptyDataError) as exc:  # pragma: no cover - defensive
+                    st.error(f"Failed to read universe file {u_path}: {type(exc).__name__}: {exc}")
             else:
                 st.warning(f"Universe file not found: {u_path}")
 
@@ -339,12 +354,22 @@ def _render_rudometkin_parameters() -> dict:
             )
         with col3:
             rk_config["max_daily_signals"] = st.number_input(
-                "Max Signals per Day (Long/Short)",
-                min_value=1,
+                "Max Daily Candidates per Direction",
+                min_value=5,
                 max_value=100,
-                value=int(rk_config.get("max_daily_signals", 10)),
-                step=1,
+                value=int(rk_config.get("max_daily_signals", 20)),  # Increased from 10
+                step=5,
+                help="Number of top LONG and SHORT candidates to select from daily scan for intraday processing. "
+                     "Higher values increase chance of intraday signals but require fetching more data. "
+                     "Recommended: 20-30 for active trading strategies."
             )
+            
+            # Warning for low values
+            if rk_config["max_daily_signals"] < 15:
+                st.warning(
+                    f"⚠️ Low candidate count ({rk_config['max_daily_signals']}) may result in few intraday signals. "
+                    "Consider 20-30 for better trade coverage."
+                )
 
     with st.expander("Advanced Indicator Settings", expanded=False):
         col1, col2 = st.columns(2)
@@ -403,6 +428,33 @@ def list_runs(base_dir: str) -> list[str]:
     return [d.name for d in runs]
 
 
+def _load_run_log(run_name: str) -> dict:
+    """Load structured run_log.json for a given run if present."""
+    log_path = BT_DIR / run_name / "run_log.json"
+    return _read_json(log_path)
+
+
+def _load_rk_signals(run_name: str) -> pd.DataFrame | None:
+    """Load latest Rudometkin daily-candidates CSV for a run, if any.
+
+    This treats RK daily scan output as a first-class artifact so that
+    RK runs remain reviewable even when we skip intraday Stage 2.
+    """
+    rk_dir = ROOT / "artifacts" / "signals" / run_name
+    if not rk_dir.exists():
+        return None
+    csv_paths = sorted(rk_dir.glob("signals_rudometkin_*.csv"))
+    if not csv_paths:
+        return None
+    latest = csv_paths[-1]
+    try:
+        df = pd.read_csv(latest)
+    except (pd.errors.ParserError, OSError):
+        return None
+    df._source_path = latest  # type: ignore[attr-defined]
+    return df
+
+
 @st.cache_data(show_spinner=False)
 def list_symbols(data_dir: str) -> list[str]:
     path = Path(data_dir)
@@ -427,7 +479,9 @@ def _read_csv(path: Path) -> pd.DataFrame | None:
         return None
     try:
         return pd.read_csv(path)
-    except (pd.errors.ParserError, OSError):
+    except (pd.errors.ParserError, pd.errors.EmptyDataError, OSError):
+        # Treat unreadable or empty CSVs as "no data" so the UI can
+        # gracefully display an empty state instead of failing.
         return None
 
 
@@ -569,6 +623,10 @@ with st.sidebar:
             )
             today = pd.Timestamp.today().date()
 
+            # For Rudometkin, default to a short 3-business-day window; for
+            # other strategies keep the existing 30-day default.
+            default_days_back = 3 if selected_meta.name == RUDOMETKIN_METADATA.name else 30
+
             if date_mode == "Days back from anchor":
                 anchor_date = st.date_input(
                     "Anchor date",
@@ -578,7 +636,7 @@ with st.sidebar:
                 days_back = st.number_input(
                     "Days back",
                     min_value=1,
-                    value=30,
+                    value=default_days_back,
                     step=1,
                     key="manual_days_back",
                 )
@@ -671,9 +729,43 @@ with st.sidebar:
             
             config_path_for_run = None
 
-        # Optional: show the final merged configuration for transparency
+        manual_mode = config_mode == "Manual"
+
+        # Enhanced config preview with capabilities and summary
         if config_payload is not None:
-            with st.expander("Preview effective config payload", expanded=False):
+            with st.expander("📋 Preview Effective Configuration", expanded=False):
+                st.markdown("### Strategy Information")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Strategy", selected_meta.strategy_name)
+                with col2:
+                    st.metric("Requires Universe", "Yes" if selected_meta.requires_universe else "No")
+                with col3:
+                    st.metric("Two-Stage Pipeline", "Yes" if selected_meta.supports_two_stage_pipeline else "No")
+                
+                st.markdown("### Execution Plan")
+                symbol_set_preview = sorted(list(set(symbol_preview) | set(universe_symbols)))
+                config_summary = {
+                    "symbols_count": len(symbol_set_preview),
+                    "sample_symbols": symbol_set_preview[:10] if symbol_set_preview else [],
+                    "date_range": {
+                        "start": fetch_start_str if manual_mode else "From config",
+                        "end": fetch_end_str if manual_mode else "From config"
+                    },
+                    "timeframe": timeframe,
+                    "initial_cash": config_payload.get("initial_cash"),
+                    "risk_pct": config_payload.get("risk_pct"),
+                }
+                
+                if selected_meta.requires_universe and rudometkin_universe_path:
+                    config_summary["universe_path"] = rudometkin_universe_path
+                
+                if selected_meta.supports_two_stage_pipeline and "max_daily_signals" in config_payload:
+                    config_summary["max_daily_signals"] = config_payload["max_daily_signals"]
+                
+                st.json(config_summary)
+                
+                st.markdown("### Full Configuration Payload")
                 st.json(config_payload)
 
     if st.button("Start backtest", type="primary", width="stretch"):
@@ -792,7 +884,26 @@ if not selected_run:
     st.stop()
 
 run = load_run(selected_run)
+run_log = _load_run_log(selected_run)
+rk_df = _load_rk_signals(selected_run)
+
 st.markdown(f"## Run: **{selected_run}**")
+
+status = (run_log or {}).get("status", "unknown")
+strategy_name = (run_log or {}).get("strategy", run["manifest"].get("strategy", "unknown"))
+status_col, strategy_col = st.columns([1, 3])
+with status_col:
+    if status.startswith("success"):
+        st.success(f"Status: {status}")
+    elif status.startswith("warning"):
+        st.warning(f"Status: {status}")
+    elif status.startswith("error"):
+        st.error(f"Status: {status}")
+    else:
+        st.info(f"Status: {status}")
+with strategy_col:
+    st.write(f"Strategy: `{strategy_name}`")
+
 chart_columns = st.columns([1, 1])
 
 with chart_columns[0]:
@@ -835,9 +946,44 @@ else:
     st.info("No metrics available for this run yet.")
 
 
+st.subheader("Run log & performance")
+log_path = run["run_dir"] / "run_log.json"
+with st.expander("Details", expanded=False):
+    if log_path.exists():
+        try:
+            import json
+
+            payload = json.loads(log_path.read_text(encoding="utf-8"))
+            entries = payload.get("entries", [])
+            if not entries:
+                st.info("No log entries recorded for this run.")
+            else:
+                df = pd.DataFrame(entries)
+                # Basic per-step timing summary
+                if "duration" in df.columns and "title" in df.columns:
+                    summary = (
+                        df.groupby("title")["duration"]
+                        .sum()
+                        .reset_index()
+                        .sort_values("duration", ascending=False)
+                    )
+                    st.subheader("Per-step durations (s)")
+                    st.dataframe(summary, use_container_width=True, height=240)
+
+                with st.expander("Raw log entries", expanded=False):
+                    st.dataframe(df, use_container_width=True, height=360)
+        except Exception as exc:  # pragma: no cover - defensive UI
+            st.info(f"Run log could not be loaded: {exc}")
+    else:
+        st.info("No run_log.json found for this run yet.")
+
+
+# Tabs for orders/fills/trades (if any)
 tabs = st.tabs(["Orders", "Filled Orders", "Trades"])
+orders_tab_idx = 0
+
 orders_df = run["orders_csv"]
-with tabs[0]:
+with tabs[orders_tab_idx]:
     if orders_df is not None and not orders_df.empty:
         display_orders = orders_df.copy()
         for column in ["price", "stop_loss", "take_profit"]:
@@ -847,7 +993,7 @@ with tabs[0]:
     else:
         st.info("No orders available.")
 
-with tabs[1]:
+with tabs[orders_tab_idx + 1]:
     filled_df = run["fills_csv"]
     if filled_df is not None and not filled_df.empty:
         display_fills = filled_df.copy()
@@ -860,7 +1006,7 @@ with tabs[1]:
     else:
         st.info("No fills available.")
 
-with tabs[2]:
+with tabs[orders_tab_idx + 2]:
     trades_df = run["trades_csv"]
     if trades_df is not None and not trades_df.empty:
         display_trades = trades_df.copy()
@@ -870,3 +1016,33 @@ with tabs[2]:
         st.dataframe(display_trades, width="stretch", height=360)
     else:
         st.info("No trades available.")
+
+
+# Rudometkin daily candidates: show whenever available, regardless of
+# whether the run had a full backtest or failed mid-pipeline.
+if rk_df is not None:
+    st.subheader("Rudometkin Daily Candidates")
+    source_path = getattr(rk_df, "_source_path", None)
+    if source_path is not None:
+        st.caption(f"Loaded from: {source_path}")
+    # Lightweight summary
+    longs = rk_df[rk_df.get("long_entry").notna()] if "long_entry" in rk_df.columns else rk_df.iloc[0:0]
+    shorts = rk_df[rk_df.get("short_entry").notna()] if "short_entry" in rk_df.columns else rk_df.iloc[0:0]
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Total Candidates", len(rk_df))
+    with c2:
+        st.metric("LONG Candidates", len(longs))
+    with c3:
+        st.metric("SHORT Candidates", len(shorts))
+
+    display_daily = rk_df.copy()
+    for col in ["long_entry", "short_entry", "sl_long", "sl_short", "tp_long", "tp_short"]:
+        if col in display_daily.columns:
+            display_daily[col] = pd.to_numeric(display_daily[col], errors="coerce").round(2)
+    if "score" in display_daily.columns:
+        display_daily["score"] = pd.to_numeric(display_daily["score"], errors="coerce").round(4)
+
+    st.dataframe(display_daily, use_container_width=True, height=400)
+elif strategy_name == "rudometkin_moc":
+    st.info("No Rudometkin daily candidates stored for this run.")

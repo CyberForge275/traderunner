@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from src.strategies.rudometkin_moc.strategy import RudometkinMOCStrategy
+from src.strategies.rudometkin_moc import pipeline as rudometkin_pipeline
 
 
 @pytest.fixture
@@ -177,3 +178,47 @@ def test_universe_path_filters_unknown_symbol(
     )
 
     assert signals == []
+
+
+def test_run_daily_scan_missing_universe_columns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """run_daily_scan should return [] when symbol/date columns are missing."""
+
+    # Create a malformed universe parquet (no symbol / date columns)
+    bad_universe = tmp_path / "bad_universe.parquet"
+    pd.DataFrame({"ts_id": [1, 2, 3]}).to_parquet(bad_universe)
+
+    class DummyFetch:
+        timeframe = "D1"
+        start = None
+        end = None
+        use_sample = False
+        force_refresh = False
+        data_dir = tmp_path
+        data_dir_m1 = tmp_path
+
+        def symbols_to_fetch(self):  # pragma: no cover - not used here
+            return []
+
+        def needs_force_refresh(self):  # pragma: no cover - not used here
+            return False
+
+        def stale_reasons(self):  # pragma: no cover - not used here
+            return {}
+
+    class DummyStrategyMeta:
+        strategy_name = "rudometkin_moc"
+        timezone = "Europe/Berlin"
+        orders_source = tmp_path / "signals.csv"
+        default_strategy_config = {"universe_path": str(bad_universe)}
+
+    class DummyPipeline:
+        run_name = "test_run"
+        fetch = DummyFetch()
+        symbols = ["TEST"]
+        strategy = DummyStrategyMeta()
+        config_path = None
+        config_payload = None
+
+    # In a non-Streamlit environment, this should simply return []
+    result = rudometkin_pipeline.run_daily_scan(DummyPipeline(), max_daily_signals=5)
+    assert result == []

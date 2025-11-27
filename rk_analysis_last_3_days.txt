@@ -1,0 +1,355 @@
+====================================================================================================
+🚀 RUDOMETKIN (RK) STRATEGY CLI
+====================================================================================================
+📅 Analyzing 3 trading days: 2025-11-19 to 2025-11-21
+📁 Universe: data/universe/rudometkin.parquet
+📁 Intraday: artifacts/data_m5
+🎯 Max candidates per direction: 20
+
+====================================================================================================
+📅 DAILY SCAN FOR 2025-11-19
+====================================================================================================
+📊 Scanning 4965 symbols...
+
+🟢 LONG CANDIDATES: 20
+----------------------------------------------------------------------------------------------------
+Rank  Symbol     Score        Entry Price  Setup          
+----------------------------------------------------------------------------------------------------
+1     MOVE       0.2495       $9.89        moc_long       
+2     GLTO       0.2381       $20.14       moc_long       
+3     MOVE       0.2272       $9.79        moc_long       
+4     GLTO       0.2206       $22.05       moc_long       
+5     BKKT       0.2164       $16.20       moc_long       
+6     MOVE       0.2136       $11.58       moc_long       
+7     MOVE       0.2135       $9.71        moc_long       
+8     BKKT       0.2129       $17.87       moc_long       
+9     BKKT       0.2052       $20.23       moc_long       
+10    BKKT       0.2010       $20.56       moc_long       
+11    BKKT       0.1900       $16.39       moc_long       
+12    MOVE       0.1831       $11.49       moc_long       
+13    GLTO       0.1796       $16.65       moc_long       
+14    LTBR       0.1701       $17.41       moc_long       
+15    NTLA       0.1664       $11.89       moc_long       
+16    QURE       0.1641       $26.97       moc_long       
+17    BTDR       0.1636       $14.49       moc_long       
+18    RGTI       0.1597       $24.32       moc_long       
+19    NEGG       0.1588       $56.93       moc_long       
+20    QBTS       0.1553       $22.57       moc_long       
+
+🔴 SHORT CANDIDATES: 20
+----------------------------------------------------------------------------------------------------
+Rank  Symbol     Score        Entry Price  Setup          
+----------------------------------------------------------------------------------------------------
+1     NXTT       17042.8571   $25.20       moc_short      
+2     WW         12658.0645   $41.53       moc_short      
+3     SGBX       7692.3077    $10.64       moc_short      
+4     INDP       2310.8696    $11.64       moc_short      
+5     VOR        2182.2368    $36.42       moc_short      
+6     POAI       1737.1795    $15.05       moc_short      
+7     LCID       831.3131     $19.36       moc_short      
+8     LCID       789.3720     $19.33       moc_short      
+9     ABVX       598.0000     $73.29       moc_short      
+10    OXLC       382.8338     $18.61       moc_short      
+11    LXP        378.2744     $48.31       moc_short      
+12    OXLC       374.7967     $18.40       moc_short      
+13    QURE       329.5011     $62.37       moc_short      
+14    QURE       291.5645     $57.03       moc_short      
+15    CELC       186.8327     $42.31       moc_short      
+16    COGT       144.5215     $37.02       moc_short      
+17    MLYS       132.1059     $37.73       moc_short      
+18    MLYS       128.6465     $36.54       moc_short      
+19    TERN       126.8080     $19.10       moc_short      
+20    TERN       123.6520     $19.16       moc_short      
+
+====================================================================================================
+🔍 INTRADAY SIGNALS CHECK FOR 2025-11-19
+====================================================================================================
+
+🟢 Checking 20 LONG candidates for intraday triggers...
+----------------------------------------------------------------------------------------------------
+  MOVE       ⚠️  No intraday data
+  GLTO       ⚠️  No intraday data
+  MOVE       ⚠️  No intraday data
+  GLTO       ⚠️  No intraday data
+  BKKT       ⚠️  Insufficient data
+  MOVE       ⚠️  No intraday data
+  MOVE       ⚠️  No intraday data
+  BKKT       ⚠️  Insufficient data
+  BKKT       ⚠️  Insufficient data
+  BKKT       ⚠️  Insufficient data
+  BKKT       ⚠️  Insufficient data
+  MOVE       ⚠️  No intraday data
+  GLTO       ⚠️  No intraday data
+  LTBR       ⚠️  No intraday data
+  NTLA       ⚠️  No intraday data
+  QURE       ⚠️  No intraday data
+  BTDR       ⚠️  Insufficient data
+  RGTI       ⚠️  No intraday data
+  NEGG       ⚠️  No intraday data
+  QBTS       ⚠️  No intraday data
+
+🔴 Checking 20 SHORT candidates for intraday triggers...
+----------------------------------------------------------------------------------------------------
+  NXTT       ⚠️  No intraday data
+  WW         ⚠️  No intraday data
+  SGBX       ⚠️  No intraday data
+  INDP       ⚠️  No intraday data
+  VOR        ⚠️  No intraday data
+  POAI       ⚠️  No intraday data
+  LCID       ⚠️  No intraday data
+  LCID       ⚠️  No intraday data
+  ABVX       ⚠️  Insufficient data
+  OXLC       ⚠️  No intraday data
+  LXP        ⚠️  No intraday data
+  OXLC       ⚠️  No intraday data
+  QURE       ⚠️  No intraday data
+  QURE       ⚠️  No intraday data
+  CELC       ⚠️  Insufficient data
+  COGT       ⚠️  Insufficient data
+  MLYS       ⚠️  No intraday data
+  MLYS       ⚠️  No intraday data
+  TERN       ⚠️  No intraday data
+  TERN       ⚠️  No intraday data
+
+📊 INTRADAY SUMMARY:
+  LONG candidates with signals:  0/20
+  SHORT candidates with signals: 0/20
+
+====================================================================================================
+📅 DAILY SCAN FOR 2025-11-20
+====================================================================================================
+📊 Scanning 5012 symbols...
+
+🟢 LONG CANDIDATES: 20
+----------------------------------------------------------------------------------------------------
+Rank  Symbol     Score        Entry Price  Setup          
+----------------------------------------------------------------------------------------------------
+1     GLTO       0.2640       $16.74       moc_long       
+2     MOVE       0.2495       $9.89        moc_long       
+3     GLTO       0.2381       $20.14       moc_long       
+4     MOVE       0.2272       $9.79        moc_long       
+5     GLTO       0.2206       $22.05       moc_long       
+6     BKKT       0.2164       $16.20       moc_long       
+7     MOVE       0.2136       $11.58       moc_long       
+8     MOVE       0.2135       $9.71        moc_long       
+9     BKKT       0.2129       $17.87       moc_long       
+10    BKKT       0.2052       $20.23       moc_long       
+11    BKKT       0.1900       $16.39       moc_long       
+12    MOVE       0.1831       $11.49       moc_long       
+13    GLTO       0.1796       $16.65       moc_long       
+14    CSIQ       0.1725       $20.68       moc_long       
+15    BE         0.1649       $90.11       moc_long       
+16    QURE       0.1641       $26.97       moc_long       
+17    BTDR       0.1636       $14.49       moc_long       
+18    CIFR       0.1604       $14.05       moc_long       
+19    IREN       0.1598       $41.95       moc_long       
+20    RGTI       0.1597       $24.32       moc_long       
+
+🔴 SHORT CANDIDATES: 20
+----------------------------------------------------------------------------------------------------
+Rank  Symbol     Score        Entry Price  Setup          
+----------------------------------------------------------------------------------------------------
+1     NXTT       17042.8571   $25.20       moc_short      
+2     WW         12658.0645   $41.53       moc_short      
+3     SGBX       7692.3077    $10.64       moc_short      
+4     INDP       2310.8696    $11.64       moc_short      
+5     VOR        2182.2368    $36.42       moc_short      
+6     POAI       1737.1795    $15.05       moc_short      
+7     LCID       831.3131     $19.36       moc_short      
+8     LCID       789.3720     $19.33       moc_short      
+9     ABVX       598.0000     $73.29       moc_short      
+10    OXLC       382.8338     $18.61       moc_short      
+11    LXP        378.2744     $48.31       moc_short      
+12    OXLC       374.7967     $18.40       moc_short      
+13    QURE       329.5011     $62.37       moc_short      
+14    QURE       291.5645     $57.03       moc_short      
+15    CELC       186.8327     $42.31       moc_short      
+16    COGT       144.5215     $37.02       moc_short      
+17    MLYS       132.1059     $37.73       moc_short      
+18    MLYS       128.6465     $36.54       moc_short      
+19    TERN       126.8080     $19.10       moc_short      
+20    TERN       123.6520     $19.16       moc_short      
+
+====================================================================================================
+🔍 INTRADAY SIGNALS CHECK FOR 2025-11-20
+====================================================================================================
+
+🟢 Checking 20 LONG candidates for intraday triggers...
+----------------------------------------------------------------------------------------------------
+  GLTO       ⚠️  No intraday data
+  MOVE       ⚠️  No intraday data
+  GLTO       ⚠️  No intraday data
+  MOVE       ⚠️  No intraday data
+  GLTO       ⚠️  No intraday data
+  BKKT       ⚠️  Insufficient data
+  MOVE       ⚠️  No intraday data
+  MOVE       ⚠️  No intraday data
+  BKKT       ⚠️  Insufficient data
+  BKKT       ⚠️  Insufficient data
+  BKKT       ⚠️  Insufficient data
+  MOVE       ⚠️  No intraday data
+  GLTO       ⚠️  No intraday data
+  CSIQ       ⚠️  Insufficient data
+  BE         ⚠️  Insufficient data
+  QURE       ⚠️  No intraday data
+  BTDR       ⚠️  Insufficient data
+  CIFR       ⚠️  Insufficient data
+  IREN       ⚠️  No intraday data
+  RGTI       ⚠️  No intraday data
+
+🔴 Checking 20 SHORT candidates for intraday triggers...
+----------------------------------------------------------------------------------------------------
+  NXTT       ⚠️  No intraday data
+  WW         ⚠️  No intraday data
+  SGBX       ⚠️  No intraday data
+  INDP       ⚠️  No intraday data
+  VOR        ⚠️  No intraday data
+  POAI       ⚠️  No intraday data
+  LCID       ⚠️  No intraday data
+  LCID       ⚠️  No intraday data
+  ABVX       ⚠️  Insufficient data
+  OXLC       ⚠️  No intraday data
+  LXP        ⚠️  No intraday data
+  OXLC       ⚠️  No intraday data
+  QURE       ⚠️  No intraday data
+  QURE       ⚠️  No intraday data
+  CELC       ⚠️  Insufficient data
+  COGT       ⚠️  Insufficient data
+  MLYS       ⚠️  No intraday data
+  MLYS       ⚠️  No intraday data
+  TERN       ⚠️  No intraday data
+  TERN       ⚠️  No intraday data
+
+📊 INTRADAY SUMMARY:
+  LONG candidates with signals:  0/20
+  SHORT candidates with signals: 0/20
+
+====================================================================================================
+📅 DAILY SCAN FOR 2025-11-21
+====================================================================================================
+📊 Scanning 5004 symbols...
+
+🟢 LONG CANDIDATES: 20
+----------------------------------------------------------------------------------------------------
+Rank  Symbol     Score        Entry Price  Setup          
+----------------------------------------------------------------------------------------------------
+1     GLTO       0.2640       $16.74       moc_long       
+2     MOVE       0.2495       $9.89        moc_long       
+3     GLTO       0.2381       $20.14       moc_long       
+4     MOVE       0.2272       $9.79        moc_long       
+5     GLTO       0.2206       $22.05       moc_long       
+6     BKKT       0.2164       $16.20       moc_long       
+7     MOVE       0.2136       $11.58       moc_long       
+8     MOVE       0.2135       $9.71        moc_long       
+9     BKKT       0.2129       $17.87       moc_long       
+10    BKKT       0.2052       $20.23       moc_long       
+11    BKKT       0.1900       $16.39       moc_long       
+12    MOVE       0.1831       $11.49       moc_long       
+13    GLTO       0.1796       $16.65       moc_long       
+14    BE         0.1745       $86.84       moc_long       
+15    CSIQ       0.1725       $20.68       moc_long       
+16    BE         0.1649       $90.11       moc_long       
+17    QURE       0.1641       $26.97       moc_long       
+18    BTDR       0.1636       $14.49       moc_long       
+19    CIFR       0.1604       $14.05       moc_long       
+20    IREN       0.1598       $41.95       moc_long       
+
+🔴 SHORT CANDIDATES: 20
+----------------------------------------------------------------------------------------------------
+Rank  Symbol     Score        Entry Price  Setup          
+----------------------------------------------------------------------------------------------------
+1     NXTT       17042.8571   $25.20       moc_short      
+2     WW         12658.0645   $41.53       moc_short      
+3     SGBX       7692.3077    $10.64       moc_short      
+4     INDP       2310.8696    $11.64       moc_short      
+5     VOR        2182.2368    $36.42       moc_short      
+6     POAI       1737.1795    $15.05       moc_short      
+7     LCID       831.3131     $19.36       moc_short      
+8     LCID       789.3720     $19.33       moc_short      
+9     ABVX       598.0000     $73.29       moc_short      
+10    OXLC       382.8338     $18.61       moc_short      
+11    LXP        378.2744     $48.31       moc_short      
+12    OXLC       374.7967     $18.40       moc_short      
+13    QURE       329.5011     $62.37       moc_short      
+14    QURE       291.5645     $57.03       moc_short      
+15    CELC       186.8327     $42.31       moc_short      
+16    PACS       159.9244     $28.88       moc_short      
+17    COGT       144.5215     $37.02       moc_short      
+18    MLYS       132.1059     $37.73       moc_short      
+19    MLYS       128.6465     $36.54       moc_short      
+20    TERN       126.8080     $19.10       moc_short      
+
+====================================================================================================
+🔍 INTRADAY SIGNALS CHECK FOR 2025-11-21
+====================================================================================================
+
+🟢 Checking 20 LONG candidates for intraday triggers...
+----------------------------------------------------------------------------------------------------
+  GLTO       ⚠️  No intraday data
+  MOVE       ⚠️  No intraday data
+  GLTO       ⚠️  No intraday data
+  MOVE       ⚠️  No intraday data
+  GLTO       ⚠️  No intraday data
+  BKKT       ⚠️  Insufficient data
+  MOVE       ⚠️  No intraday data
+  MOVE       ⚠️  No intraday data
+  BKKT       ⚠️  Insufficient data
+  BKKT       ⚠️  Insufficient data
+  BKKT       ⚠️  Insufficient data
+  MOVE       ⚠️  No intraday data
+  GLTO       ⚠️  No intraday data
+  BE         ⚪ No signals
+  CSIQ       ⚠️  Insufficient data
+  BE         ⚪ No signals
+  QURE       ⚠️  No intraday data
+  BTDR       ⚠️  Insufficient data
+  CIFR       ⚪ No signals
+  IREN       ⚠️  No intraday data
+
+🔴 Checking 20 SHORT candidates for intraday triggers...
+----------------------------------------------------------------------------------------------------
+  NXTT       ⚠️  No intraday data
+  WW         ⚠️  No intraday data
+  SGBX       ⚠️  No intraday data
+  INDP       ⚠️  No intraday data
+  VOR        ⚠️  No intraday data
+  POAI       ⚠️  No intraday data
+  LCID       ⚠️  No intraday data
+  LCID       ⚠️  No intraday data
+  ABVX       ⚠️  Insufficient data
+  OXLC       ⚠️  No intraday data
+  LXP        ⚠️  No intraday data
+  OXLC       ⚠️  No intraday data
+  QURE       ⚠️  No intraday data
+  QURE       ⚠️  No intraday data
+  CELC       ⚠️  Insufficient data
+  PACS       ⚠️  No intraday data
+  COGT       ⚠️  Insufficient data
+  MLYS       ⚠️  No intraday data
+  MLYS       ⚠️  No intraday data
+  TERN       ⚠️  No intraday data
+
+📊 INTRADAY SUMMARY:
+  LONG candidates with signals:  0/20
+  SHORT candidates with signals: 0/20
+
+====================================================================================================
+📈 OVERALL SUMMARY
+====================================================================================================
+
+2025-11-19:
+  Daily:    20 LONG, 20 SHORT
+  Intraday: 0 LONG triggered, 0 SHORT triggered
+
+2025-11-20:
+  Daily:    20 LONG, 20 SHORT
+  Intraday: 0 LONG triggered, 0 SHORT triggered
+
+2025-11-21:
+  Daily:    20 LONG, 20 SHORT
+  Intraday: 0 LONG triggered, 0 SHORT triggered
+
+====================================================================================================
+✅ Analysis complete!
+====================================================================================================
+

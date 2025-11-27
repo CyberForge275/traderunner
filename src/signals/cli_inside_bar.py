@@ -9,6 +9,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
+from axiom_bt.intraday import IntradayStore, Timeframe
 from strategies import factory, registry
 from core.settings import (
     INSIDE_BAR_SESSIONS,
@@ -32,32 +33,6 @@ def _parse_sessions(raw: str) -> List[Tuple[time, time]]:
 
 def _infer_symbols(data_path: Path) -> List[str]:
     return sorted({p.stem.upper() for p in data_path.glob("*.parquet")})
-
-
-def _load_ohlcv(path: Path, target_tz: str) -> pd.DataFrame:
-    frame = pd.read_parquet(path)
-    if "timestamp" in frame.columns:
-        ts = pd.to_datetime(frame["timestamp"], errors="coerce", utc=True)
-        frame = frame.drop(columns=["timestamp"])
-        frame.index = ts
-    elif not isinstance(frame.index, pd.DatetimeIndex):
-        raise ValueError(f"{path} is missing a datetime index or 'timestamp' column")
-
-    if frame.index.tz is None:
-        frame.index = frame.index.tz_localize("UTC")
-
-    required = ["Open", "High", "Low", "Close", "Volume"]
-    missing = [col for col in required if col not in frame.columns]
-    if missing:
-        raise ValueError(f"{path} missing OHLCV columns: {missing}")
-
-    ordered = frame[required].sort_index()
-    ordered.index.name = "timestamp"
-    if ordered.index.tz is None:
-        ordered.index = ordered.index.tz_localize("UTC")
-    ordered = ordered.tz_convert(target_tz)
-    ordered = ordered.rename(columns=lambda c: c.lower())
-    return ordered
 
 
 def _session_id(ts: pd.Timestamp, sessions: List[Tuple[time, time]]) -> int:
@@ -176,6 +151,7 @@ def main(argv: List[str] | None = None) -> int:
         return 0
 
     sessions = _parse_sessions(args.sessions)
+    store = IntradayStore(default_tz=args.tz)
     config = build_config(args)
     if args.strategy not in registry.list_strategies():
         registry.auto_discover("strategies")
@@ -184,13 +160,12 @@ def main(argv: List[str] | None = None) -> int:
     rows: List[Dict[str, object]] = []
 
     for symbol in symbols:
-        source = data_path / f"{symbol}.parquet"
-        if not source.exists():
+        try:
+            ohlcv = store.load(symbol, timeframe=Timeframe.M5, tz=args.tz)
+        except FileNotFoundError:
+            source = data_path / f"{symbol}.parquet"
             print(f"[WARN] Missing parquet for {symbol}: {source}")
             continue
-
-        try:
-            ohlcv = _load_ohlcv(source, args.tz)
         except Exception as exc:
             print(f"[WARN] Failed to load {symbol}: {exc}")
             continue

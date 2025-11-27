@@ -102,6 +102,9 @@ class StrategyMetadata:
     doc_path: Optional[Path] = None
     default_sizing: Optional[Dict] = None
     default_strategy_config: Dict[str, Any] = field(default_factory=dict)
+    requires_universe: bool = False
+    supports_two_stage_pipeline: bool = False
+
 
 
 INSIDE_BAR_METADATA = StrategyMetadata(
@@ -179,6 +182,8 @@ RUDOMETKIN_METADATA = StrategyMetadata(
     default_strategy_config={
         "universe_path": str(RUDOMETKIN_UNIVERSE_DEFAULT)
     },
+    requires_universe=True,
+    supports_two_stage_pipeline=True,
 )
 
 
