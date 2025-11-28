@@ -21,6 +21,16 @@ sdist/
 var/
 wheels/
 pip-wheel-metadata/
+# Data directories (exclude all except test samples)
+data/*
+!data/samples/
+data/samples/*
+!data/samples/*.parquet
+!data/samples/m1_candles/
+!data/samples/m5_candles/
+!data/samples/m15_candles/
+!data/samples/**/*.parquet
+!data/samples/README.md
 share/python-wheels/
 *.egg-info/
 .installed.cfg
@@ -95,3 +105,6 @@ Thumbs.db
 *.zip
 *.tar.gz
 *.rar
+
+# Temporary project analysis folder
+tmp/
