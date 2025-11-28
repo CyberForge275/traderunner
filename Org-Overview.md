@@ -16,21 +16,21 @@ Backtesting and research framework (Axiom-BT).
 ### **automatictrader-api**
 API + Worker that processes signals into order intents and sends them to Interactive Brokers (TWS).  
 **Focus:** Planning, idempotency, risk limits, health checks.  
-**Current Repository:** https://dev.azure.com/mirko2175/AutomaticTrader/_git/AutomaticTrader  
-**Future Repository:** https://github.com/droid-trading/automatictrader-api _(migration pending)_  
+**Previous Repository:** https://dev.azure.com/mirko2175/AutomaticTrader/_git/AutomaticTrader _(archived)_  
+**Repository:** https://github.com/CyberForge275/automatictrader-api  
 **Local Path:** `/home/mirko/data/workspace/automatictrader-api`  
-**Status:** 🔄 Migration to GitHub in progress
+**Status:** ✅ Migrated to GitHub
 
 ### **marketdata-stream**
 Provider-agnostic market data service with WebSocket connectivity.  
 **Focus:** Real-time data from EODHD (and later other providers) streamed/stored in internal format.  
-**Repository:** https://github.com/droid-trading/marketdata-stream _(to be created)_  
+**Repository:** https://github.com/CyberForge275/marketdata-stream  
 **Local Path:** `/home/mirko/data/workspace/droid/marketdata-stream`  
-**Status:** 🆕 Git initialized, ready for GitHub
+**Status:** ✅ Active on GitHub
 
 ### **deployment** _(optional)_
 Shared infrastructure artifacts: Docker Compose, K8s manifests, systemd templates, runbooks.  
-**Repository:** https://github.com/droid-trading/deployment _(future)_  
+**Repository:** https://github.com/CyberForge275/deployment _(future)_  
 **Status:** 📋 Planned
 
 ---
@@ -164,14 +164,14 @@ services:
 
 ### **GitHub Organization Structure**
 
-**Recommended:** Create a `droid-trading` GitHub organization
+**Current:** All repositories under `CyberForge275` GitHub account
 
 ```
-github.com/droid-trading/
-├── traderunner           → Research & backtesting (can be public)
+github.com/CyberForge275/
+├── traderunner           → Research & backtesting (public)
 ├── automatictrader-api   → Order execution (private)
-├── marketdata-stream     → Data streaming (private or public)
-└── deployment           → Infrastructure (private)
+├── marketdata-stream     → Data streaming (private)
+└── deployment           → Infrastructure (planned, private)
 ```
 
 ### **Visibility Recommendations**
@@ -197,8 +197,9 @@ For all repositories, enable:
 
 ### Repositories
 - [traderunner](https://github.com/CyberForge275/traderunner)
-- [automatictrader-api (Azure DevOps)](https://dev.azure.com/mirko2175/AutomaticTrader/_git/AutomaticTrader)
-- marketdata-stream _(pending GitHub upload)_
+- [automatictrader-api](https://github.com/CyberForge275/automatictrader-api)
+- [marketdata-stream](https://github.com/CyberForge275/marketdata-stream)
+- [automatictrader-api (Azure DevOps - archived)](https://dev.azure.com/mirko2175/AutomaticTrader/_git/AutomaticTrader)
 
 ### Documentation
 - [traderunner README](./README.md)
