@@ -89,6 +89,8 @@ def _aggregate_rows(rows: List[Dict[str, object]]) -> pd.DataFrame:
             "tp_long",
             "tp_short",
             "Symbol",
+            "strategy",
+            "strategy_version",
         ]
         return pd.DataFrame(columns=columns)
 
@@ -106,6 +108,8 @@ def _aggregate_rows(rows: List[Dict[str, object]]) -> pd.DataFrame:
             "sl_short": "first",
             "tp_long": "first",
             "tp_short": "first",
+            "strategy": "first",
+            "strategy_version": "first",
         }
     )
     merged.reset_index(inplace=True)
@@ -179,32 +183,58 @@ def main(argv: List[str] | None = None) -> int:
             if session_idx == 0:
                 continue
 
+            # Validate against SignalOutputSpec
+            from axiom_bt.contracts.signal_schema import SignalOutputSpec
+            from decimal import Decimal
+
+            # Determine entries
+            long_entry = None
+            short_entry = None
+            sl_long = None
+            sl_short = None
+            tp_long = None
+            tp_short = None
+
+            if sig.signal_type == "LONG":
+                long_entry = sig.entry_price
+                sl_long = sig.stop_loss
+                tp_long = sig.take_profit
+            elif sig.signal_type == "SHORT":
+                short_entry = sig.entry_price
+                sl_short = sig.stop_loss
+                tp_short = sig.take_profit
+
+            spec = SignalOutputSpec(
+                symbol=symbol,
+                timestamp=ts.tz_convert("UTC"),
+                strategy=args.strategy,
+                strategy_version="1.0.0",
+                long_entry=Decimal(str(long_entry)) if long_entry is not None else None,
+                short_entry=Decimal(str(short_entry)) if short_entry is not None else None,
+                sl_long=Decimal(str(sl_long)) if sl_long is not None else None,
+                sl_short=Decimal(str(sl_short)) if sl_short is not None else None,
+                tp_long=Decimal(str(tp_long)) if tp_long is not None else None,
+                tp_short=Decimal(str(tp_short)) if tp_short is not None else None,
+                setup="inside_bar",
+                score=1.0, # Inside bar signals are binary
+                metadata=sig.metadata
+            )
+
             base = {
                 "ts": ts.isoformat(),
                 "session_id": session_idx,
                 "ib": True,
                 "ib_qual": True,
-                "Symbol": symbol,
-                "long_entry": np.nan,
-                "short_entry": np.nan,
-                "sl_long": np.nan,
-                "sl_short": np.nan,
-                "tp_long": np.nan,
-                "tp_short": np.nan,
+                "Symbol": spec.symbol,
+                "long_entry": float(spec.long_entry) if spec.long_entry else np.nan,
+                "short_entry": float(spec.short_entry) if spec.short_entry else np.nan,
+                "sl_long": float(spec.sl_long) if spec.sl_long else np.nan,
+                "sl_short": float(spec.sl_short) if spec.sl_short else np.nan,
+                "tp_long": float(spec.tp_long) if spec.tp_long else np.nan,
+                "tp_short": float(spec.tp_short) if spec.tp_short else np.nan,
+                "strategy": spec.strategy,
+                "strategy_version": spec.strategy_version
             }
-
-            if sig.signal_type == "LONG":
-                base.update(
-                    long_entry=sig.entry_price,
-                    sl_long=sig.stop_loss,
-                    tp_long=sig.take_profit,
-                )
-            elif sig.signal_type == "SHORT":
-                base.update(
-                    short_entry=sig.entry_price,
-                    sl_short=sig.stop_loss,
-                    tp_short=sig.take_profit,
-                )
 
             rows.append(base)
 
@@ -222,6 +252,8 @@ def main(argv: List[str] | None = None) -> int:
             "tp_long",
             "tp_short",
             "Symbol",
+            "strategy",
+            "strategy_version",
         ]
     ]
     if not result.empty:
