@@ -16,6 +16,8 @@ TradeRunner is an enhanced trading strategy framework designed to scale from sin
 - **🖥️ Dashboard Integration**: Streamlit-based monitoring and control interface
 - **🧪 Comprehensive Testing**: Quality-first development with automated checks
 
+> **Part of the droid-trading ecosystem** - See [Organization Overview](./Org-Overview.md) for system architecture, deployment topology, and integration with `automatictrader-api` and `marketdata-stream`.
+
 ## 🚀 **Quick Start**
 
 ### **Installation**
