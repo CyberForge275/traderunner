@@ -1,0 +1,15 @@
+# Automated Market Hours Trading Cron Jobs
+# Timezone: Europe/Berlin (CET/CEST)
+# Market hours: 9:30 AM - 4:00 PM ET = 15:30 - 22:00 CET
+
+# Start marketdata-stream at market open (9:30 AM ET / 15:30 CET)
+# Runs Monday-Friday only
+30 15 * * 1-5 /opt/trading/scripts/market_start.sh
+
+# Stop marketdata-stream at market close (4:00 PM ET / 22:00 CET)
+# Runs Monday-Friday only
+0 22 * * 1-5 /opt/trading/scripts/market_stop.sh
+
+# Optional: Log rotation to prevent log file from growing too large
+# Runs daily at midnight
+0 0 * * * [ -f /var/log/marketdata-trading.log ] && tail -n 1000 /var/log/marketdata-trading.log > /var/log/marketdata-trading.log.tmp && mv /var/log/marketdata-trading.log.tmp /var/log/marketdata-trading.log
