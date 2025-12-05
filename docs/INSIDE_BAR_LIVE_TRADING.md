@@ -1,5 +1,9 @@
 # Inside Bar Strategy - Live Paper Trading Integration
 
+> **Last Updated**: 2025-12-05  
+> **Config Location**: `droid/shared-config/strategy_params.yaml`  
+> **Current RRR**: 1.0 (matches backtest)
+
 ## Overview
 
 This document explains how the Inside Bar strategy adapts from backtesting to live paper trading with real-time WebSocket data, including:
@@ -141,7 +145,7 @@ class InsideBarLiveDetector:
         # Run inside bar detection
         signals = self.strategy.generate_signals(df, symbol, config={
             "atr_period": 14,
-            "risk_reward_ratio": 2.0,
+            "risk_reward_ratio": 1.0,  # Matches backtest
             "inside_bar_mode": "inclusive",
             "breakout_confirmation": True
         })
@@ -215,7 +219,7 @@ signal = Signal(
         "mother_bar_low": 227.10,
         "atr": 1.25,
         "risk_amount": 0.40,
-        "reward_amount": 0.80  # 2:1 RRR
+        "reward_amount": 0.40  # 1:1 RRR
     }
 )
 ```

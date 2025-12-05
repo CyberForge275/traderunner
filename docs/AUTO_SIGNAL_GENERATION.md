@@ -1,5 +1,8 @@
 # Automatic Signal Generation - Deployment Summary
 
+> **Last Updated**: 2025-12-05  
+> **Config**: Loaded from `droid/shared-config/strategy_params.yaml`
+
 ## 🎯 What Was Implemented
 
 **Feature**: Automatic signal generation from live market data
@@ -40,16 +43,15 @@ inside_bar_detector: InsideBarDetector = None
 # Signal writer for persistence
 signal_writer = SignalWriter(db_path="./data/signals.db")
 
-# InsideBar detector with config
-inside_bar_detector = InsideBarDetector(
-    config={
-        "atr_period": 14,
-        "risk_reward_ratio": 2.0,  # 2:1 RR
-        "min_mother_bar_size": 0.5,
-        "breakout_confirmation": True
-    },
-    buffer_size=200
-)
+# InsideBar detector - config loaded from YAML automatically
+# Config file: droid/shared-config/strategy_params.yaml
+inside_bar_detector = InsideBarDetector(buffer_size=200)
+
+# Config includes:
+# - atr_period: 14
+# - risk_reward_ratio: 1.0 (matches backtest)
+# - lookback_candles: 50
+# - max_pattern_age_candles: 12
 ```
 
 **Auto Signal Generation on Candle Close:**
@@ -115,6 +117,8 @@ async def on_candle_complete(candle: Candle):
   "stop_loss": 243.20,
   "take_profit": 250.10,
   "strategy_name": "inside_bar",
+  "strategy_version": "1.1.0",
+  "strategy_id": "IB_v1.1.0",
   "interval": "M5",
   "confidence": 0.8,
   "metadata": {

@@ -1,4 +1,4 @@
-# Dry Run Test - WebSocket Connection Verification
+# Dry Run Test - WebSocket Connection Verification\n\n> **📜 HISTORICAL DOCUMENT**  \n> **Date**: 2025-12-03  \n> **Status**: Superseded - WebSocket connection issues resolved
 
 ## Current Status
 

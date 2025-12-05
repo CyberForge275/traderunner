@@ -1,5 +1,8 @@
 # Deployment Guide - Enhanced Trading Infrastructure
 
+> **Last Updated**: 2025-12-05  
+> **Server**: 192.168.178.55 (Debian)
+
 Created: 2025-12-02  
 Purpose: Deploy today's infrastructure enhancements for paper trading
 

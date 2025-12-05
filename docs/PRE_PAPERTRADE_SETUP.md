@@ -1,7 +1,10 @@
 # Pre-PaperTrade Lab Configuration
 
+> **Last Updated**: 2025-12-05  
+> **Server**: 192.168.178.55 (Debian)  
+> **Port**: 8090
+
 **Mode**: Stage 3 - Live Data Validation (Read-Only)  
-**Date**: 2025-12-03  
 **Goal**: Validate signal generation with live ticks, NO order submission
 
 ---
@@ -24,11 +27,11 @@ In this mode:
 
 **REQUIRED**: Update with your symbols before deployment!
 
-### Option 1: Use Existing Symbols (Example)
+### Current Symbols (Production)
 
 ```bash
-# In marketdata-stream .env
-WATCH_SYMBOLS=AAPL,TSLA,NVDA,MSFT,META
+# In marketdata-stream .env (server: /opt/trading/marketdata-stream/.env)
+EODHD_SYMBOLS=HOOD,PLTR,APP,INTC,TSLA,NVDA,MU,AVGO,LRCX,WBD
 ```
 
 ### Option 2: Custom List
@@ -79,7 +82,7 @@ nano .env
 # Add/Update these lines:
 EODHD_API_KEY=your_key_here
 EODHD_ENDPOINT=us
-WATCH_SYMBOLS=AAPL,TSLA,NVDA,MSFT,META  # Update with your symbols!
+EODHD_SYMBOLS=HOOD,PLTR,APP,INTC,TSLA,NVDA,MU,AVGO,LRCX,WBD
 
 # CRITICAL: Ensure signal_processor is NOT started
 # (We'll verify this in systemd)
@@ -120,7 +123,7 @@ sudo systemctl status marketdata-stream
 
 ```bash
 # Check EODHD connection
-curl http://localhost:8000/health | jq '.dependencies.eodhd'
+curl http://localhost:8090/health | python3 -m json.tool
 
 # Should show:
 # {

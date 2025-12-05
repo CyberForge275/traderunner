@@ -1,5 +1,10 @@
 # v2 Architecture - README
 
+> **📜 HISTORICAL/REFERENCE DOCUMENT**  
+> **Created**: November 2025  
+> **Status**: v2 architecture planning - partially implemented  
+> **Branch**: `feature/v2-architecture`
+
 ## Overview
 
 This branch (`feature/v2-architecture`) contains the implementation of the v2 trading system architecture as defined in `docs/Trading Software Factory (v2).pdf`.

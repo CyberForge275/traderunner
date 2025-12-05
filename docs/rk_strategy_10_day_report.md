@@ -1,5 +1,9 @@
 # Rudometkin (RK) Strategy 10-Day Backtest Report
 
+> **📜 HISTORICAL DOCUMENT**  
+> **Backtest Period**: Nov 12-25, 2025  
+> **Purpose**: Initial RK strategy validation
+
 **Date Range:** 2025-11-12 to 2025-11-25
 **Strategy:** Rudometkin Market-On-Close (MOC) Long/Short
 **Intraday Data:** M5 (5-minute) bars

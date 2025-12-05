@@ -1,17 +1,22 @@
 # Paper Trading Quick Start Guide
 
+> **Last Updated**: 2025-12-05  
+> **Server**: 192.168.178.55  
+> **API Port**: 8080 | **Marketdata Port**: 8090
+
 This guide helps you set up and test the paper trading integration between `traderunner` and `automatictrader-api`.
 
 ## Prerequisites
 
-- ✅ `traderunner` with signal generation working
-- ✅ `automatictrader-api` project copied to `/home/mirko/data/workspace/automatictrader-api`
-- ✅ IB Paper Trading account (optional for initial testing)
+- ✅ `marketdata-stream` running with signal generation
+- ✅ `automatictrader-api` deployed to `/opt/trading/automatictrader-api`
+- ✅ IB Paper Trading account (TWS on laptop: 192.168.178.54:4002)
 
-## Step 1: Set Up automatictrader-api
+## Step 1: Set Up automatictrader-api (Server)
 
 ```bash
-cd /home/mirko/data/workspace/automatictrader-api
+ssh mirko@192.168.178.55
+cd /opt/trading/automatictrader-api
 
 # Install dependencies
 bash scripts/bootstrap.sh
@@ -96,10 +101,10 @@ PYTHONPATH=src python -m trade.paper_trading_adapter \
 Check the automatictrader-api database:
 
 ```bash
-cd /home/mirko/data/workspace/automatictrader-api
+cd /opt/trading/automatictrader-api
 
 # View all intents
-sqlite3 data/automatictrader.db "SELECT id, symbol, side, quantity, status FROM order_intents ORDER BY id DESC LIMIT 10;"
+python3 -c "import sqlite3; c=sqlite3.connect('data/automatictrader.db'); [print(r) for r in c.execute('SELECT id,symbol,side,quantity,status FROM order_intents ORDER BY id DESC LIMIT 5')]"
 
 # Expected:
 # 1|AAPL|BUY|10|planned
