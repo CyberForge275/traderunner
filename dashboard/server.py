@@ -170,46 +170,57 @@ class StatusHandler(SimpleHTTPRequestHandler):
             }
     
     def get_logs(self):
-        """Get recent logs from API and Worker"""
+        """Get recent logs from API and Worker using journalctl"""
         try:
             api_log = ""
             worker_log = ""
             errors = []
             
-            # Get API logs
-            api_log_path = Path("/tmp/api.log")
-            if api_log_path.exists():
+            # Get API logs from journalctl
+            try:
                 result = subprocess.run(
-                    ['tail', '-n', '10', str(api_log_path)],
+                    ['journalctl', '-u', 'automatictrader-api', '-n', '10', '--no-pager'],
                     capture_output=True,
-                    text=True
+                    text=True,
+                    timeout=5
                 )
                 api_log = result.stdout
                 
                 # Extract errors
                 for line in api_log.split('\n'):
-                    if 'ERROR' in line or 'Traceback' in line or 'Exception' in line:
-                        errors.append(line.strip())
+                    if 'ERROR' in line or 'error' in line.lower() or 'failed' in line.lower():
+                        # Clean up journalctl formatting
+                        if ' -- ' in line:
+                            errors.append(line.split(' -- ', 1)[1].strip())
+                        else:
+                            errors.append(line.strip())
+            except Exception as e:
+                api_log = f"Error reading API logs: {str(e)}"
             
-            # Get Worker logs
-            worker_log_path = Path("/tmp/worker.log")
-            if worker_log_path.exists():
+            # Get Worker logs from journalctl
+            try:
                 result = subprocess.run(
-                    ['tail', '-n', '10', str(worker_log_path)],
+                    ['journalctl', '-u', 'automatictrader-worker', '-n', '10', '--no-pager'],
                     capture_output=True,
-                    text=True
+                    text=True,
+                    timeout=5
                 )
                 worker_log = result.stdout
                 
                 # Extract errors
                 for line in worker_log.split('\n'):
-                    if 'ERROR' in line or 'Traceback' in line or 'Exception' in line:
-                        errors.append(line.strip())
+                    if 'ERROR' in line or 'error' in line.lower() or 'failed' in line.lower():
+                        if ' -- ' in line:
+                            errors.append(line.split(' -- ', 1)[1].strip())
+                        else:
+                            errors.append(line.strip())
+            except Exception as e:
+                worker_log = f"Error reading Worker logs: {str(e)}"
             
             return {
                 'api_log': api_log.strip() if api_log else None,
                 'worker_log': worker_log.strip() if worker_log else None,
-                'errors': list(set(errors))[:5]  # Unique errors, max 5
+                'errors': list(set(errors))[-10:]  # Unique errors, max 10
             }
         except Exception as e:
             return {

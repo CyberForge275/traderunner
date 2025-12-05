@@ -5,6 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=mirko
+SupplementaryGroups=systemd-journal
 WorkingDirectory=/opt/trading/traderunner/dashboard
 ExecStart=/usr/bin/python3 /opt/trading/traderunner/dashboard/server.py
 Restart=always
