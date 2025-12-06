@@ -106,6 +106,8 @@ def create_event_timeline(events_df):
 
 def create_history_layout():
     """Create the History tab layout."""
+    from ..repositories import get_watchlist_symbols
+    
     # Default to today
     today = datetime.now().date()
     yesterday = today - timedelta(days=1)
@@ -113,6 +115,11 @@ def create_history_layout():
     # Get initial data
     events = get_events_by_date(yesterday, today)
     stats = get_daily_statistics(today)
+    
+    # Get symbols for filter
+    symbols = get_watchlist_symbols()
+    symbol_options = [{'label': 'All Symbols', 'value': 'all'}]
+    symbol_options.extend([{'label': sym, 'value': sym} for sym in symbols])
     
     return html.Div([
         # Controls row
@@ -134,12 +141,7 @@ def create_history_layout():
                     html.H6("Symbol Filter", style={"marginBottom": "10px"}),
                     dcc.Dropdown(
                         id='history-symbol-filter',
-                        options=[
-                            {'label': 'All Symbols', 'value': 'all'},
-                            {'label': 'AAPL', 'value': 'AAPL'},
-                            {'label': 'MSFT', 'value': 'MSFT'},
-                            {'label': 'TSLA', 'value': 'TSLA'},
-                        ],
+                        options=symbol_options,
                         value='all',
                         clearable=False,
                         style={"color": "#000"}

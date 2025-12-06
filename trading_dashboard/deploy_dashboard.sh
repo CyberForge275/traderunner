@@ -22,8 +22,10 @@ echo "===================================================="
 # Step 1: Run tests locally
 echo ""
 echo "[1/6] Running automated tests..."
+cd ..
 source .venv/bin/activate
-PYTHONPATH=. pytest trading_dashboard/tests/test_dashboard.py -v --tb=short
+cd trading_dashboard
+PYTHONPATH=.. pytest tests/ -v
 if [ $? -ne 0 ]; then
     echo "❌ Tests failed! Deployment aborted."
     exit 1
@@ -34,7 +36,7 @@ echo "✅ All tests passed!"
 echo ""
 echo "[2/6] Copying files to server..."
 rsync -avz --exclude='.venv' --exclude='__pycache__' --exclude='*.pyc' \
-    trading_dashboard/ \
+    ../trading_dashboard/ \
     $SERVER:$REMOTE_DIR/trading_dashboard/
 
 if [ $? -ne 0 ]; then

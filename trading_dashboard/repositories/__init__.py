@@ -1,6 +1,7 @@
 """
 Data repositories for Trading Dashboard
 """
+import os
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -8,7 +9,7 @@ from typing import Optional
 import pandas as pd
 import yaml
 
-from ..config import SIGNALS_DB, TRADING_DB, STRATEGY_CONFIG
+from ..config import SIGNALS_DB, TRADING_DB, STRATEGY_CONFIG, MARKETDATA_DIR
 
 
 def get_connection(db_path: Path) -> Optional[sqlite3.Connection]:
@@ -21,6 +22,25 @@ def get_connection(db_path: Path) -> Optional[sqlite3.Connection]:
 def get_watchlist_symbols() -> list[str]:
     """Get symbols from strategy configuration."""
     try:
+        # First try: Read from EODHD_SYMBOLS environment variable (used by marketdata-stream)
+        symbols_env = os.getenv("EODHD_SYMBOLS")
+        if symbols_env:
+            symbols = [s.strip() for s in symbols_env.split(",")]
+            if symbols:
+                return symbols
+        
+        # Second try: Read from .env file in marketdata directory
+        env_file = MARKETDATA_DIR / ".env"
+        if env_file.exists():
+            with open(env_file) as f:
+                for line in f:
+                    if line.startswith("EODHD_SYMBOLS="):
+                        symbols_str = line.split("=", 1)[1].strip()
+                        symbols = [s.strip() for s in symbols_str.split(",")]
+                        if symbols:
+                            return symbols
+        
+        # Third try: Read from strategy_params.yaml
         if not STRATEGY_CONFIG.exists():
             return ["AAPL", "MSFT", "TSLA", "NVDA", "PLTR"]
         

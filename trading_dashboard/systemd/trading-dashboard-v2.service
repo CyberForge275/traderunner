@@ -3,10 +3,12 @@ Description=Trading Dashboard v2 (Dash)
 After=network.target
 
 [Service]
-Type=simple
+Type=notify
 User=mirko
 Group=mirko
-WorkingDirectory=/opt/trading/traderunner/trading_dashboard
+WorkingDirectory=/opt/trading/traderunner
+Environment="MARKETDATA_DIR=/opt/trading/marketdata-stream"
+Environment="AUTOMATICTRADER_DIR=/opt/trading/automatictrader-api"
 Environment=PYTHONPATH=/opt/trading/traderunner
 Environment=DASHBOARD_PORT=9001
 Environment=DASHBOARD_USER=admin

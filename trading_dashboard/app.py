@@ -20,6 +20,7 @@ from trading_dashboard.callbacks.chart_callbacks import register_chart_callbacks
 from trading_dashboard.callbacks.timeframe_callbacks import register_timeframe_callbacks
 from trading_dashboard.callbacks.timezone_callbacks import register_timezone_callbacks
 from trading_dashboard.callbacks.history_callbacks import register_history_callbacks
+from trading_dashboard.callbacks.active_patterns_callback import register_active_patterns_callback
 
 
 # Initialize Dash app with dark theme
@@ -64,11 +65,12 @@ app.layout = html.Div([
     # Tab content
     html.Div(id="tab-content", style={"paddingBottom": "50px"}),
     
-    # Auto-refresh interval
+    # Auto-refresh interval (only for Live Monitor tab)
     dcc.Interval(
         id="refresh-interval",
         interval=UPDATE_INTERVAL_MS,
-        n_intervals=0
+        n_intervals=0,
+        disabled=False  # Will be controlled by tab switching
     ),
     
     # Status bar
@@ -122,11 +124,22 @@ def update_content(active_tab, n_intervals):
     return content, time_str, update_str
 
 
+@app.callback(
+    Output("refresh-interval", "disabled"),
+    Input("main-tabs", "active_tab")
+)
+def control_refresh_interval(active_tab):
+    """Enable refresh interval only on Live Monitor tab."""
+    # Only auto-refresh on live-monitor tab
+    return active_tab != "live-monitor"
+
+
 # Register chart callbacks
 register_chart_callbacks(app)
 register_timeframe_callbacks(app)
 register_timezone_callbacks(app)
 register_history_callbacks(app)
+register_active_patterns_callback(app)
 
 
 @app.callback(
