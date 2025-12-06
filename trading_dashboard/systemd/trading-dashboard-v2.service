@@ -1,0 +1,27 @@
+[Unit]
+Description=Trading Dashboard v2 (Dash)
+After=network.target
+
+[Service]
+Type=simple
+User=mirko
+Group=mirko
+WorkingDirectory=/opt/trading/traderunner/trading_dashboard
+Environment=PYTHONPATH=/opt/trading/traderunner
+Environment=DASHBOARD_PORT=9001
+Environment=DASHBOARD_USER=admin
+Environment=DASHBOARD_PASS=admin
+ExecStart=/opt/trading/traderunner/.venv/bin/gunicorn \
+    --bind 0.0.0.0:9001 \
+    --workers 2 \
+    --threads 4 \
+    --timeout 60 \
+    trading_dashboard.app:server
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=trading-dashboard-v2
+
+[Install]
+WantedBy=multi-user.target
