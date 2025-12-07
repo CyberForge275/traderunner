@@ -1,8 +1,11 @@
+"""Trading Dashboard package.
+
+The Dash application object lives in ``trading_dashboard.app``.
+Importing this package should not require the Dash runtime, so we
+only expose basic configuration here.
 """
-Trading Dashboard Package
-"""
-from .config import PORT, HOST, DEBUG
-from .app import app, server
+
+from .config import PORT, HOST, DEBUG  # noqa: F401
 
 __version__ = "0.1.0"
-__all__ = ["app", "server", "PORT", "HOST", "DEBUG"]
+__all__ = ["PORT", "HOST", "DEBUG"]

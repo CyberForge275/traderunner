@@ -24,6 +24,9 @@ from trading_dashboard.callbacks.history_callbacks import register_history_callb
 from trading_dashboard.callbacks.active_patterns_callback import register_active_patterns_callback
 from trading_dashboard.callbacks.backtests_callbacks import register_backtests_callbacks
 from trading_dashboard.callbacks.run_backtest_callback import register_run_backtest_callback
+from trading_dashboard.callbacks.period_buttons_callback import register_period_buttons_callback
+from trading_dashboard.callbacks.date_selection_callback import register_date_selection_callback
+from trading_dashboard.callbacks.symbol_selector_callback import register_symbol_selector_callbacks
 
 
 # Initialize Dash app with dark theme
@@ -147,7 +150,10 @@ register_timezone_callbacks(app)
 register_history_callbacks(app)
 register_active_patterns_callback(app)
 register_backtests_callbacks(app)
-register_run_backtest_callback(app)  # NEW: Run Backtest button functionality
+register_run_backtest_callback(app)
+register_period_buttons_callback(app)
+register_date_selection_callback(app)
+register_symbol_selector_callbacks(app)  # Cached symbol selector
 
 
 @app.callback(

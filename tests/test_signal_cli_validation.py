@@ -95,7 +95,8 @@ def test_inside_bar_cli_validation(mock_inside_bar_strategy, tmp_path):
             "--output", str(output_file),
             "--data-path", str(tmp_path),
             "--current-snapshot", str(tmp_path / "current_ib.csv"),
-            "--sessions", "09:00-11:00" # Ensure signal time is within session
+            # Use a wide session window so the mocked timestamp always falls inside
+            "--sessions", "09:00-12:00",
         ]
         
         ret = cli_inside_bar.main(args)
@@ -105,5 +106,5 @@ def test_inside_bar_cli_validation(mock_inside_bar_strategy, tmp_path):
         out_df = pd.read_csv(output_file)
         assert "strategy" in out_df.columns
         assert "strategy_version" in out_df.columns
-        assert out_df.iloc[0]["strategy"] == "inside_bar_v1"
+        assert out_df.iloc[0]["strategy"] == "inside_bar"
         assert out_df.iloc[0]["long_entry"] == 100.0

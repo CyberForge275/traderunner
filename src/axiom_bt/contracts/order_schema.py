@@ -1,5 +1,4 @@
-"""
-Canonical order schema contract.
+"""Canonical order schema contract.
 
 Defines the standard order format with idempotency guarantees
 for safe retry logic and order lifecycle tracking.
@@ -7,8 +6,8 @@ for safe retry logic and order lifecycle tracking.
 
 from typing import Optional, Literal
 from decimal import Decimal
-from datetime import datetime
-from pydantic import BaseModel, Field, validator
+from datetime import datetime, timezone
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 import hashlib
 
 
@@ -54,23 +53,26 @@ class OrderSchema(BaseModel):
     
     # Metadata
     source: Literal['backtest', 'paper', 'live'] = Field(..., description="Order source")
-    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
-    
-    class Config:
-        json_encoders = {
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    model_config = ConfigDict(
+        json_encoders={
             Decimal: str,
-            datetime: lambda v: v.isoformat()
+            datetime: lambda v: v.isoformat(),
         }
-    
-    @validator('valid_from', 'valid_to', 'created_at')
-    def datetime_must_be_utc(cls, v):
+    )
+
+    @field_validator('valid_from', 'valid_to', 'created_at')
+    @classmethod
+    def datetime_must_be_utc(cls, v: datetime) -> datetime:
         """Ensure all datetimes are UTC."""
         if v.tzinfo is None:
             raise ValueError("Datetime must be timezone-aware (UTC)")
         return v
-    
-    @validator('idempotency_key')
-    def idempotency_key_format(cls, v):
+
+    @field_validator('idempotency_key')
+    @classmethod
+    def idempotency_key_format(cls, v: str) -> str:
         """Validate idempotency key format."""
         if len(v) < 8:
             raise ValueError("Idempotency key must be at least 8 characters")

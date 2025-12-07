@@ -2,7 +2,7 @@
 
 from dash import Input, Output, State, html
 import dash_bootstrap_components as dbc
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def register_run_backtest_callback(app):
@@ -19,13 +19,22 @@ def register_run_backtest_callback(app):
         Output("backtests-run-progress", "children"),
         Output("backtests-run-name-input", "value"),
         Output("backtests-refresh-interval", "disabled"),
+        Output("backtests-detail", "children"),
         Input("backtests-run-button", "n_clicks"),
         State("backtests-new-strategy", "value"),
         State("backtests-new-symbols", "value"),
         State("backtests-new-timeframe", "value"),
-        State("backtests-new-period", "value"),
+        State("date-selection-mode", "value"),
+        State("anchor-date", "date"),
+        State("days-back", "value"),
+        State("explicit-start-date", "date"),
+        State("explicit-end-date", "date"),
         State("backtests-run-name-input", "value"),
         State("backtests-run-params", "value"),
+        State("config-initial-cash", "value"),
+        State("config-fees", "value"),
+        State("config-slippage", "value"),
+        State("config-risk-pct", "value"),
         prevent_initial_call=True
     )
     def run_backtest(
@@ -33,15 +42,24 @@ def register_run_backtest_callback(app):
         strategy,
         symbols_str,
         timeframe,
-        period,
+        date_mode,
+        anchor_date,
+        days_back,
+        explicit_start,
+        explicit_end,
         run_name,
-        params_str
+        params_str,
+        initial_cash,
+        fees,
+        slippage,
+        risk_pct
     ):
         """Execute backtest in background and show progress."""
         from ..services.backtest_service import get_backtest_service
+        from datetime import datetime
         
         if not n_clicks:
-            return "", "", True
+            return "", "", True, html.Div()
         
         # Generate run name if not provided
         if not run_name or not run_name.strip():
@@ -50,13 +68,17 @@ def register_run_backtest_callback(app):
         else:
             run_name = run_name.strip()
         
+        # Validate inputs
+        if not strategy or not symbols_str or not timeframe:
+            return html.Div("❌ Please select strategy, symbols, and timeframe", style={"color": "red"}), run_name, True, html.Div()
+        
         # Parse symbols
         if not symbols_str or not symbols_str.strip():
             error_msg = html.Div([
                 html.Span("⚠️ ", style={"color": "var(--accent-yellow)"}),
                 html.Span("Error: Please enter at least one symbol"),
             ])
-            return error_msg, run_name, True
+            return error_msg, run_name, True, html.Div()
         
         symbols = [s.strip() for s in symbols_str.split(",") if s.strip()]
         
@@ -65,7 +87,7 @@ def register_run_backtest_callback(app):
                 html.Span("⚠️ ", style={"color": "var(--accent-yellow)"}),
                 html.Span("Error: Please enter at least one symbol"),
             ])
-            return error_msg, run_name, True
+            return error_msg, run_name, True, html.Div()
         
         # Parse additional params (simple key=value format)
         config_params = {}
@@ -87,35 +109,62 @@ def register_run_backtest_callback(app):
                                 config_params[key] = float(val)
                             except ValueError:
                                 # Keep as string
-                                config_params[key] = val
+                                 config_params[key] = val
             except Exception as e:
                 # Ignore parse errors, just log
                 pass
         
+        # Add configuration parameters
+        if initial_cash:
+            config_params['initial_cash'] = initial_cash
+        if fees is not None:
+            config_params['fees_bps'] = fees
+        if slippage is not None:
+            config_params['slippage_bps'] = slippage
+        if risk_pct:
+            config_params['risk_pct'] = risk_pct
+        
+        # Calculate start/end dates based on mode
+        if date_mode == "days_back":
+            # Calculate from anchor date and days back
+            if isinstance(anchor_date, str):
+                end_date = datetime.fromisoformat(anchor_date).date()
+            else:
+                end_date = anchor_date
+            
+            start_date = end_date - timedelta(days=int(days_back or 30))
+        else:  # explicit mode
+            # Use explicit dates
+            if isinstance(explicit_start, str):
+                start_date = datetime.fromisoformat(explicit_start).date()
+            else:
+                start_date = explicit_start
+            
+            if isinstance(explicit_end, str):
+                end_date = datetime.fromisoformat(explicit_end).date()
+            else:
+                end_date = explicit_end
+        
         # Start backtest in background
         service = get_backtest_service()
+        
+        # Convert dates to strings for service
+        start_date_str = start_date.isoformat() if start_date else None
+        end_date_str = end_date.isoformat() if end_date else None
+        
         job_id = service.start_backtest(
             run_name=run_name,
             strategy=strategy,
             symbols=symbols,
             timeframe=timeframe,
-            period=period,
+            start_date=start_date_str,
+            end_date=end_date_str,
             config_params=config_params if config_params else None
         )
         
-        # Show progress indicator
-        progress = html.Div([
-            html.Div(
-                dbc.Spinner(size="sm", color="success", spinner_style={"marginRight": "8px"}),
-                style={"display": "inline-block"},
-            ),
-            html.Div([
-                html.Div(f"🚀 Running: {run_name}", style={"fontWeight": "bold", "color": "var(--accent-green)"}),
-                html.Div(f"Job ID: {job_id}", style={"fontSize": "0.85em", "color": "var(--text-secondary)", "marginTop": "4px"}),
-                html.Div(f"Strategy: {strategy} | {timeframe} | {period}", style={"fontSize": "0.85em", "color": "var(--text-secondary)"}),
-                html.Div(f"Symbols: {', '.join(symbols)}", style={"fontSize": "0.85em", "color": "var(--text-secondary)"}),
-            ]),
-        ])
+        # Format date range for display
+        date_range_display = f"{start_date_str} to {end_date_str}" if start_date_str and end_date_str else "N/A"
+        
         
         # Enable refresh interval to poll for completion
         # Clear run name input for next run

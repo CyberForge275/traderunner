@@ -74,6 +74,11 @@ class TestDatabaseAccess:
 
 class TestLayoutComponents:
     """Test layout component creation."""
+
+    @pytest.fixture(autouse=True)
+    def _skip_if_dash_missing(self):
+        """Skip layout tests if Dash is not installed in this environment."""
+        pytest.importorskip("dash")
     
     def test_live_monitor_layout(self):
         """Test Live Monitor layout creates without errors."""
@@ -101,6 +106,13 @@ class TestLayoutComponents:
         from trading_dashboard.layouts import create_history_layout
         
         layout = create_history_layout()
+        assert layout is not None, "Layout should be created"
+
+    def test_backtests_layout(self):
+        """Test Backtests layout creates without errors."""
+        from trading_dashboard.layouts import create_backtests_layout
+
+        layout = create_backtests_layout()
         assert layout is not None, "Layout should be created"
 
 

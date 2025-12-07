@@ -13,6 +13,7 @@ import pandas as pd
 
 from ..base import BaseStrategy, Signal
 from .core import InsideBarCore, InsideBarConfig, RawSignal
+from .core import STRATEGY_VERSION as _IB_CORE_VERSION
 
 
 class InsideBarStrategy(BaseStrategy):
@@ -31,6 +32,11 @@ class InsideBarStrategy(BaseStrategy):
     def name(self) -> str:
         """Return strategy name."""
         return "inside_bar"
+    
+    @property
+    def version(self) -> str:
+        """Return strategy version from unified core metadata."""
+        return _IB_CORE_VERSION
     
     @property
     def description(self) -> str:

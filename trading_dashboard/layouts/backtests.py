@@ -597,22 +597,14 @@ def create_backtests_layout():
     strategy_card = html.Div(
         className="dashboard-card",
         children=[
-            html.H6("Strategy Filter", style={"marginBottom": "10px"}),
+            html.H6("Filter Existing Runs", style={"marginBottom": "10px"}),
+            html.Label("Strategy", style={"fontSize": "0.9em", "color": "var(--text-secondary)"}),
             dcc.Dropdown(
                 id="backtests-strategy-filter",
                 options=strategy_options,
                 value="all",
                 clearable=False,
                 style={"color": "#000"},
-            ),
-            html.Hr(),
-            html.H6("Run Date Range", style={"marginBottom": "10px"}),
-            dcc.DatePickerRange(
-                id="backtests-date-range",
-                start_date=week_ago,
-                end_date=today,
-                display_format="YYYY-MM-DD",
-                style={"width": "100%"},
             ),
         ],
     )
@@ -629,6 +621,7 @@ def create_backtests_layout():
                 id="backtests-new-strategy",
                 options=[
                     {"label": "Inside Bar", "value": "inside_bar"},
+                    {"label": "Inside Bar V2", "value": "inside_bar_v2"},
                     {"label": "Rudometkin", "value": "rudometkin"},
                 ],
                 value="inside_bar",
@@ -636,15 +629,25 @@ def create_backtests_layout():
                 style={"color": "#000", "marginBottom": "8px"},
             ),
             
-            # Symbols input
+            
+            # Symbols input with cached selector
             html.Label("Symbols (comma-separated)", style={"fontWeight": "bold", "marginTop": "8px"}),
-            dcc.Input(
-                id="backtests-new-symbols",
-                type="text",
-                placeholder="TSLA,APP,PLTR,HOOD",
-                value="TSLA,APP,PLTR,HOOD",
-                style={"width": "100%", "marginBottom": "8px"},
-            ),
+            html.Div([
+                dcc.Dropdown(
+                    id="cached-symbols-selector",
+                    options=[],  # Will be populated by callback based on timeframe
+                    multi=True,
+                    placeholder="Select from cached symbols...",
+                    style={"marginBottom": "4px", "color": "#000"},
+                ),
+                dcc.Input(
+                    id="backtests-new-symbols",
+                    type="text",
+                    placeholder="Or type: TSLA,AAPL,HOOD",
+                    value="TSLA,AAPL,PLTR,HOOD",
+                    style={"width": "100%", "marginBottom": "8px"},
+                ),
+            ]),
             
             # Timeframe selector
             html.Label("Timeframe", style={"fontWeight": "bold", "marginTop": "8px"}),
@@ -661,21 +664,134 @@ def create_backtests_layout():
                 style={"color": "#000", "marginBottom": "8px"},
             ),
             
-            # Period selector
-            html.Label("Period", style={"fontWeight": "bold", "marginTop": "8px"}),
-            dcc.Dropdown(
-                id="backtests-new-period",
+            
+            # Date selection method (Streamlit-style)
+            html.Label("Date Selection", style={"fontWeight": "bold", "marginTop": "8px"}),
+            dcc.RadioItems(
+                id="date-selection-mode",
                 options=[
-                    {"label": "1 Day", "value": "1d"},
-                    {"label": "5 Days", "value": "5d"},
-                    {"label": "1 Month", "value": "1mo"},
-                    {"label": "3 Months", "value": "3mo"},
-                    {"label": "6 Months", "value": "6mo"},
-                    {"label": "1 Year", "value": "1y"},
+                    {"label": "Days back from anchor", "value": "days_back"},
+                    {"label": "Explicit date range", "value": "explicit"},
                 ],
-                value="1mo",
-                clearable=False,
-                style={"color": "#000", "marginBottom": "15px"},
+                value="days_back",
+                style={"marginBottom": "8px"},
+            ),
+            
+            # Anchor date (for days back mode)
+            html.Div(
+                id="anchor-date-container",
+                children=[
+                    html.Label("Anchor Date", style={"fontSize": "0.9em", "marginTop": "5px"}),
+                    dcc.DatePickerSingle(
+                        id="anchor-date",
+                        date=datetime.utcnow().date(),
+                        display_format="YYYY-MM-DD",
+                        style={"width": "100%", "marginBottom": "8px"},
+                    ),
+                ],
+            ),
+            
+            # Days back (for days back mode)
+            html.Div(
+                id="days-back-container",
+                children=[
+                    html.Label("Days back", style={"fontSize": "0.9em", "marginTop": "5px"}),
+                    dcc.Input(
+                        id="days-back",
+                        type="number",
+                        value=30,
+                        min=1,
+                        max=365,
+                        step=1,
+                        style={"width": "100%", "marginBottom": "8px"},
+                    ),
+                ],
+            ),
+            
+            # Explicit date range (for explicit mode)
+            html.Div(
+                id="explicit-range-container",
+                children=[
+                    html.Label("Start Date", style={"fontSize": "0.9em", "marginTop": "5px"}),
+                    dcc.DatePickerSingle(
+                        id="explicit-start-date",
+                        date=(datetime.utcnow() - timedelta(days=30)).date(),
+                        display_format="YYYY-MM-DD",
+                        style={"width": "100%", "marginBottom": "8px"},
+                    ),
+                    html.Label("End Date", style={"fontSize": "0.9em", "marginTop": "5px"}),
+                    dcc.DatePickerSingle(
+                        id="explicit-end-date",
+                        date=datetime.utcnow().date(),
+                        display_format="YYYY-MM-DD",
+                        style={"width": "100%", "marginBottom": "8px"},
+                    ),
+                ],
+                style={"display": "none"},  # Hidden by default
+            ),
+            
+            # Data window display
+            html.Div(
+                id="data-window-display",
+                style={
+                    "fontSize": "0.85em",
+                    "color": "var(--text-secondary)",
+                    "padding": "8px",
+                    "backgroundColor": "rgba(255,255,255,0.05)",
+                    "borderRadius": "4px",
+                    "marginBottom": "8px"},
+            ),
+            
+            # Configuration parameters (collapsible)
+            dbc.Accordion(
+                [
+                    dbc.AccordionItem(
+                        [
+                            html.Label("Initial Cash ($)", style={"fontSize": "0.9em", "marginTop": "5px"}),
+                            dcc.Input(
+                                id="config-initial-cash",
+                                type="number",
+                                value=10000,
+                                min=1000,
+                                step=1000,
+                                style={"width": "100%", "marginBottom": "8px"},
+                            ),
+                            
+                            html.Label("Fees (bps)", style={"fontSize": "0.9em", "marginTop": "5px"}),
+                            dcc.Input(
+                                id="config-fees",
+                                type="number",
+                                value=2.0,
+                                min=0,
+                                step=0.1,
+                                style={"width": "100%", "marginBottom": "8px"},
+                            ),
+                            
+                            html.Label("Slippage (bps)", style={"fontSize": "0.9em", "marginTop": "5px"}),
+                            dcc.Input(
+                                id="config-slippage",
+                                type="number",
+                                value=1.0,
+                                min=0,
+                                step=0.1,
+                                style={"width": "100%", "marginBottom": "8px"},
+                            ),
+                            
+                            html.Label("Risk % per Trade", style={"fontSize": "0.9em", "marginTop": "5px"}),
+                            dcc.Input(
+                                id="config-risk-pct",
+                                type="number",
+                                value=1.0,
+                                min=0.1,
+                                step=0.1,
+                                style={"width": "100%", "marginBottom": "8px"},
+                            ),
+                        ],
+                        title="⚙️ Configuration Parameters",
+                    ),
+                ],
+                start_collapsed=True,
+                style={"marginBottom": "15px"},
             ),
             
            # Run button

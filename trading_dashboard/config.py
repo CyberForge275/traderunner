@@ -25,6 +25,9 @@ AUTOMATICTRADER_DIR = Path(os.getenv("AUTOMATICTRADER_DIR", "/opt/trading/automa
 SIGNALS_DB = MARKETDATA_DIR / "data" / "signals.db"
 TRADING_DB = AUTOMATICTRADER_DIR / "data" / "automatictrader.db"
 
+# Backtest artifacts (TradeRunner)
+BACKTESTS_DIR = TRADERUNNER_DIR / "artifacts" / "backtests"
+
 # Strategy config
 STRATEGY_CONFIG = MARKETDATA_DIR / "config" / "strategy_params.yaml"
 

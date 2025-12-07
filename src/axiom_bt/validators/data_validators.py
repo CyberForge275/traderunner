@@ -1,5 +1,4 @@
-"""
-Data quality validators and SLA enforcement.
+"""Data quality validators and SLA enforcement.
 
 Implements the SLAs defined in v2 architecture:
 - m5_completeness >= 0.99
@@ -9,7 +8,7 @@ Implements the SLAs defined in v2 architecture:
 """
 
 from typing import Dict, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pandas as pd
 from dataclasses import dataclass
 
@@ -17,16 +16,17 @@ from dataclasses import dataclass
 @dataclass
 class SLAResult:
     """Result of an SLA check."""
+
     sla_name: str
     passed: bool
     measured_value: float
     threshold: float
     message: str
-    timestamp: datetime = None
-    
-    def __post_init__(self):
+    timestamp: Optional[datetime] = None
+
+    def __post_init__(self) -> None:
         if self.timestamp is None:
-            self.timestamp = datetime.utcnow()
+            self.timestamp = datetime.now(timezone.utc)
     
     def to_dict(self) -> dict:
         return {
@@ -156,7 +156,7 @@ class DataQualitySLA:
         Only relevant for real-time data.
         """
         if reference_time is None:
-            reference_time = datetime.utcnow()
+            reference_time = datetime.now(timezone.utc)
         
         if len(df) == 0:
             return SLAResult(

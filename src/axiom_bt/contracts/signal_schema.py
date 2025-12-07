@@ -1,5 +1,4 @@
-"""
-Signal output schema contract.
+"""Signal output schema contract.
 
 Defines the canonical format for strategy signals to ensure
 consistency across different strategy implementations.
@@ -8,7 +7,7 @@ consistency across different strategy implementations.
 from typing import Optional, Dict, Any
 from decimal import Decimal
 from datetime import datetime
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class SignalOutputSpec(BaseModel):
@@ -50,22 +49,25 @@ class SignalOutputSpec(BaseModel):
     
     # Additional metadata
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
-    
-    class Config:
-        json_encoders = {
+
+    model_config = ConfigDict(
+        json_encoders={
             Decimal: str,
-            datetime: lambda v: v.isoformat()
+            datetime: lambda v: v.isoformat(),
         }
-    
-    @validator('timestamp')
-    def timestamp_must_be_utc(cls, v):
+    )
+
+    @field_validator("timestamp")
+    @classmethod
+    def timestamp_must_be_utc(cls, v: datetime) -> datetime:
         """Ensure timestamp is UTC."""
         if v.tzinfo is None:
             raise ValueError("Timestamp must be timezone-aware (UTC)")
         return v
-    
-    @validator('score')
-    def score_must_be_valid(cls, v):
+
+    @field_validator("score")
+    @classmethod
+    def score_must_be_valid(cls, v: Optional[float]) -> Optional[float]:
         """Validate score is in range."""
         if v is not None and not (0.0 <= v <= 1.0):
             raise ValueError("Score must be between 0.0 and 1.0")

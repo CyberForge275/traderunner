@@ -35,7 +35,8 @@ class BacktestService:
         strategy: str,
         symbols: List[str],
         timeframe: str,
-        period: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
         config_params: Optional[Dict] = None
     ) -> str:
         """Start a backtest in background thread.
@@ -45,7 +46,8 @@ class BacktestService:
             strategy: Strategy identifier (e.g., "inside_bar")
             symbols: List of symbols to backtest
             timeframe: Candle timeframe (e.g., "M5", "D1")
-            period: Lookback period (e.g., "1mo", "3mo")
+            start_date: Start date for backtest (ISO format YYYY-MM-DD)
+            end_date: End date for backtest (ISO format YYYY-MM-DD)
             config_params: Optional additional configuration
             
         Returns:
@@ -61,7 +63,8 @@ class BacktestService:
                 "strategy": strategy,
                 "symbols": symbols,
                 "timeframe": timeframe,
-                "period": period,
+                "start_date": start_date,
+                "end_date": end_date,
                 "started_at": datetime.now().isoformat(),
                 "progress": "Initializing...",
             }
@@ -69,7 +72,7 @@ class BacktestService:
         # Start background thread
         thread = threading.Thread(
             target=self._run_pipeline,
-            args=(job_id, run_name, strategy, symbols, timeframe, period, config_params),
+            args=(job_id, run_name, strategy, symbols, timeframe, start_date, end_date, config_params),
             daemon=True
         )
         thread.start()
@@ -83,7 +86,8 @@ class BacktestService:
         strategy: str,
         symbols: List[str],
         timeframe: str,
-        period: str,
+        start_date: Optional[str],
+        end_date: Optional[str],
         config_params: Optional[Dict]
     ):
         """Execute pipeline in background thread.
@@ -109,14 +113,25 @@ class BacktestService:
             
             self._update_job_progress(job_id, "Configuring data fetch...")
             
-            # Build fetch config
-            fetch = FetchConfig(
-                symbols=symbols,
-                timeframe=timeframe,
-                period=period,
-                use_sample=False,
-                force_refresh=False
-            )
+            # Build fetch config - use date range if provided, otherwise default to 1 month
+            if start_date and end_date:
+                fetch = FetchConfig(
+                    symbols=symbols,
+                    timeframe=timeframe,
+                    start_date=start_date,
+                    end_date=end_date,
+                    use_sample=False,
+                    force_refresh=False
+                )
+            else:
+                # Fallback to period-based config if dates not provided
+                fetch = FetchConfig(
+                    symbols=symbols,
+                    timeframe=timeframe,
+                    period="1mo",
+                    use_sample=False,
+                    force_refresh=False
+                )
             
             # Build pipeline config
             pipeline_config = config_params or {}
