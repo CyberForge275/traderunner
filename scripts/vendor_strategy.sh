@@ -72,21 +72,41 @@ fi
 
 echo -e "${GREEN}✅ Version alignment OK${NC}"
 
-# Copy core files
-echo -e "${YELLOW}📦 Copying core files...${NC}"
+# Copy core files with versioned names
+echo -e "${YELLOW}📦 Copying core files to versioned format...${NC}"
 
 if [ ! -d "$VENDOR_DIR" ]; then
     mkdir -p "$VENDOR_DIR"
     touch "${VENDOR_DIR}/__init__.py"
 fi
 
-cp "${STRATEGY_DIR}/core.py" "${VENDOR_DIR}/core.py"
-echo "   Copied: core.py"
+VERSION_CLEAN=$(echo "$VERSION" | sed 's/\./_/g')
+TARGET_CORE="${VENDOR_DIR}/${STRATEGY}_core_v${VERSION_CLEAN}.py"
+TARGET_CONFIG="${VENDOR_DIR}/${STRATEGY}_config_v${VERSION_CLEAN}.py"
+
+cp "${STRATEGY_DIR}/core.py" "$TARGET_CORE"
+echo "   Copied: $(basename "$TARGET_CORE")"
 
 if [ -f "${STRATEGY_DIR}/config.py" ]; then
-    cp "${STRATEGY_DIR}/config.py" "${VENDOR_DIR}/config.py"
-    echo "   Copied: config.py"
+    cp "${STRATEGY_DIR}/config.py" "$TARGET_CONFIG"
+    
+    # Rewrite import in config file
+    # From: from .core import InsideBarConfig
+    # To:   from .inside_bar_core_v2_0_0 import InsideBarConfig
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "s/from src.unified_core.core/from .${STRATEGY}_core_v${VERSION_CLEAN}/g" "$TARGET_CONFIG"
+        sed -i '' "s/from .core/from .${STRATEGY}_core_v${VERSION_CLEAN}/g" "$TARGET_CONFIG"
+    else
+        sed -i "s/from src.unified_core.core/from .${STRATEGY}_core_v${VERSION_CLEAN}/g" "$TARGET_CONFIG"
+        sed -i "s/from .core/from .${STRATEGY}_core_v${VERSION_CLEAN}/g" "$TARGET_CONFIG"
+    fi
+    
+    echo "   Copied: $(basename "$TARGET_CONFIG") (with import rewrite)"
 fi
+
+# IMPORTANT: User must update __init__.py manually or we need sophisticated parsing
+echo -e "${YELLOW}⚠️  REMINDER: You must update marketdata-stream/src/unified_core/__init__.py${NC}"
+echo "   Add entry: \"${VERSION}\": \"src.unified_core.${STRATEGY}_core_v${VERSION_CLEAN}\""
 
 # Create version marker
 echo -e "${YELLOW}🏷️  Creating version marker...${NC}"

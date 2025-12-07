@@ -67,14 +67,28 @@ if [ "$TR_VERSION" != "$MD_VERSION" ]; then
 else
     echo -e "${GREEN}✅ Versions aligned: ${TR_VERSION}${NC}"
     
-    # Also check checksums for extra verification
+    # Checksum verification for multi-version support
+    MD_VERSION_CLEAN=$(echo "$MD_VERSION" | sed 's/\./_/g')
+    MD_CORE_FILE="${MD_ROOT}/src/unified_core/${STRATEGY}_core_v${MD_VERSION_CLEAN}.py"
+    
+    # Fallback for legacy (non-versioned) file
+    if [ ! -f "$MD_CORE_FILE" ]; then
+         MD_CORE_FILE="${MD_ROOT}/src/unified_core/core.py"
+    fi
+
+    if [ ! -f "$MD_CORE_FILE" ]; then
+        echo -e "${YELLOW}⚠️  Core file not found at: ${MD_CORE_FILE}${NC}"
+        echo "   Cannot verify checksum."
+        exit 1
+    fi
+
     TR_CHECKSUM=$(sha256sum "$TR_CORE" | awk '{print $1}' | cut -c1-16)
-    MD_CHECKSUM=$(sha256sum "${MD_ROOT}/src/unified_core/core.py" | awk '{print $1}' | cut -c1-16)
+    MD_CHECKSUM=$(sha256sum "$MD_CORE_FILE" | awk '{print $1}' | cut -c1-16)
     
     echo ""
     echo "Checksum verification:"
     echo "  traderunner:       ${TR_CHECKSUM}"
-    echo "  marketdata-stream: ${MD_CHECKSUM}"
+    echo "  marketdata-stream: ${MD_CHECKSUM} ($(basename "$MD_CORE_FILE"))"
     
     if [ "$TR_CHECKSUM" != "$MD_CHECKSUM" ]; then
         echo -e "${YELLOW}⚠️  Checksums differ!${NC}"
