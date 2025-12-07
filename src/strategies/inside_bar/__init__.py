@@ -1,5 +1,15 @@
-"""Inside Bar strategy package."""
+"""InsideBar strategy package - Unified implementation."""
 
-from .strategy import InsideBarStrategy
+from .core import InsideBarCore, InsideBarConfig, RawSignal
+from .config import load_config, get_default_config_path, load_default_config
 
-__all__ = ["InsideBarStrategy"]
+__version__ = "2.0.0"
+
+__all__ = [
+    "InsideBarCore",
+    "InsideBarConfig",
+    "RawSignal",
+    "load_config",
+    "get_default_config_path",
+    "load_default_config",
+]

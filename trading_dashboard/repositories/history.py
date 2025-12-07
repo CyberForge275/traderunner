@@ -92,7 +92,9 @@ def get_events_by_date(
     # Combine all events
     if events:
         df = pd.concat(events, ignore_index=True)
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        # Convert to datetime and then to CET
+        df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
+        df['timestamp'] = df['timestamp'].dt.tz_convert('Europe/Berlin')
         df = df.sort_values('timestamp', ascending=False)
         return df.head(500)  # Limit to 500 most recent events
     
