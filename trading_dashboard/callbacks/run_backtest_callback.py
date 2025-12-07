@@ -19,7 +19,6 @@ def register_run_backtest_callback(app):
         Output("backtests-run-progress", "children"),
         Output("backtests-run-name-input", "value"),
         Output("backtests-refresh-interval", "disabled"),
-        Output("backtests-detail", "children"),
         Input("backtests-run-button", "n_clicks"),
         State("backtests-new-strategy", "value"),
         State("backtests-new-symbols", "value"),
@@ -29,7 +28,7 @@ def register_run_backtest_callback(app):
         State("days-back", "value"),
         State("explicit-start-date", "date"),
         State("explicit-end-date", "date"),
-        State("backtests-run-name-input", "value"),
+        State("backtests-new-run-name", "value"),  # Changed from backtests-run-name-input
         State("backtests-run-params", "value"),
         State("config-initial-cash", "value"),
         State("config-fees", "value"),
@@ -59,18 +58,23 @@ def register_run_backtest_callback(app):
         from datetime import datetime
         
         if not n_clicks:
-            return "", "", True, html.Div()
+            return "", "", True
         
-        # Generate run name if not provided
+        # Validate run name is provided
         if not run_name or not run_name.strip():
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            run_name = f"run_{strategy}_{timestamp}"
-        else:
-            run_name = run_name.strip()
+            error_msg = html.Div(
+                "❌ Please enter a name for this backtest run",
+                style={"color": "red", "fontWeight": "bold"}
+            )
+            return error_msg, run_name, True
+        
+        # Prepend timestamp to run name
+        timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
+        run_name = f"{timestamp}_{run_name.strip()}"
         
         # Validate inputs
         if not strategy or not symbols_str or not timeframe:
-            return html.Div("❌ Please select strategy, symbols, and timeframe", style={"color": "red"}), run_name, True, html.Div()
+            return html.Div("❌ Please select strategy, symbols, and timeframe", style={"color": "red"}), run_name, True
         
         # Parse symbols
         if not symbols_str or not symbols_str.strip():
@@ -78,7 +82,7 @@ def register_run_backtest_callback(app):
                 html.Span("⚠️ ", style={"color": "var(--accent-yellow)"}),
                 html.Span("Error: Please enter at least one symbol"),
             ])
-            return error_msg, run_name, True, html.Div()
+            return error_msg, run_name, True
         
         symbols = [s.strip() for s in symbols_str.split(",") if s.strip()]
         
@@ -87,7 +91,7 @@ def register_run_backtest_callback(app):
                 html.Span("⚠️ ", style={"color": "var(--accent-yellow)"}),
                 html.Span("Error: Please enter at least one symbol"),
             ])
-            return error_msg, run_name, True, html.Div()
+            return error_msg, run_name, True
         
         # Parse additional params (simple key=value format)
         config_params = {}

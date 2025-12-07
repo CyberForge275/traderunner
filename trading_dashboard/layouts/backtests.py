@@ -629,6 +629,30 @@ def create_backtests_layout():
                 style={"color": "#000", "marginBottom": "8px"},
             ),
             
+            # Run name input with timestamp prefix
+            html.Label("Backtest Run Name", style={"fontWeight": "bold", "marginTop": "8px"}),
+            html.Div([
+                html.Span(
+                    id="run-name-timestamp-prefix",
+                    children="251207_225402_",  # Will be updated by callback
+                    style={
+                        "color": "#888",  # Light grey
+                        "fontSize": "0.95em",
+                        "lineHeight": "38px",  # Match input height
+                        "paddingRight": "4px",
+                        "fontFamily": "monospace",
+                    }
+                ),
+                dcc.Input(
+                    id="backtests-new-run-name",
+                    type="text",
+                    placeholder="YourNameHere",
+                    style={
+                        "flex": "1",
+                        "marginBottom": "8px",
+                    },
+                ),
+            ], style={"display": "flex", "alignItems": "center"}),
             
             # Symbols input with cached selector
             html.Label("Symbols (comma-separated)", style={"fontWeight": "bold", "marginTop": "8px"}),
