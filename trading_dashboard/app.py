@@ -14,13 +14,16 @@ from trading_dashboard.layouts import (
     get_live_monitor_content,
     get_charts_content,
     get_portfolio_content,
-    get_history_content
+    get_history_content,
+    get_backtests_content,
 )
 from trading_dashboard.callbacks.chart_callbacks import register_chart_callbacks
 from trading_dashboard.callbacks.timeframe_callbacks import register_timeframe_callbacks
 from trading_dashboard.callbacks.timezone_callbacks import register_timezone_callbacks
 from trading_dashboard.callbacks.history_callbacks import register_history_callbacks
 from trading_dashboard.callbacks.active_patterns_callback import register_active_patterns_callback
+from trading_dashboard.callbacks.backtests_callbacks import register_backtests_callbacks
+from trading_dashboard.callbacks.run_backtest_callback import register_run_backtest_callback
 
 
 # Initialize Dash app with dark theme
@@ -58,6 +61,7 @@ app.layout = html.Div([
             dbc.Tab(label="Portfolio", tab_id="portfolio"),
             dbc.Tab(label="Charts", tab_id="charts"),
             dbc.Tab(label="History", tab_id="history"),
+            dbc.Tab(label="Backtests", tab_id="backtests"),
         ],
         style={"backgroundColor": "var(--bg-secondary)"}
     ),
@@ -118,6 +122,8 @@ def update_content(active_tab, n_intervals):
         content = get_charts_content()
     elif active_tab == "history":
         content = get_history_content()
+    elif active_tab == "backtests":
+        content = get_backtests_content()
     else:
         content = html.Div("Unknown tab")
     
@@ -140,6 +146,8 @@ register_timeframe_callbacks(app)
 register_timezone_callbacks(app)
 register_history_callbacks(app)
 register_active_patterns_callback(app)
+register_backtests_callbacks(app)
+register_run_backtest_callback(app)  # NEW: Run Backtest button functionality
 
 
 @app.callback(
