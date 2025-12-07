@@ -14,8 +14,41 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+from pathlib import Path
+import hashlib
 import pandas as pd
 import numpy as np
+
+
+# ══════════════════════════════════════════════════════════════════════
+# VERSION METADATA
+# ══════════════════════════════════════════════════════════════════════
+
+__version__ = "2.0.0"
+__strategy_name__ = "InsideBar"
+
+
+def _get_core_checksum() -> str:
+    """
+    Calculate SHA256 checksum of this core.py file.
+    
+    This ensures we can verify which exact version of the code
+    generated a signal, even if version tags don't change.
+    
+    Returns:
+        First 16 characters of SHA256 hash
+    """
+    try:
+        core_path = Path(__file__)
+        with open(core_path, 'rb') as f:
+            return hashlib.sha256(f.read()).hexdigest()[:16]
+    except Exception:
+        return "unknown"
+
+
+STRATEGY_VERSION = __version__
+STRATEGY_NAME = __strategy_name__
+CORE_CHECKSUM = _get_core_checksum()
 
 
 @dataclass
@@ -110,6 +143,26 @@ class InsideBarCore:
         """
         config.validate()
         self.config = config
+    
+    @property
+    def version(self) -> str:
+        """Strategy version string."""
+        return STRATEGY_VERSION
+    
+    @property
+    def metadata(self) -> dict:
+        """
+        Strategy metadata including version and checksum.
+        
+        Returns:
+            Dictionary with name, version, checksum, and file path
+        """
+        return {
+            "name": STRATEGY_NAME,
+            "version": STRATEGY_VERSION,
+            "checksum": CORE_CHECKSUM,
+            "file": __file__
+        }
     
     def calculate_atr(self, df: pd.DataFrame) -> pd.DataFrame:
         """
