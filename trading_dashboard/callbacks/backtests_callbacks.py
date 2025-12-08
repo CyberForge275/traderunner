@@ -32,30 +32,6 @@ def register_backtests_callbacks(app):
         if df is None or df.empty:
             return []
         return df.to_dict("records")
-
-    @app.callback(
-        Output("version-selector-container", "style"),
-        Output("backtests-strategy-version", "options"),
-        Output("backtests-strategy-version", "value"),
-        Input("backtests-new-strategy", "value")
-    )
-    def update_version_dropdown(strategy):
-        """Show/hide version dropdown based on strategy selection."""
-        from ..utils.version_loader import get_strategy_versions
-        
-        # Only show for InsideBar strategies
-        if strategy in ["insidebar_intraday", "insidebar_intraday_v2"]:
-            versions = get_strategy_versions(strategy)
-            if versions:
-                # Default to latest (first in list, sorted DESC)
-                return (
-                    {"display": "block"},  # Show
-                    versions,  # Options
-                    versions[0]["value"] if versions else None  # Latest version
-                )
-        
-        # Hide for other strategies
-        return {"display": "none"}, [], None
     
     @app.callback(
         Output("version-pattern-hint", "children"),
