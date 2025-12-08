@@ -167,8 +167,6 @@ def register_run_backtest_callback(app):
             start_date=start_date_str,
             end_date=end_date_str,
             config_params=config_params if config_params else None,
-            strategy_version=insidebar_strategy_version,  # Use plugin version
-            strategy_params=strategy_params,
         )
         
         # Format date range for display
