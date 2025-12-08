@@ -94,39 +94,25 @@ def register_run_backtest_callback(app):
         if not symbols_str or not symbols_str.strip():
             error_msg = html.Div([
                 html.Span("⚠️ ", style={"color": "var(--accent-yellow)"}),
-                html.Span("Error: Please enter at least one symbol"),
-            ])
-            return error_msg, run_name, True
+        if symbols_str:
+            symbols = [s.strip() for s in symbols_str.split(",") if s.strip()]
+        else:
+            return (
+                html.Div("❌ Please enter at least one symbol", style={"color": "red"}),
+                run_name,
+                True
+            )
         
-        symbols = [s.strip() for s in symbols_str.split(",") if s.strip()]
-        
-        if not symbols:
-            error_msg = html.Div([
-                html.Span("⚠️ ", style={"color": "var(--accent-yellow)"}),
-                html.Span("Error: Please enter at least one symbol"),
-            ])
-            return error_msg, run_name, True
-        
-        # Parse additional params (simple key=value format)
+        # Parse params string if provided (legacy)
         config_params = {}
-        if params_str and params_str.strip():
+        if params_str:
             try:
-                for line in params_str.strip().split("\\n"):
-                    line = line.strip()
-                    if "=" in line and not line.startswith("#"):
                 for item in params_str.split(','):
                     if '=' in item:
                         k, v = item.split('=', 1)
                         config_params[k.strip()] = v.strip()
             except Exception:
                 pass
-        
-        if fees is not None:
-            config_params['fees_bps'] = fees
-        if slippage is not None:
-            config_params['slippage_bps'] = slippage
-        if risk_pct:
-            config_params['risk_pct'] = risk_pct
         
         # Calculate start/end dates based on mode
         if date_mode == "days_back":
