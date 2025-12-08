@@ -34,6 +34,8 @@ def register_run_backtest_callback(app):
         State("config-fees", "value"),
         State("config-slippage", "value"),
         State("config-risk-pct", "value"),
+        State("backtests-strategy-version", "value"),  # Selected version
+        State("backtests-new-version", "value"),  # NEW: New version input
         prevent_initial_call=True
     )
     def run_backtest(
@@ -51,7 +53,9 @@ def register_run_backtest_callback(app):
         initial_cash,
         fees,
         slippage,
-        risk_pct
+        risk_pct,
+        strategy_version,  # Selected version
+        new_version,  # NEW: New version input
     ):
         """Execute backtest in background and show progress."""
         from ..services.backtest_service import get_backtest_service
@@ -163,7 +167,8 @@ def register_run_backtest_callback(app):
             timeframe=timeframe,
             start_date=start_date_str,
             end_date=end_date_str,
-            config_params=config_params if config_params else None
+            config_params=config_params if config_params else None,
+            strategy_version=strategy_version  # NEW: Pass version to service
         )
         
         # Format date range for display

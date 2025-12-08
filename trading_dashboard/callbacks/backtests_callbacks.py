@@ -34,6 +34,58 @@ def register_backtests_callbacks(app):
         return df.to_dict("records")
 
     @app.callback(
+        Output("version-selector-container", "style"),
+        Output("backtests-strategy-version", "options"),
+        Output("backtests-strategy-version", "value"),
+        Input("backtests-new-strategy", "value")
+    )
+    def update_version_dropdown(strategy):
+        """Show/hide version dropdown based on strategy selection."""
+        from ..utils.version_loader import get_strategy_versions
+        
+        # Only show for InsideBar strategies
+        if strategy in ["insidebar_intraday", "insidebar_intraday_v2"]:
+            versions = get_strategy_versions(strategy)
+            if versions:
+                # Default to latest (first in list, sorted DESC)
+                return (
+                    {"display": "block"},  # Show
+                    versions,  # Options
+                    versions[0]["value"] if versions else None  # Latest version
+                )
+        
+        # Hide for other strategies
+        return {"display": "none"}, [], None
+    
+    @app.callback(
+        Output("version-pattern-hint", "children"),
+        Output("version-pattern-hint", "style"),
+        Input("backtests-new-version", "value")
+    )
+    def validate_version_pattern(new_version):
+        """Validate new version input pattern."""
+        import re
+        
+        if not new_version or not new_version.strip():
+            return (
+                "Pattern: v#.## (e.g., v1.01, v2.00)",
+                {"fontSize": "0.75em", "color": "#888", "marginBottom": "8px"}
+            )
+        
+        # Pattern: v followed by number, dot, two-digit number
+        pattern = r'^v\d+\.\d{2}$'
+        if re.match(pattern, new_version.strip()):
+            return (
+                "✓ Valid version format",
+                {"fontSize": "0.75em", "color": "green", "marginBottom": "8px"}
+            )
+        else:
+            return (
+                "❌ Invalid format. Use: v#.## (e.g., v1.01, v2.00)",
+                {"fontSize": "0.75em", "color": "red", "marginBottom": "8px"}
+            )
+
+    @app.callback(
         Output("backtests-detail", "children"),
         Input("backtests-table", "derived_virtual_data"),
         Input("backtests-table", "selected_rows"),  # Use selected_rows for better scrolling support

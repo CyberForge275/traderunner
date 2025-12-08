@@ -191,3 +191,18 @@ if __name__ == "__main__":
     print("=" * 50)
     
     app.run(host=HOST, port=PORT, debug=DEBUG)
+
+# Initialize strategy configuration plugins
+from trading_dashboard.strategy_configs.registry import initialize_registry, get_registry
+initialize_registry(app)
+
+@app.callback(
+    Output('strategy-config-container', 'children'),
+    Input('backtests-new-strategy', 'value')
+)
+def update_strategy_config_ui(strategy):
+    """Dynamically load strategy-specific configuration UI."""
+    if not strategy:
+        return []
+    registry = get_registry()
+    return registry.render_config_for_strategy(strategy)

@@ -636,6 +636,45 @@ def create_backtests_layout():
                 style={"color": "#000", "marginBottom": "8px"},
             ),
             
+            # Version selector (conditional - only for versioned strategies)
+            html.Div(
+                id="version-selector-container",
+                children=[
+                    # Existing version dropdown
+                    html.Label(
+                        "Version",
+                        style={"fontWeight": "bold", "marginTop": "12px"}
+                    ),
+                    dcc.Dropdown(
+                        id="backtests-strategy-version",
+                        options=[],  # Will be populated by callback
+                        placeholder="Select existing version...",
+                        clearable=False,
+                        style={"color": "#000", "marginBottom": "4px"},
+                    ),
+                    
+                    # New version input
+                    html.Label(
+                        "New version (optional)",
+                        style={"fontWeight": "normal", "marginTop": "8px", "fontSize": "0.9em", "color": "var(--text-secondary)"}
+                    ),
+                    html.Div([
+                        dcc.Input(
+                            id="backtests-new-version",
+                            type="text",
+                            placeholder="e.g., v1.01 or v2.00",
+                            style={"width": "100%", "marginBottom": "4px"},
+                        ),
+                        html.Div(
+                            id="version-pattern-hint",
+                            children="Pattern: v#.## (e.g., v1.01, v2.00)",
+                            style={"fontSize": "0.75em", "color": "#888", "marginBottom": "8px"}
+                        ),
+                    ]),
+                ],
+                style={"display": "none"}  # Hidden by default
+            ),
+            
             # Run name input with timestamp prefix
             html.Label("Backtest Run Name", style={"fontWeight": "bold", "marginTop": "8px"}),
             html.Div([

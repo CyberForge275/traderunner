@@ -1,15 +1,19 @@
-# InsideBar Strategy - Single Configuration
-# This file controls BOTH backtesting and live trading
+# InsideBar Strategy - Version 1.00
+# IMMUTABLE - Created: 2025-12-08T22:14:00Z
+# This file should NEVER be modified after creation
 
-metadata:
-  strategy: InsideBar
-  version: "1.02"
-  config_version: "1.0.0"
-  min_core_version: "2.0.0"
-  max_core_version: "2.9.99"
-  created_at: "2025-12-06T23:00:00Z"
-  author: "CyberForge275"
-  description: Inside Bar Breakout Strategy with ATR-based risk management
+version_meta:
+  version: "1.00"
+  created_at: "2025-12-08T22:14:00Z"
+  created_by: "mirko"
+  parent_version: null
+  change_type: "initial"
+  config_hash: ""  # Will be calculated
+  status: "production"
+  
+changes_from_parent:
+  - note: "Initial version from production config"
+    reason: "Baseline configuration with RRR=2.0 from successful backtests"
 
 parameters:
   # === Core Parameters (affect signal generation) ===
@@ -35,7 +39,7 @@ parameters:
   # "strict" = current bar must be strictly inside
   inside_bar_mode: inclusive
   
-  # === Live Trading Parameters (ignored in backtest) ===
+  # === Live Trading Parameters ===
   
   # Number of recent candles to consider
   lookback_candles: 50
@@ -48,8 +52,6 @@ parameters:
 
 backtesting:
   # Execution lag in number of candles
-  # 0 = enter on breakout candle close
-  # 1 = enter on next candle open
   execution_lag: 0
   
   # Session filtering (optional)
@@ -64,3 +66,12 @@ live_trading:
   
   # Pattern cache reset frequency
   reset_frequency: daily
+
+notes: |
+  Initial production version extracted from working configuration.
+  This version has been successfully tested with:
+  - RRR = 2.0 showing better profit factor
+  - ATR period = 14 for volatility measurement
+  - Inclusive inside bar mode for more signals
+  
+  Lab status: Ready for Pre-PaperTrading
