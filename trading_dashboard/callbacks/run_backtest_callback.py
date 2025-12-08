@@ -114,27 +114,13 @@ def register_run_backtest_callback(app):
                 for line in params_str.strip().split("\\n"):
                     line = line.strip()
                     if "=" in line and not line.startswith("#"):
-                        key, val = line.split("=", 1)
-                        key = key.strip()
-                        val = val.strip()
-                        # Try to evaluate as number or keep as string
-                        try:
-                            # Try int first
-                            config_params[key] = int(val)
-                        except ValueError:
-                            try:
-                                # Try float
-                                config_params[key] = float(val)
-                            except ValueError:
-                                # Keep as string
-                                 config_params[key] = val
-            except Exception as e:
-                # Ignore parse errors, just log
+                for item in params_str.split(','):
+                    if '=' in item:
+                        k, v = item.split('=', 1)
+                        config_params[k.strip()] = v.strip()
+            except Exception:
                 pass
         
-        # Add configuration parameters
-        if initial_cash:
-            config_params['initial_cash'] = initial_cash
         if fees is not None:
             config_params['fees_bps'] = fees
         if slippage is not None:
