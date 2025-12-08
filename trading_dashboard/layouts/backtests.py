@@ -777,8 +777,33 @@ def create_backtests_layout():
                     "marginBottom": "8px"},
             ),
             
-            # Configuration parameters (collapsible)
-            dbc.Accordion(
+            
+            # Run button
+            dbc.Button(
+                "▶ Run Backtest",
+                id="backtests-run-button",
+                color="success",
+                className="w-100",
+                style={"marginTop": "10px", "fontWeight": "bold"},
+            ),
+            
+            # Progress indicator
+            html.Div(id="backtests-run-progress", style={"marginTop": "12px"}),
+        ],
+        style={"marginTop": "20px"},
+    )
+
+    run_select_card = html.Div(
+        className="dashboard-card",
+        children=[
+            html.H6("Previous Runs", style={"marginBottom": "10px"}),
+            dcc.Dropdown(
+                id="backtests-run-select",
+                options=run_options,
+                value=run_options[0]["value"] if run_options else None,
+                placeholder="Select a run…",
+                clearable=True,
+                style={"color": "#000"},
             ),
             html.Hr(),
             html.H6("Backtest Run Name", style={"marginBottom": "10px"}),
