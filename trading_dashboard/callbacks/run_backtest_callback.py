@@ -90,18 +90,22 @@ def register_run_backtest_callback(app):
         if not strategy or not symbols_str or not timeframe:
             return html.Div("❌ Please select strategy, symbols, and timeframe", style={"color": "red"}), run_name, True
         
-        # Parse symbols
+        # Validate symbols
         if not symbols_str or not symbols_str.strip():
             error_msg = html.Div([
                 html.Span("⚠️ ", style={"color": "var(--accent-yellow)"}),
-        if symbols_str:
-            symbols = [s.strip() for s in symbols_str.split(",") if s.strip()]
-        else:
-            return (
-                html.Div("❌ Please enter at least one symbol", style={"color": "red"}),
-                run_name,
-                True
-            )
+                html.Span("Error: Please enter at least one symbol"),
+            ])
+            return error_msg, run_name, True
+        
+        symbols = [s.strip() for s in symbols_str.split(",") if s.strip()]
+        
+        if not symbols:
+            error_msg = html.Div([
+                html.Span("⚠️ ", style={"color": "var(--accent-yellow)"}),
+                html.Span("Error: Please enter at least one symbol"),
+            ])
+            return error_msg, run_name, True
         
         # Parse params string if provided (legacy)
         config_params = {}
