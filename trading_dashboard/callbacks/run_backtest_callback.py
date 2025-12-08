@@ -28,15 +28,12 @@ def register_run_backtest_callback(app):
         State("days-back", "value"),
         State("explicit-start-date", "date"),
         State("explicit-end-date", "date"),
-        State("backtests-new-run-name", "value"),  # Changed from backtests-run-name-input
+        State("backtests-new-run-name", "value"),
         State("backtests-run-params", "value"),
-        State("config-initial-cash", "value"),
-        State("config-fees", "value"),
-        State("config-slippage", "value"),
-        State("config-risk-pct", "value"),
-        State("backtests-strategy-version", "value"),
-        State("backtests-new-version", "value"),
-        # InsideBar strategy parameters
+        # InsideBar version management (from plugin)
+        State("insidebar-version-dropdown", "value"),
+        State("insidebar-new-version", "value"),
+        # InsideBar strategy parameters (from plugin)
         State("insidebar-atr-period", "value"),
         State("insidebar-min-mother-bar", "value"),
         State("insidebar-breakout-confirm", "value"),
@@ -58,12 +55,9 @@ def register_run_backtest_callback(app):
         explicit_end,
         run_name,
         params_str,
-        initial_cash,
-        fees,
-        slippage,
-        risk_pct,
-        strategy_version,
-        new_version,
+        # InsideBar version
+        insidebar_strategy_version,
+        insidebar_new_version,
         # InsideBar parameters
         insidebar_atr_period,
         insidebar_min_mother_bar,
@@ -197,7 +191,7 @@ def register_run_backtest_callback(app):
             start_date=start_date_str,
             end_date=end_date_str,
             config_params=config_params if config_params else None,
-            strategy_version=strategy_version,
+            strategy_version=insidebar_strategy_version,  # Use plugin version
             strategy_params=strategy_params,
         )
         
