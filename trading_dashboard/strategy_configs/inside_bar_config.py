@@ -69,6 +69,117 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
                         children="Pattern: v#.## (e.g., v1.01, v2.00)",
                         style={"fontSize": "0.75em", "color": "#888", "marginBottom": "8px"}
                     ),
+                    
+                    html.Hr(style={"margin": "16px 0"}),
+                    
+                    # Pattern Detection Parameters
+                    html.H6(
+                        "📊 Pattern Detection",
+                        style={"marginTop": "8px", "marginBottom": "8px", "fontSize": "0.9em"}
+                    ),
+                    
+                    html.Label("ATR Period", style={"fontSize": "0.85em", "marginTop": "4px"}),
+                    dcc.Input(
+                        id="insidebar-atr-period",
+                        type="number",
+                        value=14,
+                        min=5,
+                        max=50,
+                        step=1,
+                        style={"width": "100%", "marginBottom": "8px"}
+                    ),
+                    
+                    html.Label("Min Mother Bar Size (ATR multiple)", 
+                        style={"fontSize": "0.85em", "marginTop": "4px"}),
+                    dcc.Input(
+                        id="insidebar-min-mother-bar",
+                        type="number",
+                        value=0.5,
+                        min=0,
+                        max=5,
+                        step=0.1,
+                        style={"width": "100%", "marginBottom": "8px"}
+                    ),
+                    
+                    html.Label("Breakout Confirmation", 
+                        style={"fontSize": "0.85em", "marginTop": "4px"}),
+                    dcc.Checklist(
+                        id="insidebar-breakout-confirm",
+                        options=[{"label": "Require close beyond mother bar", "value": "true"}],
+                        value=["true"],
+                        style={"marginBottom": "8px"}
+                    ),
+                    
+                    html.Hr(style={"margin": "16px 0"}),
+                    
+                    # Entry & Exit Parameters
+                    html.H6(
+                        "🎯 Entry & Exit",
+                        style={"marginTop": "8px", "marginBottom": "8px", "fontSize": "0.9em"}
+                    ),
+                    
+                    html.Label("Risk/Reward Ratio", style={"fontSize": "0.85em", "marginTop": "4px"}),
+                    dcc.Input(
+                        id="insidebar-rrr",
+                        type="number",
+                        value=2.0,
+                        min=0.5,
+                        max=10,
+                        step=0.1,
+                        style={"width": "100%", "marginBottom": "8px"}
+                    ),
+                    
+                    html.Hr(style={"margin": "16px 0"}),
+                    
+                    # Live Trading Parameters
+                    html.H6(
+                        "⚙️ Live Trading",
+                        style={"marginTop": "8px", "marginBottom": "8px", "fontSize": "0.9em"}
+                    ),
+                    
+                    html.Label("Lookback Candles", style={"fontSize": "0.85em", "marginTop": "4px"}),
+                    dcc.Input(
+                        id="insidebar-lookback-candles",
+                        type="number",
+                        value=50,
+                        min=10,
+                        max=200,
+                        step=1,
+                        style={"width": "100%", "marginBottom": "8px"}
+                    ),
+                    
+                    html.Label("Max Pattern Age (candles)", 
+                        style={"fontSize": "0.85em", "marginTop": "4px"}),
+                    dcc.Input(
+                        id="insidebar-max-pattern-age",
+                        type="number",
+                        value=12,
+                        min=1,
+                        max=50,
+                        step=1,
+                        style={"width": "100%", "marginBottom": "8px"}
+                    ),
+                    
+                    html.Hr(style={"margin": "16px 0"}),
+                    
+                    # Backtesting Parameters
+                    html.H6(
+                        "🧪 Backtesting",
+                        style={"marginTop": "8px", "marginBottom": "8px", "fontSize": "0.9em"}
+                    ),
+                    
+                    html.Label("Execution Lag (candles)", 
+                        style={"fontSize": "0.85em", "marginTop": "4px"}),
+                    dcc.Input(
+                        id="insidebar-execution-lag",
+                        type="number",
+                        value=0,
+                        min=0,
+                        max=10,
+                        step=1,
+                        style={"width": "100%", "marginBottom": "8px"}
+                    ),
+                    
                 ], style={"marginLeft": "15px", "marginTop": "8px"}),
             ], open=True),  # Expanded by default
         ]
