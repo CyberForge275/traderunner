@@ -116,13 +116,13 @@ INSIDE_BAR_METADATA = StrategyMetadata(
     orders_source=ROOT / "artifacts" / "signals" / "current_signals_ib.csv",
     default_payload={
         "engine": "replay",
-        "mode": INSIDE_BAR_DEFAULTS.name,
+        "mode": "insidebar_intraday",  # Fixed: explicit mode name for replay engine
         "data": {"tz": INSIDE_BAR_TIMEZONE},
         "costs": INSIDE_BAR_DEFAULTS.costs,
         "initial_cash": INSIDE_BAR_DEFAULTS.initial_cash,
-        "strategy": "inside_bar_v1",
+        "strategy": "inside_bar",  # Fixed: CLI expects 'inside_bar' not 'inside_bar_v1'
     },
-    strategy_name="inside_bar_v1",
+    strategy_name="inside_bar",  # Fixed: match CLI argument choices
     doc_path=ROOT / "docs" / "inside_bar_strategy.pdf",
     default_sizing={
         "mode": "risk",

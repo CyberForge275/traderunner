@@ -170,7 +170,16 @@ def main() -> int:
         filled.to_csv(run_dir / "filled_orders.csv", index=False)
     if isinstance(trades, pd.DataFrame):
         trades.to_csv(run_dir / "trades.csv", index=False)
-    if isinstance(equity, pd.DataFrame):
+    
+    # Add drawdown_pct column to equity before saving
+    if isinstance(equity, pd.DataFrame) and not equity.empty and "equity" in equity.columns:
+        # Calculate drawdown percentage
+        equity_values = pd.to_numeric(equity["equity"], errors="coerce")
+        running_max = equity_values.cummax()
+        # Drawdown as percentage from peak (negative values)
+        equity["drawdown_pct"] = ((equity_values / running_max) - 1.0) * 100.0
+        equity.to_csv(run_dir / "equity_curve.csv", index=False)
+    elif isinstance(equity, pd.DataFrame):
         equity.to_csv(run_dir / "equity_curve.csv", index=False)
     if "orders" in result and isinstance(result["orders"], pd.DataFrame):
         result["orders"].to_csv(run_dir / "orders.csv", index=False)

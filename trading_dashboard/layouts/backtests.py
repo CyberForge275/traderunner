@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from dash import html, dcc, dash_table
+from dash import dcc, html, dash_table, Input, Output, State
 import dash_bootstrap_components as dbc
 import plotly.express as px
 import pandas as pd
@@ -47,15 +47,22 @@ def _create_backtests_table(df):
                 id="backtests-table",
                 columns=columns,
                 data=df.to_dict("records"),
-                page_size=15,
-                sort_action="native",
-                row_selectable="single",
-                style_table={"overflowX": "auto"},
+                page_size=5,  # Show 5 rows
+                page_action="none",  # Disable pagination
+                row_selectable="single",  # Enable row selection
+                sort_action="native",  # Enable sorting
+                style_table={
+                    "overflowY": "auto",  # Enable vertical scrolling
+                    "maxHeight": "300px",  # Limit height to ~5 rows
+                },
                 style_header={
                     "backgroundColor": "var(--bg-secondary)",
                     "color": "var(--text-secondary)",
                     "fontWeight": "bold",
                     "border": "1px solid var(--border-color)",
+                    "position": "sticky",
+                    "top": 0,
+                    "zIndex": 1,
                 },
                 style_cell={
                     "backgroundColor": "var(--bg-card)",
@@ -82,7 +89,7 @@ def _create_metrics_cards(metrics: dict | None):
                             style={"color": "var(--text-secondary)", "marginBottom": "5px"},
                         ),
                         html.H3(
-                            f"{metrics.get('net_pnl', 0.0):,.2f}",
+                            f"{metrics.get('net_pnl', 0.0):,.3f}",
                             style={"marginBottom": "0"},
                         ),
                     ],
@@ -116,7 +123,7 @@ def _create_metrics_cards(metrics: dict | None):
                             style={"color": "var(--text-secondary)", "marginBottom": "5px"},
                         ),
                         html.H3(
-                            f"{metrics.get('max_drawdown', 0.0):,.2f}",
+                            f"{metrics.get('max_drawdown', 0.0):,.3f}",
                             style={"marginBottom": "0"},
                         ),
                     ],
@@ -132,7 +139,7 @@ def _create_metrics_cards(metrics: dict | None):
                             style={"color": "var(--text-secondary)", "marginBottom": "5px"},
                         ),
                         html.H3(
-                            f"{metrics.get('sharpe_ratio', 0.0):.2f}",
+                            f"{metrics.get('sharpe_ratio', 0.0):.3f}",
                             style={"marginBottom": "0"},
                         ),
                     ],
@@ -620,11 +627,11 @@ def create_backtests_layout():
             dcc.Dropdown(
                 id="backtests-new-strategy",
                 options=[
-                    {"label": "Inside Bar", "value": "inside_bar"},
-                    {"label": "Inside Bar V2", "value": "inside_bar_v2"},
-                    {"label": "Rudometkin", "value": "rudometkin"},
+                    {"label": "Inside Bar", "value": "insidebar_intraday"},
+                    {"label": "Inside Bar V2", "value": "insidebar_intraday_v2"},
+                    {"label": "Rudometkin", "value": "rudometkin_moc_mode"},
                 ],
-                value="inside_bar",
+                value="insidebar_intraday",
                 clearable=False,
                 style={"color": "#000", "marginBottom": "8px"},
             ),
@@ -667,8 +674,8 @@ def create_backtests_layout():
                 dcc.Input(
                     id="backtests-new-symbols",
                     type="text",
-                    placeholder="Or type: TSLA,AAPL,HOOD",
-                    value="TSLA,AAPL,PLTR,HOOD",
+                    placeholder="Or type: TSLA,AAPL,PLTR,HOOD",
+                    value="",  # Empty by default
                     style={"width": "100%", "marginBottom": "8px"},
                 ),
             ]),
@@ -723,7 +730,7 @@ def create_backtests_layout():
                     dcc.Input(
                         id="days-back",
                         type="number",
-                        value=30,
+                        value=4,  # Changed from 30 to 4
                         min=1,
                         max=365,
                         step=1,

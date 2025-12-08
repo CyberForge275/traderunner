@@ -146,9 +146,35 @@ def simulate_insidebar_from_orders(
     initial_cash: float = DEFAULT_INITIAL_CASH,
     data_path_m1: Optional[Path] = None,
 ) -> Dict[str, Any]:
+    import logging
+    logger = logging.getLogger(__name__)
+    
     orders = pd.read_csv(orders_csv)
-    orders["valid_from"] = pd.to_datetime(orders.get("valid_from"), utc=True, errors="coerce")
-    orders["valid_to"] = pd.to_datetime(orders.get("valid_to"), utc=True, errors="coerce")
+    
+    # Enhanced datetime conversion with better error handling
+    logger.info(f"Processing orders from {orders_csv}")
+    logger.info(f"Orders shape: {orders.shape}")
+    logger.info(f"Orders columns: {orders.columns.tolist()}")
+    
+    # Convert datetime columns with explicit error handling
+    for col in ["valid_from", "valid_to"]:
+        if col in orders.columns:
+            try:
+                # First, check if all values can be converted
+                orders[col] = pd.to_datetime(orders[col], utc=True)
+                logger.info(f"Successfully converted '{col}' to datetime. Dtype: {orders[col].dtype}")
+            except Exception as e:
+                # Log detailed error information
+                logger.error(f"Failed to convert '{col}' column to datetime")
+                logger.error(f"Error: {type(e).__name__}: {str(e)}")
+                logger.error(f"Sample values from '{col}': {orders[col].head().tolist()}")
+                logger.error(f"Column dtype: {orders[col].dtype}")
+                raise ValueError(
+                    f"Failed to convert '{col}' to datetime. "
+                    f"Please ensure all values are valid datetime strings. "
+                    f"Sample values: {orders[col].head().tolist()}"
+                ) from e
+    
     if orders.empty:
         empty = pd.DataFrame()
         return {
@@ -158,10 +184,29 @@ def simulate_insidebar_from_orders(
             "metrics": {"num_trades": 0, "pnl": 0.0},
         }
 
+    # Validate that datetime conversion worked before using .dt accessor
     for column in ["valid_from", "valid_to"]:
+        # Only validate if column exists (it should after the conversion above)
+        if column not in orders.columns:
+            logger.error(f"Required column '{column}' is missing from orders CSV")
+            raise ValueError(
+                f"Missing required column '{column}' in orders file. "
+                f"Available columns: {orders.columns.tolist()}"
+            )
+        
+        if not pd.api.types.is_datetime64_any_dtype(orders[column]):
+            logger.error(f"Column '{column}' is not datetime dtype: {orders[column].dtype}")
+            raise TypeError(
+                f"Column '{column}' must be datetime type, got {orders[column].dtype}. "
+                f"This usually means datetime conversion failed silently."
+            )
+        
+        # Handle timezone
         if orders[column].dt.tz is None:
+            logger.info(f"Localizing '{column}' to {tz}")
             orders[column] = orders[column].dt.tz_localize(tz)
         else:
+            logger.info(f"Converting '{column}' from {orders[column].dt.tz} to {tz}")
             orders[column] = orders[column].dt.tz_convert(tz)
 
     ib_orders = orders.query('order_type == "STOP"').copy()
@@ -317,8 +362,27 @@ def simulate_daily_moc_from_orders(
     costs: Costs,
     initial_cash: float = DEFAULT_INITIAL_CASH,
 ) -> Dict[str, Any]:
+    import logging
+    logger = logging.getLogger(__name__)
+    
     orders = pd.read_csv(orders_csv)
-    orders["valid_from"] = pd.to_datetime(orders.get("valid_from"), utc=True, errors="coerce")
+    
+    # Enhanced datetime conversion with better error handling
+    logger.info(f"Processing MOC orders from {orders_csv}")
+    logger.info(f"Orders shape: {orders.shape}")
+    
+    if "valid_from" in orders.columns:
+        try:
+            orders["valid_from"] = pd.to_datetime(orders["valid_from"], utc=True)
+            logger.info(f"Successfully converted 'valid_from' to datetime. Dtype: {orders['valid_from'].dtype}")
+        except Exception as e:
+            logger.error(f"Failed to convert 'valid_from' to datetime: {type(e).__name__}: {str(e)}")
+            logger.error(f"Sample values: {orders['valid_from'].head().tolist()}")
+            raise ValueError(
+                f"Failed to convert 'valid_from' to datetime. "
+                f"Sample values: {orders['valid_from'].head().tolist()}"
+            ) from e
+    
     if orders.empty:
         empty = pd.DataFrame()
         return {
@@ -328,9 +392,18 @@ def simulate_daily_moc_from_orders(
             "metrics": {"num_trades": 0, "pnl": 0.0},
         }
 
+    # Validate datetime dtype before using .dt accessor
+    if not pd.api.types.is_datetime64_any_dtype(orders["valid_from"]):
+        logger.error(f"Column 'valid_from' is not datetime dtype: {orders['valid_from'].dtype}")
+        raise TypeError(
+            f"Column 'valid_from' must be datetime type, got {orders['valid_from'].dtype}"
+        )
+    
     if orders["valid_from"].dt.tz is None:
+        logger.info(f"Localizing 'valid_from' to {tz}")
         orders["valid_from"] = orders["valid_from"].dt.tz_localize(tz)
     else:
+        logger.info(f"Converting 'valid_from' from {orders['valid_from'].dt.tz} to {tz}")
         orders["valid_from"] = orders["valid_from"].dt.tz_convert(tz)
 
     filled = []

@@ -102,74 +102,97 @@ class BacktestService:
             # Update progress
             self._update_job_progress(job_id, "Loading pipeline configuration...")
             
-            from apps.streamlit.pipeline import execute_pipeline
-            from apps.streamlit.state import PipelineConfig, FetchConfig
-            from apps.streamlit import strategies
+            # Use the pipeline adapter
+            from .pipeline_adapter import create_adapter
             
-            # Get strategy metadata
-            strategy_obj = strategies.registry.get(strategy)
-            if not strategy_obj:
-                raise ValueError(f"Unknown strategy: {strategy}")
+            # Create adapter with progress callback
+            def update_progress(msg: str):
+                self._update_job_progress(job_id, msg)
             
-            self._update_job_progress(job_id, "Configuring data fetch...")
+            adapter = create_adapter(progress_callback=update_progress)
             
-            # Build fetch config - use date range if provided, otherwise default to 1 month
-            if start_date and end_date:
-                fetch = FetchConfig(
-                    symbols=symbols,
-                    timeframe=timeframe,
-                    start_date=start_date,
-                    end_date=end_date,
-                    use_sample=False,
-                    force_refresh=False
-                )
-            else:
-                # Fallback to period-based config if dates not provided
-                fetch = FetchConfig(
-                    symbols=symbols,
-                    timeframe=timeframe,
-                    period="1mo",
-                    use_sample=False,
-                    force_refresh=False
-                )
-            
-            # Build pipeline config
-            pipeline_config = config_params or {}
-            pipeline = PipelineConfig(
+            # Execute backtest
+            result = adapter.execute_backtest(
                 run_name=run_name,
-                fetch=fetch,
+                strategy=strategy,
                 symbols=symbols,
-                strategy=strategy_obj,
-                config_path=None,
-                config_payload=pipeline_config
+                timeframe=timeframe,
+                start_date=start_date,
+                end_date=end_date,
+                config_params=config_params
             )
             
-            self._update_job_progress(job_id, "Running backtest pipeline...")
+            # Check result
+            if result["status"] == "failed":
+                # If pipeline failed, try to extract more details from run_log.json
+                command_output = None
+                try:
+                    # Assuming run_name is used to create the artifact directory
+                    run_log_path = Path(f"/home/mirko/data/workspace/droid/traderunner/artifacts/backtests/{run_name}/run_log.json")
+                    if run_log_path.exists():
+                        import json
+                        with open(run_log_path) as f:
+                            run_log = json.load(f)
+                        # Find the failed command entry
+                        for entry in run_log.get("entries", []):
+                            if entry.get("kind") == "command" and entry.get("status") == "error":
+                                command_output = entry.get("output", "")
+                                break
+                except Exception as log_err:
+                    print(f"Could not extract command output from run_log: {log_err}")
+                
+                error_msg = result.get('error', 'Unknown error')
+                # Enhance error message with command output if available
+                if command_output:
+                    error_msg = f"{error_msg}\n\nCommand Output:\n{command_output}"
+                
+                with self._lock:
+                    job_data = self.running_jobs.pop(job_id, {})
+                    self.completed_jobs[job_id] = {
+                        **job_data,
+                        "status": "failed",
+                        "error": error_msg,
+                        "traceback": result.get('traceback', ''),
+                        "output": command_output,  # Store command output separately
+                        "ended_at": datetime.now().isoformat(),
+                        "progress": f"Error: {result.get('error', 'Unknown error')}",
+                    }
+                return # Exit early as the job has failed and been recorded
             
-            # Execute pipeline (this runs all 4 steps)
-            effective_run_name = execute_pipeline(pipeline)
+            effective_run_name = result["run_name"]
             
             # Success
             with self._lock:
                 job_data = self.running_jobs.pop(job_id, {})
                 self.completed_jobs[job_id] = {
                     **job_data,
-                    "status": "success",
+                    "status": "completed",
                     "run_name": effective_run_name,
-                    "completed_at": datetime.now().isoformat(),
+                    "ended_at": datetime.now().isoformat(),
                     "progress": "Backtest completed successfully",
                 }
                 
         except Exception as e:
-            # Error
+            # Error - capture full traceback
+            import traceback
             error_msg = f"{type(e).__name__}: {str(e)}"
+            full_traceback = traceback.format_exc()
+            
+            # Log to console for debugging
+            print(f"\n{'='*60}")
+            print(f"BACKTEST ERROR - Job ID: {job_id}")
+            print(f"{'='*60}")
+            print(full_traceback)
+            print(f"{'='*60}\n")
+            
             with self._lock:
                 job_data = self.running_jobs.pop(job_id, {})
                 self.completed_jobs[job_id] = {
                     **job_data,
-                    "status": "error",
+                    "status": "failed",
                     "error": error_msg,
-                    "completed_at": datetime.now().isoformat(),
+                    "traceback": full_traceback,  # Store full traceback
+                    "ended_at": datetime.now().isoformat(),
                     "progress": f"Error: {error_msg}",
                 }
     

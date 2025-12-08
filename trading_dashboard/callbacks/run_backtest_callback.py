@@ -169,10 +169,18 @@ def register_run_backtest_callback(app):
         # Format date range for display
         date_range_display = f"{start_date_str} to {end_date_str}" if start_date_str and end_date_str else "N/A"
         
+        # Show progress indicator
+        progress_msg = html.Div(
+            [
+                html.Div("🚀 Backtest started!", style={"color": "green", "fontWeight": "bold"}),
+                html.Div(f"Run: {run_name}", style={"fontSize": "0.85em", "marginTop": "4px"}),
+                html.Div(f"Job ID: {job_id}", style={"fontSize": "0.85em"}),
+            ]
+        )
         
         # Enable refresh interval to poll for completion
         # Clear run name input for next run
-        return progress, "", False
+        return progress_msg, "", False
     
     @app.callback(
         Output("backtests-run-progress", "children", allow_duplicate=True),
@@ -190,15 +198,36 @@ def register_run_backtest_callback(app):
         # Check if there are any running jobs
         running_jobs = {jid: j for jid, j in all_jobs.items() if j.get("status") == "running"}
         
-        if not running_jobs:
-            # No running jobs - disable interval and clear progress
+        # Also show recently completed/failed jobs (last 30 seconds)
+        recent_jobs = {}
+        import time
+        current_time = time.time()
+        for jid, job in all_jobs.items():
+            if job.get("status") in ["completed", "failed"]:
+                # Check if completed/failed recently
+                ended_at = job.get("ended_at")
+                if ended_at:
+                    try:
+                        from datetime import datetime
+                        end_time = datetime.fromisoformat(ended_at).timestamp()
+                        if current_time - end_time < 30:  # Show for 30 seconds
+                            recent_jobs[jid] = job
+                    except:
+                        pass
+        
+        if not running_jobs and not recent_jobs:
+            # No jobs to display - clear progress
             return "", True
         
-        # Show status of running jobs
+        # Show status of all relevant jobs
         job_statuses = []
+        
+        # Running jobs
         for job_id, job in running_jobs.items():
-            progress_msg = job.get("progress", "Running...")
+            progress_text = job.get("progress", "Running...")
             run_name = job.get("run_name", "unknown")
+            started_at = job.get("started_at", "")
+            
             job_statuses.append(
                 html.Div([
                     html.Div(
@@ -206,11 +235,81 @@ def register_run_backtest_callback(app):
                         style={"display": "inline-block"},
                     ),
                     html.Div([
-                        html.Div(f"🚀 {run_name}", style={"fontWeight": "bold", "color": "var(--accent-green)"}),
-                        html.Div(progress_msg, style={"fontSize": "0.85em", "color": "var(--text-secondary)", "marginTop": "4px"}),
+                        html.Div(f"🚀 Running: {run_name}", style={"fontWeight": "bold", "color": "var(--accent-green)"}),
+                        html.Div(f"Job ID: {job_id}", style={"fontSize": "0.75em", "color": "var(--text-secondary)", "marginTop": "2px"}),
+                        html.Div(f"Status: {progress_text}", style={"fontSize": "0.85em", "marginTop": "4px", "fontStyle": "italic"}),
+                        html.Div(f"Started: {started_at[:19] if started_at else 'N/A'}", style={"fontSize": "0.75em", "color": "var(--text-secondary)", "marginTop": "2px"}),
                     ]),
-                ], style={"marginBottom": "10px"})
+                ], style={"marginBottom": "12px"})
             )
         
-        # Keep interval enabled
-        return html.Div(job_statuses), False
+        # Recently completed jobs
+        for job_id, job in recent_jobs.items():
+            run_name = job.get("run_name", "unknown")
+            status = job.get("status")
+            progress_text = job.get("progress", "")
+            ended_at = job.get("ended_at", "")
+            traceback_text = job.get("traceback", None)
+            
+            if status == "completed":
+                icon = "✅"
+                color = "var(--accent-green)"
+                status_text = "Completed Successfully"
+                details = []
+            else:  # failed
+                # Failed job - show detailed error with traceback
+                error_msg = job.get("error", "Unknown error")
+                traceback_text = job.get("traceback", "No traceback available")
+                
+                # Also include command output if available (from run_log.json)
+                command_output = ""
+                if "output" in job and job["output"]:
+                    command_output = f"\n\n### Command Output:\n```\n{job['output']}\n```"
+                
+                progress_display = html.Div([
+                    dbc.Alert([
+                        html.H5("Failed", className="alert-heading mb-2"),
+                        html.P(f"Error: {error_msg}", className="mb-2"),
+                        html.Small([
+                            html.Strong("Job ID: "), job_id, html.Br(),
+                            html.Strong("Ended: "), job.get("ended_at", "Unknown")
+                        ], className="text-muted")
+                    ], color="danger", className="mb-3"),
+                    
+                    # Expandable traceback section
+                    dbc.Card([
+                        dbc.CardHeader(
+                            dbc.Button(
+                                "📋 Full Error Traceback",
+                                id={"type": "error-collapse-btn", "index": job_id},
+                                className="w-100 text-start",
+                                color="link",
+                                size="sm"
+                            )
+                        ),
+                        dbc.Collapse(
+                            dbc.CardBody([
+                                html.Pre(traceback_text, style={"fontSize": "0.85em", "whiteSpace": "pre-wrap"}),
+                                html.Div(dcc.Markdown(command_output)) if command_output else None
+                            ]),
+                            id={"type": "error-collapse", "index": job_id},
+                            is_open=False
+                        )
+                    ], className="border-danger")
+                ])
+                job_statuses.append(progress_display)
+                continue # Skip the common display logic below for failed jobs
+            
+            job_statuses.append(
+                html.Div([
+                    html.Div(icon, style={"fontSize": "1.2em", "marginRight": "8px", "display": "inline-block"}),
+                    html.Div([
+                        html.Div(f"{run_name}", style={"fontWeight": "bold", "color": color}),
+                        html.Div(f"{status_text}", style={"fontSize": "0.85em", "marginTop": "2px"}),
+                        html.Div(f"Ended: {ended_at[:19] if ended_at else 'N/A'}", style={"fontSize": "0.75em", "color": "var(--text-secondary)", "marginTop": "2px"}),
+                        *details,  # Add traceback if present
+                    ], style={"display": "inline-block", "verticalAlign": "top"}),
+                ], style={"marginBottom": "12px"})
+            )
+        
+        return html.Div(job_statuses), len(running_jobs) == 0

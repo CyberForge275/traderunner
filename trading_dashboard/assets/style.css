@@ -201,3 +201,33 @@ body {
     left: 0;
     right: 0;
 }
+
+/* Dash Tabs - High Contrast Styling */
+.tab {
+    background-color: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-bottom: none !important;
+    color: var(--text-secondary) !important;
+    padding: 12px 24px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+}
+
+.tab:hover {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+.tab--selected {
+    background-color: var(--bg-card) !important;
+    color: var(--accent-blue) !important;
+    border-bottom: 2px solid var(--accent-blue) !important;
+    font-weight: 600 !important;
+}
+
+/* Dash Tabs Container */
+.tabs {
+    background-color: var(--bg-primary) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
