@@ -636,9 +636,14 @@ def create_backtests_layout():
                 style={"color": "#000", "marginBottom": "8px"},
             ),
             
-            # Version selector (conditional - only for versioned strategies)
+            
+            # Dynamic strategy configuration container (populated by plugin)
             html.Div(
+                id="strategy-config-container",
+                children=[],
+                style={"marginTop": "12px", "marginBottom": "12px"}
             ),
+            
             
             # Run name input with timestamp prefix
             html.Label("Backtest Run Name", style={"fontWeight": "bold", "marginTop": "8px"}),
