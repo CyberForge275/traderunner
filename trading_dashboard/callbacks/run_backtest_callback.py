@@ -34,8 +34,16 @@ def register_run_backtest_callback(app):
         State("config-fees", "value"),
         State("config-slippage", "value"),
         State("config-risk-pct", "value"),
-        State("backtests-strategy-version", "value"),  # Selected version
-        State("backtests-new-version", "value"),  # NEW: New version input
+        State("backtests-strategy-version", "value"),
+        State("backtests-new-version", "value"),
+        # InsideBar strategy parameters
+        State("insidebar-atr-period", "value"),
+        State("insidebar-min-mother-bar", "value"),
+        State("insidebar-breakout-confirm", "value"),
+        State("insidebar-rrr", "value"),
+        State("insidebar-lookback-candles", "value"),
+        State("insidebar-max-pattern-age", "value"),
+        State("insidebar-execution-lag", "value"),
         prevent_initial_call=True
     )
     def run_backtest(
@@ -54,8 +62,16 @@ def register_run_backtest_callback(app):
         fees,
         slippage,
         risk_pct,
-        strategy_version,  # Selected version
-        new_version,  # NEW: New version input
+        strategy_version,
+        new_version,
+        # InsideBar parameters
+        insidebar_atr_period,
+        insidebar_min_mother_bar,
+        insidebar_breakout_confirm,
+        insidebar_rrr,
+        insidebar_lookback_candles,
+        insidebar_max_pattern_age,
+        insidebar_execution_lag,
     ):
         """Execute backtest in background and show progress."""
         from ..services.backtest_service import get_backtest_service
@@ -160,56 +176,17 @@ def register_run_backtest_callback(app):
         start_date_str = start_date.isoformat() if start_date else None
         end_date_str = end_date.isoformat() if end_date else None
         
-        # Build strategy parameters dict
+        # Build strategy parameters dict from UI inputs
         strategy_params = {}
-        # NOTE: The variables like atr_period, min_mother_bar, etc. are not defined in this scope.
-        # This code snippet assumes these variables would be passed as State or derived from params_str.
-        # For now, this will cause a NameError if not handled.
-        # Assuming they would be extracted from `params_str` or added as new `State` inputs.
-        # For the purpose of this edit, I will include the structure as requested,
-        # but note the missing variable definitions.
         if strategy in ["insidebar_intraday", "insidebar_intraday_v2"]:
-            # These variables (atr_period, min_mother_bar, etc.) would need to be
-            # extracted from `params_str` or added as new `State` inputs to the callback.
-            # For now, using placeholder values or assuming they are available.
-            # This part of the instruction is incomplete without defining how these
-            # parameters are obtained.
-            # To make it syntactically correct and runnable, I'll use default values
-            # or assume they are part of config_params if not explicitly defined.
-            # However, the instruction explicitly states to build strategy_params.
-            # Given the instruction, I will add the structure as provided,
-            # but this will likely lead to NameErrors if the variables are not defined.
-            # A more complete solution would involve adding these as State inputs
-            # or parsing them from `params_str`.
-            # For faithful reproduction of the instruction, I'll add the dict as is.
-            # To avoid NameError for now, I'll comment out the specific values
-            # or use dummy values if the intent is to show the structure.
-            # Given the instruction, it seems these are expected to be available.
-            # I will assume they are meant to be extracted from `config_params` if not
-            # explicitly added as `State` inputs.
-            # For the sake of making the code syntactically valid without further context,
-            # I will use default values or assume they are part of `config_params`.
-            # The instruction implies these are direct variables.
-            # Since they are not defined, I will use dummy values to make the code runnable.
-            # A proper implementation would involve adding these as `State` inputs.
-            
-            # Placeholder values for undefined variables to ensure syntax correctness
-            atr_period = config_params.get("atr_period", 14)
-            min_mother_bar = config_params.get("min_mother_bar_size", 0.5)
-            breakout_confirm = config_params.get("breakout_confirmation", "false")
-            rrr = config_params.get("risk_reward_ratio", 2.0)
-            lookback_candles = config_params.get("lookback_candles", 50)
-            max_pattern_age = config_params.get("max_pattern_age_candles", 12)
-            execution_lag = config_params.get("execution_lag", 0)
-
             strategy_params = {
-                "atr_period": atr_period or 14,
-                "min_mother_bar_size": min_mother_bar or 0.5,
-                "breakout_confirmation": bool(breakout_confirm and "true" in str(breakout_confirm).lower()),
-                "risk_reward_ratio": rrr or 2.0,
-                "lookback_candles": lookback_candles or 50,
-                "max_pattern_age_candles": max_pattern_age or 12,
-                "execution_lag": execution_lag or 0,
+                "atr_period": insidebar_atr_period or 14,
+                "min_mother_bar_size": insidebar_min_mother_bar or 0.5,
+                "breakout_confirmation": bool(insidebar_breakout_confirm and "true" in insidebar_breakout_confirm),
+                "risk_reward_ratio": insidebar_rrr or 2.0,
+                "lookback_candles": insidebar_lookback_candles or 50,
+                "max_pattern_age_candles": insidebar_max_pattern_age or 12,
+                "execution_lag": insidebar_execution_lag or 0,
             }
         
         job_id = service.start_backtest(
@@ -221,7 +198,7 @@ def register_run_backtest_callback(app):
             end_date=end_date_str,
             config_params=config_params if config_params else None,
             strategy_version=strategy_version,
-            strategy_params=strategy_params,  # Pass params
+            strategy_params=strategy_params,
         )
         
         # Format date range for display
