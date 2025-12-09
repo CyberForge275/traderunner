@@ -26,13 +26,17 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
         return [
             # Version selection dropdown
             html.Label(
-                "Version",
-                style={"fontWeight": "bold", "marginTop": "12px"}
+                "Version (Required)",
+                style={"fontWeight": "bold", "marginTop": "12px", "color": "#d32f2f"}
+            ),
+            html.Small(
+                "⚠️ Version is mandatory for strategy lab progression",
+                style={"fontSize": "0.75em", "color": "#666", "display": "block", "marginBottom": "4px"}
             ),
             dcc.Dropdown(
                 id="insidebar-version-dropdown",
                 options=[],  # Will be populated by callback
-                placeholder="Loading versions...",
+                placeholder="Select existing version or create new below...",
                 clearable=False,
                 style={"color": "#000", "marginBottom": "8px"},
             ),
