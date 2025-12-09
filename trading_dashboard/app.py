@@ -16,6 +16,7 @@ from trading_dashboard.layouts import (
     get_portfolio_content,
     get_history_content,
     get_backtests_content,
+    get_pre_papertrade_content,
 )
 from trading_dashboard.callbacks.chart_callbacks import register_chart_callbacks
 from trading_dashboard.callbacks.timeframe_callbacks import register_timeframe_callbacks
@@ -24,6 +25,7 @@ from trading_dashboard.callbacks.history_callbacks import register_history_callb
 from trading_dashboard.callbacks.active_patterns_callback import register_active_patterns_callback
 from trading_dashboard.callbacks.backtests_callbacks import register_backtests_callbacks
 from trading_dashboard.callbacks.run_backtest_callback import register_run_backtest_callback
+from trading_dashboard.callbacks.pre_papertrade_callbacks import register_pre_papertrade_callbacks
 from trading_dashboard.callbacks.period_buttons_callback import register_period_buttons_callback
 from trading_dashboard.callbacks.date_selection_callback import register_date_selection_callback
 from trading_dashboard.callbacks.symbol_selector_callback import register_symbol_selector_callbacks
@@ -66,6 +68,7 @@ app.layout = html.Div([
             dbc.Tab(label="Charts", tab_id="charts"),
             dbc.Tab(label="History", tab_id="history"),
             dbc.Tab(label="Backtests", tab_id="backtests"),
+            dbc.Tab(label="Pre-PaperTrade Lab", tab_id="pre-papertrade"),
         ],
         style={"backgroundColor": "var(--bg-secondary)"}
     ),
@@ -128,6 +131,8 @@ def update_content(active_tab, n_intervals):
         content = get_history_content()
     elif active_tab == "backtests":
         content = get_backtests_content()
+    elif active_tab == "pre-papertrade":
+        content = get_pre_papertrade_content()
     else:
         content = html.Div("Unknown tab")
     
@@ -152,6 +157,7 @@ register_history_callbacks(app)
 register_active_patterns_callback(app)
 register_backtests_callbacks(app)
 register_run_backtest_callback(app)
+register_pre_papertrade_callbacks(app)
 register_period_buttons_callback(app)
 register_date_selection_callback(app)
 register_symbol_selector_callbacks(app)
