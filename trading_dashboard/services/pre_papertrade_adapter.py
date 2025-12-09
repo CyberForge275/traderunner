@@ -219,13 +219,22 @@ class PrePaperTradeAdapter:
             
             df = pd.read_parquet(data_file)
             
-            # Get data bounds for logging
+            # CRITICAL: Normalize timezone handling
+            # Convert DataFrame index to timezone-naive for consistent comparison
+            if hasattr(df.index, 'tz') and df.index.tz is not None:
+                df.index = df.index.tz_localize(None)
+            
+            # Get data bounds for logging (now timezone-naive)
             data_start = df.index.min()
             data_end = df.index.max()
             
+            # Ensure lookback_start and target dates are also timezone-naive
+            lookback_start_naive = pd.to_datetime(lookback_start).tz_localize(None) if hasattr(lookback_start, 'tz') else lookback_start
+            target_date_ts_naive = pd.to_datetime(target_date_ts).tz_localize(None) if hasattr(target_date_ts, 'tz') else target_date_ts
+            
             # Check if lookback_start is before available data
-            if lookback_start < data_start:
-                actual_lookback_days = (target_date_ts - data_start).days
+            if lookback_start_naive < data_start:
+                actual_lookback_days = (target_date_ts_naive - data_start).days
                 self.progress_callback(
                     f"⚠️ {symbol}: Requested {lookback_days}-day lookback, "
                     f"but data starts at {data_start.date()}. "
@@ -233,11 +242,11 @@ class PrePaperTradeAdapter:
                 )
                 effective_start = data_start
             else:
-                effective_start = lookback_start
+                effective_start = lookback_start_naive
             
             # STEP 1: Load data WITH lookback buffer (from lookback_start to target_end)
             # This ensures indicators have enough historical data
-            target_end = target_date_ts + pd.Timedelta(days=1)
+            target_end = target_date_ts_naive + pd.Timedelta(days=1)
             df_with_lookback = df[(df.index >= effective_start) & (df.index < target_end)]
             
             if df_with_lookback.empty:
@@ -247,7 +256,7 @@ class PrePaperTradeAdapter:
                 continue
             
             self.progress_callback(
-                f" {symbol}: Loaded {len(df_with_lookback)} candles "
+                f"  {symbol}: Loaded {len(df_with_lookback)} candles "
                 f"({effective_start.date()} to {data_end.date() if data_end < target_end else target_date})"
             )
             
@@ -260,11 +269,13 @@ class PrePaperTradeAdapter:
             # STEP 3: Filter signals to ONLY target_date
             # Important: Only include signals detected ON the replay date
             # This prevents "future" signals from appearing in results
-            target_date_end = target_date_ts + pd.Timedelta(days=1)
             filtered_signals = []
             for sig in strategy_signals:
                 sig_time = pd.to_datetime(sig['detected_at'])
-                if target_date_ts <= sig_time < target_date_end:
+                # Make timezone-naive for comparison
+                if hasattr(sig_time, 'tz') and sig_time.tz is not None:
+                    sig_time = sig_time.tz_localize(None)
+                if target_date_ts_naive <= sig_time < target_end:
                     filtered_signals.append(sig)
             
             if len(filtered_signals) < len(strategy_signals):
@@ -334,9 +345,11 @@ class PrePaperTradeAdapter:
         """
         signals = []
         
-        if strategy == "inside_bar":
+        # Map strategy names to detection methods
+        # Support both registry names and internal names
+        if strategy in ["inside_bar", "insidebar_intraday", "insidebar_intraday_v2"]:
             signals = self._detect_inside_bar(symbol, df, config_params)
-        elif strategy == "rudometkin_moc":
+        elif strategy in ["rudometkin_moc", "rudometkin_moc_mode"]:
             signals = self._detect_rudometkin_moc(symbol, df, config_params)
         else:
             raise ValueError(f"Strategy detection not implemented for: {strategy}")
@@ -347,44 +360,48 @@ class PrePaperTradeAdapter:
         self, symbol: str, df: pd.DataFrame, config_params: Optional[Dict]
     ) -> List[Dict]:
         """Detect InsideBar patterns and generate signals."""
-        from strategies.inside_bar.core import detect_inside_bars, InsideBarConfig
+        from strategies.inside_bar.core import InsideBarCore, InsideBarConfig
         
         # Build config from parameters
         config = InsideBarConfig(
+            atr_period=14,
             risk_reward_ratio=config_params.get("risk_reward_ratio", 2.0) if config_params else 2.0,
-            volume_filter=config_params.get("volume_filter", True) if config_params else True,
+            min_mother_bar_size=0.5,
+            breakout_confirmation=True,
+            inside_bar_mode="inclusive",
+            # Note: volume_filter removed - not in InsideBarConfig
         )
         
-        # Detect inside bars
-        detected = detect_inside_bars(df, config)
+        # Create core instance and process data
+        core = InsideBarCore(config)
         
+        # Prepare DataFrame - ensure required columns
+        df_prepared = df.copy()
+        if 'timestamp' not in df_prepared.columns:
+            df_prepared = df_prepared.reset_index()
+            if df_prepared.columns[0] != 'timestamp':
+                df_prepared = df_prepared.rename(columns={df_prepared.columns[0]: 'timestamp'})
+        
+        # Ensure lowercase column names
+        df_prepared.columns = [c.lower() for c in df_prepared.columns]
+        
+        # Run strategy detection using core
+        raw_signals = core.process_data(df_prepared, symbol)
+        
+        # Convert RawSignal objects to dictionary format
         signals = []
-        for _, row in detected.iterrows():
-            # Create BUY signal
-            if row.get("breakout_high"):
-                signals.append({
-                    "symbol": symbol,
-                    "side": "BUY",
-                    "entry_price": float(row["breakout_high"]),
-                    "stop_loss": float(row["stop_loss_high"]),
-                    "take_profit": float(row["take_profit_high"]),
-                    "detected_at": row.name.isoformat(),
-                    "strategy": "inside_bar",
-                    "timeframe": "M5",  # TODO: Get from config
-                })
-            
-            # Create SELL signal
-            if row.get("breakout_low"):
-                signals.append({
-                    "symbol": symbol,
-                    "side": "SELL",
-                    "entry_price": float(row["breakout_low"]),
-                    "stop_loss": float(row["stop_loss_low"]),
-                    "take_profit": float(row["take_profit_low"]),
-                    "detected_at": row.name.isoformat(),
-                    "strategy": "inside_bar",
-                    "timeframe": "M5",
-                })
+        for raw in raw_signals:
+            signals.append({
+                "symbol": symbol,
+                "side": raw.side,
+                "entry_price": raw.entry_price,
+                "stop_loss": raw.stop_loss,
+                "take_profit": raw.take_profit,
+                "detected_at": raw.timestamp.isoformat() if hasattr(raw.timestamp, 'isoformat') else str(raw.timestamp),
+                "strategy": "inside_bar",
+                "timeframe": "M5",  # TODO: Get from config
+                "metadata": raw.metadata
+            })
         
         return signals
     
