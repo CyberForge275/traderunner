@@ -19,6 +19,9 @@ import hashlib
 import pandas as pd
 import numpy as np
 
+# Import SessionFilter from config module
+from .config import SessionFilter
+
 
 # ══════════════════════════════════════════════════════════════════════
 # VERSION METADATA
@@ -64,6 +67,9 @@ class InsideBarConfig:
     min_mother_bar_size: float = 0.5
     breakout_confirmation: bool = True
     inside_bar_mode: str = "inclusive"  # or "strict"
+    
+    # Session filtering (None = no filtering, applies to all time periods)
+    session_filter: Optional[SessionFilter] = None
     
     # Live-specific parameters (ignored in backtest)
     lookback_candles: int = 50
@@ -425,6 +431,7 @@ class InsideBarCore:
         2. Calculate ATR
         3. Detect inside bars
         4. Generate breakout signals
+        5. Apply session filtering (if configured)
         
         Args:
             df: DataFrame with OHLC data
@@ -433,7 +440,7 @@ class InsideBarCore:
             symbol: Trading symbol
             
         Returns:
-            List of RawSignal objects
+            List of RawSignal objects (filtered by session if configured)
             
         Raises:
             ValueError: If required columns are missing
@@ -447,9 +454,19 @@ class InsideBarCore:
         # Ensure DataFrame is sorted by timestamp
         df = df.sort_values('timestamp').reset_index(drop=True)
         
-        # Pipeline
+        # Pipeline: Calculate ATR, detect patterns, generate signals
         df = self.calculate_atr(df)
         df = self.detect_inside_bars(df)
         signals = self.generate_signals(df, symbol)
+        
+        # Apply session filtering if configured
+        if self.config.session_filter is not None:
+            filtered_signals = []
+            for sig in signals:
+                # Ensure timestamp is a pd.Timestamp
+                ts = pd.to_datetime(sig.timestamp)
+                if self.config.session_filter.is_in_session(ts):
+                    filtered_signals.append(sig)
+            return filtered_signals
         
         return signals

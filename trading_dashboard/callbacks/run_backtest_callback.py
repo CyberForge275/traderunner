@@ -41,6 +41,7 @@ def register_run_backtest_callback(app):
         State("insidebar-lookback-candles", "value"),
         State("insidebar-max-pattern-age", "value"),
         State("insidebar-execution-lag", "value"),
+        State("backtests-session-filter", "value"),  # NEW
         prevent_initial_call=True
     )
     def run_backtest(
@@ -66,6 +67,7 @@ def register_run_backtest_callback(app):
         insidebar_lookback_candles,
         insidebar_max_pattern_age,
         insidebar_execution_lag,
+        session_filter_input,  # NEW
     ):
         """Execute backtest in background and show progress."""
         from ..services.backtest_service import get_backtest_service

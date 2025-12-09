@@ -63,13 +63,11 @@ def register_backtests_callbacks(app):
 
     @app.callback(
         Output("backtests-detail", "children"),
-        Input("backtests-table", "derived_virtual_data"),
-        Input("backtests-table", "selected_rows"),  # Use selected_rows for better scrolling support
-        Input("backtests-run-select", "value"),
-        Input("backtests-refresh-interval", "n_intervals"),  # Auto-refresh when jobs complete
+        Input("backtests-run-dropdown", "value"),
+        Input("backtests-refresh-interval", "n_intervals"),
         prevent_initial_call=False,
     )
-    def update_backtests_detail(rows, selected_rows, run_dropdown_value, n_intervals):
+    def update_backtests_detail(run_name, n_intervals):
         from ..repositories.backtests import (
             get_backtest_log,
             get_backtest_metrics,
@@ -80,28 +78,6 @@ def register_backtests_callbacks(app):
         )
         from ..layouts.backtests import create_backtest_detail
 
-        # If user explicitly picked a run from the dropdown, use that.
-        if run_dropdown_value:
-            run_name = run_dropdown_value
-        else:
-            if not rows:
-                return create_backtest_detail(None, None, None)
-
-            # Use the selected row if available
-            if selected_rows and len(selected_rows) > 0:
-                idx = selected_rows[0]
-            else:
-                # Default to first row if nothing explicitly selected
-                idx = 0
-
-            if idx < 0 or idx >= len(rows):
-                return create_backtest_detail(None, None, None)
-
-            row = rows[idx]
-            run_name = row.get("run_name")
-
-        if not run_name:
-            return create_backtest_detail(None, None, None)
         if not run_name:
             return create_backtest_detail(None, None, None)
 

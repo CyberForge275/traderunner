@@ -116,7 +116,22 @@ class PrePaperTradeAdapter:
                         "min_mother_bar_size": 0.5,
                         "breakout_confirmation": True,
                         "inside_bar_mode": "inclusive",
+                        # Option B: No session filtering by default (None = all time periods)
+                        # Session filtering can be configured in version YAML if needed
+                        "session_filter": None,
                     }
+                    
+                    # Handle session_filter parameter from version config
+                    if "session_filter" in version_config:
+                        # If version config has session_filter as list of strings,
+                        # convert to SessionFilter object
+                        sf_config = version_config["session_filter"]
+                        if isinstance(sf_config, list) and sf_config:
+                            from src.strategies.inside_bar.config import SessionFilter
+                            version_config["session_filter"] = SessionFilter.from_strings(sf_config)
+                        elif sf_config is None or not sf_config:
+                            version_config["session_filter"] = None
+                    
                     # Merge: defaults first, then version config, then user params
                     final_config = {**defaults, **version_config}
                     if config_params:

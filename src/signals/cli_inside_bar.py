@@ -65,13 +65,14 @@ def build_config(args: argparse.Namespace) -> Dict[str, object]:
     if args.stop_cap is not None and args.stop_cap > 0:
         config["stop_distance_cap"] = float(args.stop_cap)
 
-    if args.session_filter:
-        start_hour, end_hour = args.session_filter
-        config["session_filter"] = {
-            "enabled": True,
-            "start_hour": start_hour,
-            "end_hour": end_hour,
-        }
+    # NEW: Build SessionFilter from --sessions argument
+    # This replaces the old session filtering logic in main()
+    if args.sessions:
+        from strategies.inside_bar.config import SessionFilter
+        session_strings = [s.strip() for s in args.sessions.split(",") if s.strip()]
+        if session_strings:
+            session_filter = SessionFilter.from_strings(session_strings)
+            config["session_filter"] = session_filter
 
     return config
 
@@ -193,15 +194,18 @@ def main(argv: List[str] | None = None) -> int:
 
         for sig in signals:
             ts = pd.Timestamp(sig.timestamp).tz_convert(args.tz)
+            
+            # Calculate session ID for grouping (still needed for deduplication)
             session_idx = _session_id(ts, sessions)
-            if session_idx == 0:
-                continue
+            
+            # NOTE: Session filtering is now handled by strategy.generate_signals()
+            # via config.session_filter parameter. The old "if session_idx == 0: continue"
+            # logic has been removed to avoid double-filtering.
 
             # Determine entries
             long_entry = None
             short_entry = None
             sl_long = None
-            sl_short = None
             tp_long = None
             tp_short = None
 

@@ -60,22 +60,50 @@ def register_pre_papertrade_callbacks(app):
         return html.Small(description, className="text-muted")
 
     @app.callback(
-        Output("pre-papertrade-status", "children"),
-        Output("pre-papertrade-status", "color"),
-        Output("signals-table", "data"),
-        Output("signals-total", "children"),
-        Output("signals-buy", "children"),
-        Output("signals-sell", "children"),
-        Output("pre-papertrade-interval", "disabled"),
-        Input("run-pre-papertrade-btn", "n_clicks"),
-        Input("clear-signals-btn", "n_clicks"),
-        Input("pre-papertrade-interval", "n_intervals"),
-        State("pre-papertrade-mode", "value"),
-        State("replay-single-date", "date"),
-        State("pre-papertrade-strategy", "value"),
-        State("pre-papertrade-symbols", "value"),
-        State("pre-papertrade-timeframe", "value"),
-        State("pre-papertrade-job-status", "data"),
+        Output("past-runs-dropdown", "options"),
+        Input("pre-papertrade-status", "children"),  # Trigger on page load
+    )
+    def load_past_runs(_):
+        """Load list of past Pre-PaperTrade test runs."""
+        from ..repositories.pre_papertrade import get_past_runs
+        
+        try:
+            past_runs = get_past_runs()
+            options = [
+                {
+                    "label": f"{run['timestamp']} - {run['strategy']} ({run['signals_count']} signals)",
+                    "value": run['id']
+                }
+                for run in past_runs
+            ]
+            return options
+        except Exception:
+            return []
+
+    @app.callback(
+        [
+            Output("pre-papertrade-status", "children"),
+            Output("pre-papertrade-status", "color"),
+            Output("signals-table", "data"),
+            Output("signals-total", "children"),
+            Output("signals-buy", "children"),
+            Output("signals-sell", "children"),
+            Output("pre-papertrade-interval", "disabled"),
+        ],
+        [
+            Input("run-pre-papertrade-btn", "n_clicks"),
+            Input("clear-signals-btn", "n_clicks"),
+            Input("pre-papertrade-interval", "n_intervals"),
+        ],
+        [
+            State("pre-papertrade-mode", "value"),
+            State("replay-single-date", "date"),
+            State("pre-papertrade-strategy", "value"),
+            State("pre-papertrade-symbols", "value"),
+            State("pre-papertrade-timeframe", "value"),
+            State("session-filter-input", "value"),  # NEW
+            State("pre-papertrade-job-status", "data"),
+        ],
         prevent_initial_call=True,
     )
     def handle_pre_papertrade_actions(
@@ -87,6 +115,7 @@ def register_pre_papertrade_callbacks(app):
         strategy,
         symbols_str,
         timeframe,
+        session_filter_input,  # NEW
         job_status,
     ):
         """Handle Start and Clear signals button clicks."""
@@ -131,74 +160,100 @@ def register_pre_papertrade_callbacks(app):
                     "0",
                     True,
                 )
-
+            # Parse symbols
             symbols = [s.strip().upper() for s in symbols_str.split(",") if s.strip()]
 
-            # Create adapter and execute
-            adapter = create_adapter()
-
+            # Execute strategy
             try:
-                if mode == "live":
-                    # Live mode
-                    result = adapter.execute_strategy(
-                        strategy=strategy_name,
-                        version=version,  # NEW: Pass version
-                        mode="live",
-                        symbols=symbols,
-                        timeframe=timeframe,
-                    )
-                else:
-                    # Time Machine replay mode
-                    result = adapter.execute_strategy(
-                        strategy=strategy_name,
-                        version=version,  # NEW: Pass version
-                        mode="replay",
-                        symbols=symbols,
-                        timeframe=timeframe,
-                        replay_date=replay_date,
-                    )
-
-                if result["status"] == "completed":
-                    signals = result.get("signals", [])
+                with create_adapter() as adapter:
+                    # NEW: Parse session filter from UI input
+                    config_params = {}
+                    if session_filter_input and session_filter_input.strip():
+                        try:
+                            from dash import html
+                            from src.strategies.inside_bar.config import SessionFilter
+                            session_strings = [s.strip() for s in session_filter_input.split(",") if s.strip()]
+                            session_filter = SessionFilter.from_strings(session_strings)
+                            config_params["session_filter"] = session_filter
+                        except Exception as e:
+                            from dash import html
+                            return (
+                                [
+                                    html.H4("❌ Invalid Session Filter", className="text-danger"),
+                                    html.P(f"Error: {str(e)}"),
+                                    html.P("Format: HH:MM-HH:MM or HH:MM-HH:MM,HH:MM-HH:MM (e.g., 15:00-16:00,16:00-17:00)"),
+                                ],
+                                "danger",
+                                [],
+                                "0",
+                                "0",
+                                "0",
+                                True,  # Disable interval
+                            )
                     
-                    # Format signals for table
-                    table_data = [
-                        {
-                            "symbol": s["symbol"],
-                            "side": s["side"],
-                            "entry_price": f"${s['entry_price']:.2f}",
-                            "stop_loss": f"${s['stop_loss']:.2f}" if s.get("stop_loss") else "-",
-                            "take_profit": f"${s['take_profit']:.2f}" if s.get("take_profit") else "-",
-                            "detected_at": s["detected_at"],
-                            "status": "pending",
-                        }
-                        for s in signals
-                    ]
+                    if mode == "live":
+                        # Live mode
+                        result = adapter.execute_strategy(
+                            strategy=strategy_name,
+                            version=version,  # NEW: Pass version
+                            mode="live",
+                            symbols=symbols,
+                            timeframe=timeframe,
+                            config_params=config_params if config_params else None,  # NEW
+                        )
+                    else:
+                        # Time Machine replay mode
+                        result = adapter.execute_strategy(
+                            strategy=strategy_name,
+                            version=version,  # NEW: Pass version
+                            mode="replay",
+                            symbols=symbols,
+                            timeframe=timeframe,
+                            replay_date=replay_date,
+                            config_params=config_params if config_params else None,  # NEW
+                        )
 
-                    buy_count = sum(1 for s in signals if s["side"] == "BUY")
-                    sell_count = sum(1 for s in signals if s["side"] == "SELL")
-
-                    mode_label = "🔴 Live" if mode == "live" else "⏰ Time Machine"
-                    return (
-                        f"{mode_label}: Generated {len(signals)} signals successfully",
-                        "success",
-                        table_data,
-                        str(len(signals)),
-                        str(buy_count),
-                        str(sell_count),
-                        True,  # Disable interval
-                    )
-                else:
-                    error_msg = result.get("error", "Unknown error")
-                    return (
-                        f"❌ Failed: {error_msg}",
-                        "danger",
-                        [],
-                        "0",
-                        "0",
-                        "0",
-                        True,
-                    )
+                    if result["status"] == "completed":
+                        signals = result.get("signals", [])
+                        
+                        # Format signals for table
+                        table_data = [
+                            {
+                                "symbol": s["symbol"],
+                                "side": s["side"],
+                                "entry_price": f"{s['entry_price']:.2f}",
+                                "stop_loss": f"{s['stop_loss']:.2f}",
+                                "take_profit": f"{s['take_profit']:.2f}",
+                                "detected_at": s["timestamp"],
+                                "status": "Pending",
+                            }
+                            for s in signals
+                        ]
+                        
+                        # Count by side
+                        buy_count = sum(1 for s in signals if s["side"] == "BUY")
+                        sell_count = sum(1 for s in signals if s["side"] == "SELL")
+                        
+                        return (
+                            f"✅ Completed: {len(signals)} signals generated",
+                            "success",
+                            table_data,
+                            str(len(signals)),
+                            str(buy_count),
+                            str(sell_count),
+                            True,
+                        )
+                    else:
+                        error_msg = result.get("error", "Unknown error")
+                        return (
+                            f"❌ Failed: {error_msg}",
+                            "danger",
+                            [],
+                            "0",
+                            "0",
+                            "0",
+                            True,
+                        )
 
             except Exception as e:
                 return (

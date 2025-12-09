@@ -171,6 +171,25 @@ def create_pre_papertrade_layout():
                                             
                                             html.Hr(),
                                             
+                                            # NEW: Session Filter Input
+                                            dbc.Label("Session Hours (optional):", className="fw-bold"),
+                                            dbc.Input(
+                                                id="session-filter-input",
+                                                type="text",
+                                                placeholder="15:00-16:00,16:00-17:00",
+                                                value="",
+                                                className="mb-2",
+                                            ),
+                                            dbc.FormText(
+                                                "Enter time windows to filter signals (24-hour format). "
+                                                "Leave empty for no filtering (all time periods). "
+                                                "Example: 15:00-17:00",
+                                                color="secondary",
+                                                className="mb-3"
+                                            ),
+                                            
+                                            html.Hr(),
+                                            
                                             # Strategy Parameters (for now, static - Phase 3 will make dynamic)
                                             html.Div(
                                                 id="strategy-parameters-container",
@@ -181,6 +200,30 @@ def create_pre_papertrade_layout():
                                                         className="text-muted d-block mb-3"
                                                     ),
                                                 ]
+                                            ),
+                                        ]
+                                    ),
+                                ],
+                                className="mb-3",
+                            ),
+                            
+                            # NEW: Past Runs Selector
+                            dbc.Card(
+                                [
+                                    dbc.CardHeader("📂 Load Previous Test"),
+                                    dbc.CardBody(
+                                        [
+                                            dbc.Label("Select Past Run:"),
+                                            dcc.Dropdown(
+                                                id="past-runs-dropdown",
+                                                options=[],  # Will be populated by callback
+                                                placeholder="Select a previous test...",
+                                                clearable=True,
+                                                className="mb-2",
+                                            ),
+                                            html.Small(
+                                                "Load results from a previous Pre-PaperTrade test",
+                                                className="text-muted"
                                             ),
                                         ]
                                     ),

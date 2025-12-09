@@ -704,6 +704,19 @@ def create_backtests_layout():
                 style={"color": "#000", "marginBottom": "8px"},
             ),
             
+            # NEW: Session Hours Filter
+            html.Label("Session Hours (optional)", style={"fontWeight": "bold", "marginTop": "12px"}),
+            dcc.Input(
+                id="backtests-session-filter",
+                type="text",
+                placeholder="15:00-16:00,16:00-17:00",
+                value="",
+                style={"width": "100%", "marginBottom": "4px"},
+            ),
+            html.Small(
+                "Filter signals to specific time windows (24-hour format). Leave empty for no filtering.",
+                style={"fontSize": "0.85em", "color": "var(--text-secondary)", "display": "block", "marginBottom": "8px"}
+            ),
             
             # Date selection method (Streamlit-style)
             html.Label("Date Selection", style={"fontWeight": "bold", "marginTop": "8px"}),
@@ -832,11 +845,27 @@ def create_backtests_layout():
         style={"marginTop": "20px"},
     )
 
-    left_pane = html.Div([strategy_card, new_backtest_card, run_select_card])
+    left_pane = html.Div([strategy_card, new_backtest_card])
 
+    # Right pane: dropdown selector + backtest details
     right_pane = html.Div(
         [
-            html.Div(table, style={"marginBottom": "20px"}),
+            # NEW: Dropdown to select backtest run (replaces table)
+            html.Div(
+                className="dashboard-card",
+                children=[
+                    html.H5("Select Backtest Run", style={"marginBottom": "10px"}),
+                    dcc.Dropdown(
+                        id="backtests-run-dropdown",
+                        options=run_options,
+                        value=run_options[0]["value"] if run_options else None,
+                        placeholder="Select a backtest run to view...",
+                        clearable=True,
+                        style={"color": "#000"},
+                    ),
+                ],
+                style={"marginBottom": "20px"}
+            ),
             html.Div(id="backtests-detail"),
         ]
     )
