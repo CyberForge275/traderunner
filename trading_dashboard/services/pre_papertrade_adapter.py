@@ -332,10 +332,42 @@ class PrePaperTradeAdapter:
         config_params: Optional[Dict],
     ) -> List[Dict]:
         """
-        Run strategy detection logic on historical data.
+        Run strategy detection using the strategy factory.
+        
+        This method uses the strategy registry to get the correct strategy
+        version (V1, V2, etc.) and runs it with the exact configuration.
         
         Args:
-            strategy: Strategy name
+            strategy: Strategy name from STRATEGY_REGISTRY
+            symbol: Stock symbol
+            df: OHLCV DataFrame
+            config_params: Strategy configuration parameters
+            
+        Returns:
+            List of signal dictionaries in Pre-PaperTrade format
+        """
+        return self._run_strategy_with_factory(
+            strategy, symbol, df, config_params
+        )
+    
+    def _run_strategy_with_factory(
+        self, 
+        strategy: str, 
+        symbol: str, 
+        df: pd.DataFrame, 
+        config_params: Optional[Dict]
+    ) -> List[Dict]:
+        """
+        Run strategy detection using the strategy factory pattern.
+        
+        This method:
+        1. Loads the correct strategy class from registry
+        2. Creates an instance with config_params
+        3. Runs generate_signals() method
+        4. Converts strategy Signals to Pre-PaperTrade dict format
+        
+        Args:
+            strategy: Strategy name (e.g., 'insidebar_intraday', 'insidebar_intraday_v2')
             symbol: Stock symbol
             df: OHLCV DataFrame
             config_params: Strategy configuration parameters
@@ -343,67 +375,117 @@ class PrePaperTradeAdapter:
         Returns:
             List of signal dictionaries
         """
-        signals = []
+        from strategies import factory, registry
         
-        # Map strategy names to detection methods
-        # Support both registry names and internal names
-        if strategy in ["inside_bar", "insidebar_intraday", "insidebar_intraday_v2"]:
-            signals = self._detect_inside_bar(symbol, df, config_params)
-        elif strategy in ["rudometkin_moc", "rudometkin_moc_mode"]:
-            signals = self._detect_rudometkin_moc(symbol, df, config_params)
-        else:
-            raise ValueError(f"Strategy detection not implemented for: {strategy}")
+        # Map dashboard strategy names to strategy class names
+        strategy_name_map = {
+            "insidebar_intraday": "inside_bar",
+            "insidebar_intraday_v2": "inside_bar_v2",
+            "rudometkin_moc_mode": "rudometkin_moc",
+        }
         
-        return signals
+        # Get the strategy class name
+        strategy_class_name = strategy_name_map.get(strategy, strategy)
+        
+        self.progress_callback(f"Using strategy: {strategy_class_name} (version: {strategy})")
+        
+        try:
+            # Auto-discover strategies from registry
+            registry.auto_discover("strategies")
+            
+            # Create strategy instance with config
+            strategy_instance = factory.create_strategy(
+                strategy_class_name, 
+                config_params or {}
+            )
+            
+            # Prepare DataFrame for strategy
+            df_prepared  = self._prepare_dataframe_for_strategy(df)
+            
+            # Run strategy's generate_signals method
+            signals = strategy_instance.generate_signals(
+                df_prepared, 
+                symbol, 
+                config_params or {}
+            )
+            
+            # Convert strategy Signals to Pre-PaperTrade dict format
+            return self._convert_signals_to_dict(signals, symbol)
+            
+        except (ValueError, KeyError, AttributeError) as e:
+            self.progress_callback(f"⚠️ Strategy error for {symbol}: {e}")
+            raise ValueError(f"Strategy '{strategy}' failed for {symbol}: {e}")
     
-    def _detect_inside_bar(
-        self, symbol: str, df: pd.DataFrame, config_params: Optional[Dict]
-    ) -> List[Dict]:
-        """Detect InsideBar patterns and generate signals."""
-        from strategies.inside_bar.core import InsideBarCore, InsideBarConfig
+    def _prepare_dataframe_for_strategy(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Prepare DataFrame for strategy consumption.
         
-        # Build config from parameters
-        config = InsideBarConfig(
-            atr_period=14,
-            risk_reward_ratio=config_params.get("risk_reward_ratio", 2.0) if config_params else 2.0,
-            min_mother_bar_size=0.5,
-            breakout_confirmation=True,
-            inside_bar_mode="inclusive",
-            # Note: volume_filter removed - not in InsideBarConfig
-        )
-        
-        # Create core instance and process data
-        core = InsideBarCore(config)
-        
-        # Prepare DataFrame - ensure required columns
+        Ensures DataFrame has required columns and format:
+        - timestamp column (from index if needed)
+        - lowercase column names
+        - sorted by timestamp
+        """
         df_prepared = df.copy()
+        
+        # Ensure timestamp column exists
         if 'timestamp' not in df_prepared.columns:
             df_prepared = df_prepared.reset_index()
             if df_prepared.columns[0] != 'timestamp':
                 df_prepared = df_prepared.rename(columns={df_prepared.columns[0]: 'timestamp'})
         
-        # Ensure lowercase column names
+        # Ensure lowercase column names (strategies expect this)
         df_prepared.columns = [c.lower() for c in df_prepared.columns]
         
-        # Run strategy detection using core
-        raw_signals = core.process_data(df_prepared, symbol)
+        # Sort by timestamp
+        if 'timestamp' in df_prepared.columns:
+            df_prepared = df_prepared.sort_values('timestamp').reset_index(drop=True)
         
-        # Convert RawSignal objects to dictionary format
-        signals = []
-        for raw in raw_signals:
-            signals.append({
+        return df_prepared
+    
+    def _convert_signals_to_dict(self, signals: List, symbol: str) -> List[Dict]:
+        """
+        Convert strategy Signal objects to Pre-PaperTrade dictionary format.
+        
+        Args:
+            signals: List of Signal objects from strategy
+            symbol: Stock symbol
+            
+        Returns:
+            List of signal dictionaries with required fields
+        """
+        dict_signals = []
+        
+        for signal in signals:
+            # Extract timestamp
+            timestamp = signal.timestamp
+            if hasattr(timestamp, 'isoformat'):
+                detected_at = timestamp.isoformat()
+            else:
+                detected_at = str(timestamp)
+            
+            # Map signal_type to side (LONG/SHORT → BUY/SELL)
+            signal_type = getattr(signal, 'signal_type', '').upper()
+            if signal_type in ['LONG', 'BUY']:
+                side = 'BUY'
+            elif signal_type in ['SHORT', 'SELL']:
+                side = 'SELL'
+            else:
+                self.progress_callback(f"⚠️ Unknown signal type: {signal_type}, skipping")
+                continue
+            
+            dict_signals.append({
                 "symbol": symbol,
-                "side": raw.side,
-                "entry_price": raw.entry_price,
-                "stop_loss": raw.stop_loss,
-                "take_profit": raw.take_profit,
-                "detected_at": raw.timestamp.isoformat() if hasattr(raw.timestamp, 'isoformat') else str(raw.timestamp),
-                "strategy": "inside_bar",
+                "side": side,
+                "entry_price": float(signal.entry_price) if signal.entry_price else 0.0,
+                "stop_loss": float(signal.stop_loss) if signal.stop_loss else 0.0,
+                "take_profit": float(signal.take_profit) if signal.take_profit else 0.0,
+                "detected_at": detected_at,
+                "strategy": signal.strategy if hasattr(signal, 'strategy') else "unknown",
                 "timeframe": "M5",  # TODO: Get from config
-                "metadata": raw.metadata
+                "metadata": signal.metadata if hasattr(signal, 'metadata') else {}
             })
         
-        return signals
+        return dict_signals
     
     def _detect_rudometkin_moc(
         self, symbol: str, df: pd.DataFrame, config_params: Optional[Dict]

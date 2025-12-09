@@ -44,8 +44,13 @@ def test_time_machine():
         'timeframe': 'M5',
         'replay_date': '2025-11-25',  # Use date that exists in data
         'config_params': {
+            # Required parameters
+            'atr_period': 14,
             'risk_reward_ratio': 2.0,
-            'volume_filter': True
+            # Optional parameters
+            'min_mother_bar_size': 0.5,
+            'breakout_confirmation': True,
+            'inside_bar_mode': 'inclusive',
         }
     }
     
