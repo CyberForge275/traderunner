@@ -44,7 +44,13 @@ class PrePaperTradeAdapter:
         Args:
             progress_callback: Optional function to call with progress updates
         """
-        self.progress_callback = progress_callback or (lambda msg: None)
+        # Always log to console for debugging + call user callback if provided
+        def _log_and_callback(msg: str):
+            print(f"[PRE-PAPERTRADE] {msg}")  # Console logging
+            if progress_callback:
+                progress_callback(msg)  # UI callback
+        
+        self.progress_callback = _log_and_callback
         self.signals_db_path = Path("/opt/trading/marketdata-stream/data/signals.db")
         # For local testing, use a local path
         if not self.signals_db_path.exists():
