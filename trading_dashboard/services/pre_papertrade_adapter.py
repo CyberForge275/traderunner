@@ -239,6 +239,9 @@ class PrePaperTradeAdapter:
             lookback_start = target_date_ts - pd.Timedelta(days=lookback_days)
             
             self.progress_callback(
+                f"Loading {lookback_days} days for indicator calculations"
+            )
+        
         # Load historical data
         data_dir = ROOT / "artifacts" / f"data_{timeframe.lower()}"
         all_signals = []
