@@ -231,3 +231,81 @@ body {
     border-bottom: 1px solid var(--border-color) !important;
 }
 
+/* Dropdown Menus - High Contrast */
+.Select-control {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.Select-menu-outer {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+}
+
+.Select-option {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    padding: 8px 12px !important;
+}
+
+.Select-option:hover {
+    background-color: var(--bg-secondary) !important;
+    color: var(--accent-blue) !important;
+}
+
+.Select-option.is-selected {
+    background-color: var(--bg-secondary) !important;
+    color: var(--accent-blue) !important;
+    font-weight: 600 !important;
+}
+
+.Select-option.is-disabled {
+    background-color: var(--bg-card) !important;
+    color: var(--text-secondary) !important;
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+
+.Select-value-label {
+    color: var(--text-primary) !important;
+}
+
+.Select-placeholder {
+    color: var(--text-secondary) !important;
+}
+
+/* DCC Dropdown - High Contrast */
+.dash-dropdown .Select-control {
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+.dash-dropdown .Select-menu {
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+.dash-dropdown .Select-option {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+.dash-dropdown .Select-option:hover {
+    background-color: var(--bg-secondary) !important;
+    color: var(--accent-blue) !important;
+}
+
+.dash-dropdown .Select-option--is-selected {
+    background-color: var(--bg-secondary) !important;
+    color: var(--accent-blue) !important;
+    font-weight: 600 !important;
+}
+
+.dash-dropdown .Select-option--is-disabled {
+    background-color: var(--bg-card) !important;
+    color: #4a5361 !important;
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+}
+
