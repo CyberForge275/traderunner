@@ -57,6 +57,7 @@ class PrePaperTradeAdapter:
         symbols: List[str],
         timeframe: str,
         replay_date: Optional[str] = None,
+        version: Optional[str] = None,  # NEW: Version parameter
         config_params: Optional[Dict] = None,
     ) -> Dict:
         """
@@ -68,6 +69,7 @@ class PrePaperTradeAdapter:
             symbols: List of stock symbols
             timeframe: Timeframe (e.g., 'M5', 'M15', 'D')
             replay_date: Single date for Time Machine replay (YYYY-MM-DD)
+            version: Optional version number (e.g., '1.00', '2.01')
             config_params: Optional strategy configuration parameters
             
         Returns:
@@ -78,6 +80,14 @@ class PrePaperTradeAdapter:
                 - error: Error message if failed
         """
         try:
+            # Load version-specific config if version provided
+            if version:
+                version_config = self._load_version_config(strategy, version)
+                # Merge with user-provided config_params (user params take precedence)
+                if config_params:
+                    version_config.update(config_params)
+                config_params = version_config
+            
             if mode == "replay":
                 return self._execute_replay(
                     strategy, symbols, timeframe, 
@@ -552,6 +562,72 @@ class PrePaperTradeAdapter:
         conn.close()
         
         self.progress_callback(f"✅ Wrote {len(signals)} signals to {self.signals_db_path}")
+    
+    def _load_version_config(self, strategy: str, version: str) -> Dict:
+        """
+        Load configuration from version registry.
+        
+        Args:
+            strategy: Strategy name (e.g., 'insidebar_intraday')
+            version: Version number (e.g., '1.00')
+            
+        Returns:
+            Configuration dictionary loaded from version YAML file
+        """
+        import sqlite3
+        import yaml
+        from pathlib import Path
+        
+        # Map dashboard strategy names to folder names
+        strategy_map = {
+            "insidebar_intraday": "inside_bar",
+            "insidebar_intraday_v2": "inside_bar_v2",
+            "rudometkin_moc_mode": "rudometkin_moc",
+        }
+        
+        folder_name = strategy_map.get(strategy)
+        if not folder_name:
+            self.progress_callback(f"⚠ Unknown strategy: {strategy}, using defaults")
+            return {}
+        
+        # Path to registry database
+        db_path = ROOT / "src" / "strategies" / folder_name / "registry.db"
+        
+        if not db_path.exists():
+            self.progress_callback(f"⚠ No registry DB for {strategy}, using defaults")
+            return {}
+        
+        try:
+            # Query registry for config path
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT config_path FROM versions WHERE version = ?",
+                (version,)
+            )
+            row = cursor.fetchone()
+            conn.close()
+            
+            if not row:
+                self.progress_callback(f"⚠ Version {version} not found in registry, using defaults")
+                return {}
+            
+            config_path = Path(row[0])
+            
+            # Load YAML config
+            if not config_path.exists():
+                self.progress_callback(f"⚠ Config file not found: {config_path}, using defaults")
+                return {}
+            
+            with open(config_path) as f:
+                config = yaml.safe_load(f)
+            
+            self.progress_callback(f"✅ Loaded config for {strategy} v{version} from {config_path.name}")
+            return config if config else {}
+            
+        except Exception as e:
+            self.progress_callback(f"⚠ Error loading version config: {e}, using defaults")
+            return {}
 
 
 def create_adapter(progress_callback: Optional[Callable[[str], None]] = None) -> PrePaperTradeAdapter:

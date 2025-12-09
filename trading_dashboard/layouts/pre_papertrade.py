@@ -12,15 +12,29 @@ import dash_bootstrap_components as dbc
 
 
 def _get_strategy_options():
-    """Get strategy options from STRATEGY_REGISTRY."""
-    from apps.streamlit.state import STRATEGY_REGISTRY
+    """Get combined strategy+version options."""
+    try:
+        from trading_dashboard.utils.version_loader import get_all_strategy_versions_combined
+        options = get_all_strategy_versions_combined()
+        if options:
+            return options
+    except Exception as e:
+        print(f"Error loading strategy versions: {e}")
     
+    # Fallback to basic strategy list (no versions)
     return [
         {
-            "label": f"{meta.label} ({meta.name})",
-            "value": meta.name
-        }
-        for meta in STRATEGY_REGISTRY.values()
+            "label": "Inside Bar (no versions available)",
+            "value": "insidebar_intraday"
+        },
+        {
+            "label": "InsideBarv2 (no versions available)",
+            "value": "insidebar_intraday_v2"
+        },
+        {
+            "label": "Rudometkin MOC (no versions available)",
+            "value": "rudometkin_moc_mode"
+        },
     ]
 
 

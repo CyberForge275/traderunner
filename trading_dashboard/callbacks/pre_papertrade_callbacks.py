@@ -45,19 +45,19 @@ def register_pre_papertrade_callbacks(app):
     def update_strategy_description(strategy):
         """Update strategy description when selection changes."""
         from dash import html
-        from apps.streamlit.state import STRATEGY_REGISTRY
+        
+        # Hardcoded strategy descriptions (avoid import issues)
+        strategy_descriptions = {
+            "insidebar_intraday": "Inside Bar Intraday - Pattern breakout strategy (V1)",
+            "insidebar_intraday_v2": "Inside Bar Intraday v2 - Enhanced pattern breakout with strict filtering (V2)",
+            "rudometkin_moc_mode": "Rudometkin MOC - Market-On-Close mean reversion system",
+        }
         
         if not strategy:
             return html.Small("Select a strategy", className="text-muted")
         
-        metadata = STRATEGY_REGISTRY.get(strategy)
-        if not metadata:
-            return html.Small("Unknown strategy", className="text-danger")
-        
-        return html.Small(
-            f"{metadata.label} - {metadata.strategy_name}",
-            className="text-muted"
-        )
+        description = strategy_descriptions.get(strategy, "Unknown strategy")
+        return html.Small(description, className="text-muted")
 
     @app.callback(
         Output("pre-papertrade-status", "children"),
@@ -110,6 +110,16 @@ def register_pre_papertrade_callbacks(app):
 
         # Run test
         if triggered_id == "run-pre-papertrade-btn":
+            # Parse combined strategy|version value
+            strategy_name = strategy
+            version = None
+            
+            if strategy and "|" in strategy:
+                # Format: "strategy_id|version"
+                parts = strategy.split("|", 1)
+                strategy_name = parts[0]
+                version = parts[1]
+            
             # Validate inputs
             if not symbols_str or not symbols_str.strip():
                 return (
@@ -131,7 +141,8 @@ def register_pre_papertrade_callbacks(app):
                 if mode == "live":
                     # Live mode
                     result = adapter.execute_strategy(
-                        strategy=strategy,
+                        strategy=strategy_name,
+                        version=version,  # NEW: Pass version
                         mode="live",
                         symbols=symbols,
                         timeframe=timeframe,
@@ -139,7 +150,8 @@ def register_pre_papertrade_callbacks(app):
                 else:
                     # Time Machine replay mode
                     result = adapter.execute_strategy(
-                        strategy=strategy,
+                        strategy=strategy_name,
+                        version=version,  # NEW: Pass version
                         mode="replay",
                         symbols=symbols,
                         timeframe=timeframe,
