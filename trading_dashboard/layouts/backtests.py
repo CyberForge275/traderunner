@@ -807,44 +807,20 @@ def create_backtests_layout():
             
             # Progress indicator
             html.Div(id="backtests-run-progress", style={"marginTop": "12px"}),
+            
+            # Pipeline execution log (similar to Streamlit "Last run output")
+            html.Div(
+                id="backtests-pipeline-log",
+                style={"marginTop": "20px"},
+            ),
+            
+            # Store current job ID for polling (hidden)
+            dcc.Store(id="backtests-current-job-id", data=None),
         ],
         style={"marginTop": "20px"},
     )
 
-    run_select_card = html.Div(
-        className="dashboard-card",
-        children=[
-            html.H6("Previous Runs", style={"marginBottom": "10px"}),
-            dcc.Dropdown(
-                id="backtests-run-select",
-                options=run_options,
-                value=run_options[0]["value"] if run_options else None,
-                placeholder="Select a run…",
-                clearable=True,
-                style={"color": "#000"},
-            ),
-            html.Hr(),
-            html.H6("Backtest Run Name", style={"marginBottom": "10px"}),
-            dcc.Input(
-                id="backtests-run-name-input",
-                type="text",
-                placeholder="Name for new backtest run",
-                style={"width": "100%"},
-            ),
-            html.P(
-                "Parameters (reserved for future backtest launch)",
-                className="text-muted",
-                style={"marginTop": "10px", "marginBottom": "4px"},
-            ),
-            dcc.Textarea(
-                id="backtests-run-params",
-                placeholder="e.g. initial_cash=10000, risk_pct=1.0",
-                style={"width": "100%", "height": "70px", "color": "#000"},
-            ),
-        ],
-        style={"marginTop": "20px"},
-    )
-
+    # Left pane: New backtest configuration only (removed duplicate run_select_card)
     left_pane = html.Div([strategy_card, new_backtest_card])
 
     # Right pane: dropdown selector + backtest details

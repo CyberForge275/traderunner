@@ -19,6 +19,8 @@ def register_run_backtest_callback(app):
         Output("backtests-run-progress", "children"),
         Output("backtests-new-run-name", "value"),  # FIXED: was backtests-run-name-input
         Output("backtests-refresh-interval", "disabled"),
+        Output("backtests-pipeline-log", "children"),  # NEW: Pipeline execution log
+        Output("backtests-current-job-id", "data"),  # NEW: Store current job ID
         Input("backtests-run-button", "n_clicks"),
         State("backtests-new-strategy", "value"),
         State("backtests-new-symbols", "value"),
@@ -74,7 +76,7 @@ def register_run_backtest_callback(app):
         from datetime import datetime
         
         if not n_clicks:
-            return "", "", True
+            return "", "", True, "", None  # Added job_id
         
         # Validate run name is provided
         if not run_name or not run_name.strip():
@@ -82,7 +84,7 @@ def register_run_backtest_callback(app):
                 "❌ Please enter a name for this backtest run",
                 style={"color": "red", "fontWeight": "bold"}
             )
-            return error_msg, run_name, True
+            return error_msg, run_name, True, "", None
         
         # Prepend timestamp to run name
         timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
@@ -117,11 +119,11 @@ def register_run_backtest_callback(app):
                     html.Span("Select an existing version from dropdown OR enter a new version (e.g., v1.01)", 
                              style={"fontSize": "0.9em"}),
                 ], style={"padding": "8px", "backgroundColor": "#ffebee", "borderLeft": "3px solid red"})
-                return error_msg, run_name, True
+                return error_msg, run_name, True, "", None
         
         # Validate inputs
         if not strategy or not symbols_str or not timeframe:
-            return html.Div("❌ Please select strategy, symbols, and timeframe", style={"color": "red"}), run_name, True
+            return html.Div("❌ Please select strategy, symbols, and timeframe", style={"color": "red"}), run_name, True, "", None
         
         # Validate symbols
         if not symbols_str or not symbols_str.strip():
@@ -138,7 +140,7 @@ def register_run_backtest_callback(app):
                 html.Span("⚠️ ", style={"color": "var(--accent-yellow)"}),
                 html.Span("Error: Please enter at least one symbol"),
             ])
-            return error_msg, run_name, True
+            return error_msg, run_name, True, "", None
         
         # Calculate start/end dates based on mode
         if date_mode == "days_back":
@@ -196,7 +198,7 @@ def register_run_backtest_callback(app):
                     html.P(f"Error: {str(e)}"),
                     html.P("Format: HH:MM-HH:MM or HH:MM-HH:MM,HH:MM-HH:MM"),
                 ])
-                return error_msg, run_name, True
+                return error_msg, run_name, True, "", None
         
         job_id = service.start_backtest(
             run_name=run_name,
@@ -220,9 +222,213 @@ def register_run_backtest_callback(app):
             ]
         )
         
+        # Initial log message
+        initial_log = html.Div([
+            html.H6("📋 Pipeline Execution Log", style={"marginTop": "20px", "marginBottom": "10px"}),
+            html.P("Backtest started... waiting for execution log...", 
+                   style={"color": "#888", "fontSize": "0.9em"})
+        ])
+        
         # Enable refresh interval to poll for completion
         # Clear run name input for next run
-        return progress_msg, "", False
+        return progress_msg, "", False, initial_log, run_name  # Store run_name as job reference
+    
+    @app.callback(
+        Output("backtests-pipeline-log", "children", allow_duplicate=True),
+        Input("backtests-refresh-interval", "n_intervals"),
+        State("backtests-current-job-id", "data"),
+        prevent_initial_call=True
+    )
+    def update_pipeline_log(n_intervals, current_job_id):
+        """Fetch and display pipeline execution log incrementally from active job."""
+        from pathlib import Path
+        import json
+        from dash import no_update
+        
+        # No active job being tracked
+        if not current_job_id:
+            return no_update
+        
+        # Build path to run_log.json for this job
+        log_path = Path(f"/home/mirko/data/workspace/droid/traderunner/artifacts/backtests/{current_job_id}/run_log.json")
+        
+        if not log_path.exists():
+            # Log file not created yet, show waiting message
+            return html.Div([
+                html.H6("📋 Pipeline Execution Log", style={"marginTop": "20px", "marginBottom": "10px"}),
+                html.P("⏳ Waiting for pipeline to start writing log...", 
+                       style={"color": "#888", "fontSize": "0.9em"})
+            ])
+        
+        # Try to read log file (may be partially written)
+        try:
+            with open(log_path, 'r') as f:
+                run_log = json.load(f)
+        except json.JSONDecodeError:
+            # File is being written, show last known state or wait
+            return html.Div([
+                html.H6("📋 Pipeline Execution Log", style={"marginTop": "20px", "marginBottom": "10px"}),
+                html.P("⏳ Log file being updated...", 
+                       style={"color": "#888", "fontSize": "0.9em"})
+            ])
+        except Exception as e:
+            # Unexpected error
+            return html.Div([
+                html.H6("📋 Pipeline Execution Log", style={"marginTop": "20px", "marginBottom": "10px"}),
+                html.P(f"❌ Error reading log: {str(e)}", 
+                       style={"color": "#dc3545", "fontSize": "0.9em"})
+            ])
+        
+        # Format log entries incrementally
+        entries = run_log.get('entries', [])
+        status = run_log.get('status', 'running')
+        
+        if not entries:
+            return html.Div([
+                html.H6("📋 Pipeline Execution Log", style={"marginTop": "20px", "marginBottom": "10px"}),
+                html.P("⏳ Waiting for first step to complete...", 
+                       style={"color": "#888", "fontSize": "0.9em"})
+            ])
+        
+        # Build formatted display
+        log_display = [html.H6("📋 Pipeline Execution", style={"marginTop": "20px", "marginBottom": "15px"})]
+        
+        # Add overall status indicator if completed
+        if status in ['success', 'completed']:
+            log_display.append(html.Div("✅ Pipeline completed successfully", 
+                                        style={"color": "#28a745", "fontWeight": "600", "marginBottom": "12px"}))
+        elif status in ['error', 'failed']:
+            log_display.append(html.Div("❌ Pipeline failed", 
+                                        style={"color": "#dc3545", "fontWeight": "600", "marginBottom": "12px"}))
+        elif status == 'running':
+            log_display.append(html.Div("🔄 Pipeline running...", 
+                                        style={"color": "#007bff", "fontWeight": "600", "marginBottom": "12px"}))
+        
+        # Format each entry
+        for idx, entry in enumerate(entries, 1):
+            kind = entry.get('kind', '')
+            title = entry.get('title', f'Step {idx}')
+            entry_status = entry.get('status', '')
+            duration = entry.get('duration')
+            
+            # Skip meta entries
+            if kind in ['run_meta', 'step']:
+                continue
+            
+            # Status styling
+            status_color = {
+                'success': '#28a745',
+                'error': '#dc3545',
+                'warning': '#ffc107',
+                'info': '#17a2b8',
+            }.get(entry_status, '#6c757d')
+            
+            status_icon = {
+                'success': '✓',
+                'error': '✗',
+                'warning': '⚠',
+            }.get(entry_status, '•')
+            
+            # Build header
+            header_parts = [
+                html.Span(f"Step {idx} • ", style={"fontWeight": "600", "fontSize": "0.9em", "color": "#666"}),
+                html.Span(title, style={"marginRight": "8px"}),
+            ]
+            
+            if entry_status:
+                header_parts.append(
+                    html.Span(f"{status_icon} {entry_status}", 
+                             style={"color": status_color, "fontSize": "0.85em", "fontWeight": "500"})
+                )
+            
+            step_header = html.Div(
+                header_parts,
+                style={
+                    "padding": "8px 12px",
+                    "backgroundColor": "#f8f9fa",
+                    "borderLeft": f"3px solid {status_color}",
+                    "marginBottom": "8px",
+                    "borderRadius": "3px",
+                }
+            )
+            
+            # Build details
+            details_parts = []
+            
+            if kind == 'command':
+                command = entry.get('command', '')
+                output = entry.get('output', '')
+                return_code = entry.get('return_code')
+                
+                if command:
+                    details_parts.append(
+                        html.Pre(command, style={
+                            "backgroundColor": "#2b2b2b",
+                            "color": "#d4d4d4",
+                            "padding": "8px",
+                            "borderRadius": "3px",
+                            "fontSize": "0.8em",
+                            "overflow": "auto",
+                            "marginBottom": "8px",
+                        })
+                    )
+                
+                info_line_parts = []
+                if return_code is not None:
+                    info_line_parts.append(f"Return code: {return_code}")
+                if duration is not None:
+                    info_line_parts.append(f"Duration: {duration:.2f}s")
+                
+                if info_line_parts:
+                    details_parts.append(
+                        html.P(" • ".join(info_line_parts), 
+                               style={"fontSize": "0.85em", "color": "#666", "margin": "4px 0"})
+                    )
+                
+                if output:
+                    details_parts.append(
+                        html.Pre(output, style={
+                            "backgroundColor": "#272822",
+                            "color": "#f8f8f2",
+                            "padding": "12px",
+                            "borderRadius": "4px",
+                            "fontSize": "0.82em",
+                            "overflow": "auto",
+                            "maxHeight": "300px",
+                            "marginTop": "8px",
+                        })
+                    )
+            
+            elif kind == 'message':
+                message = entry.get('message', '')
+                if message:
+                    details_parts.append(
+                        html.P(message, style={"fontSize": "0.9em", "margin": "8px 0", "color": "#333"})
+                    )
+                if duration is not None:
+                    details_parts.append(
+                        html.P(f"Duration: {duration:.2f}s", 
+                               style={"fontSize": "0.85em", "color": "#666", "margin": "4px 0"})
+                    )
+            
+            # Combine
+            log_display.append(
+                html.Div([
+                    step_header,
+                    html.Div(details_parts, style={"paddingLeft": "12px", "marginBottom": "16px"})
+                ])
+            )
+        
+        return html.Div(
+            log_display,
+            style={
+                "marginTop": "20px",
+                "padding": "16px",
+                "backgroundColor": "#fff",
+                "border": "1px solid #dee2e6",
+                "borderRadius": "6px",
+            }
+        )
     
     @app.callback(
         Output("backtests-run-progress", "children", allow_duplicate=True),

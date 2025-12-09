@@ -29,10 +29,15 @@ from strategies import factory, registry, strategy_hooks
 
 
 _LOG_ENTRIES: List[dict] = []
+_CURRENT_RUN_DIR: Optional[Path] = None  # NEW: Track current run directory for incremental writes
+_CURRENT_RUN_META: Optional[Dict[str, Any]] = None  # NEW: Store run metadata
 
 
 def _store_log(entry: dict) -> None:
-    """Append a log entry to the in-memory and session log buffers."""
+    """Append a log entry to the in-memory and session log buffers.
+    
+    MODIFIED: Now also writes to run_log.json incrementally for real-time progress.
+    """
     _LOG_ENTRIES.append(entry)
     try:
         log = st.session_state.setdefault("pipeline_log", [])
@@ -40,6 +45,22 @@ def _store_log(entry: dict) -> None:
     except Exception:  # pragma: no cover - defensive
         # Keep logging best-effort; don't break pipeline on UI/session issues.
         pass
+    
+    # NEW: Write incrementally to run_log.json for real-time Dash progress
+    if _CURRENT_RUN_DIR and _CURRENT_RUN_DIR.exists():
+        try:
+            log_path = _CURRENT_RUN_DIR / "run_log.json"
+            log_payload = {
+                **(_CURRENT_RUN_META or {}),
+                "entries": _LOG_ENTRIES,
+                "status": "running",  # Will be updated to final status at end
+            }
+            # Atomic write using temp file + rename
+            temp_path = log_path.with_suffix('.json.tmp')
+            temp_path.write_text(json.dumps(log_payload, indent=2), encoding="utf-8")
+            temp_path.replace(log_path)  # Atomic on POSIX systems
+        except Exception:  # pragma: no cover - best-effort, don't break pipeline
+            pass
 
 
 def get_pipeline_log() -> List[dict]:
@@ -245,14 +266,23 @@ def execute_pipeline(pipeline: PipelineConfig) -> str:
 
     # Reset in-memory log buffer at the very beginning so this run
     # has a clean, complete trace from the first event.
-    global _LOG_ENTRIES
+    global _LOG_ENTRIES, _CURRENT_RUN_DIR, _CURRENT_RUN_META
     _LOG_ENTRIES = []
-
+    
+    # NEW: Setup incremental logging
     run_name = pipeline.run_name
     run_dir = BT_DIR / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
-
+    _CURRENT_RUN_DIR = run_dir  # Enable incremental writes
+    
     run_started_at = datetime.now(timezone.utc).isoformat()
+    _CURRENT_RUN_META = {
+        "run_name": run_name,
+        "strategy": pipeline.strategy.strategy_name,
+        "symbols": list(pipeline.symbols),
+        "timeframe": pipeline.fetch.timeframe,
+        "created_at": run_started_at,
+    }
     _store_log({
         "kind": "run_meta",
         "phase": "start",
