@@ -11,29 +11,6 @@ def register_backtests_callbacks(app):
     """Register callbacks for the Backtests tab."""
 
     @app.callback(
-        Output("backtests-table", "data"),
-        Input("backtests-date-range", "start_date"),
-        Input("backtests-date-range", "end_date"),
-        Input("backtests-strategy-filter", "value"),
-        Input("backtests-refresh-interval", "n_intervals"),  # NEW: auto-refresh
-    )
-    def update_backtests_table(start_date, end_date, strategy_value, n_intervals):
-        from ..repositories.backtests import list_backtests
-
-        # Convert dates
-        if isinstance(start_date, str):
-            start_date = datetime.fromisoformat(start_date).date()
-        if isinstance(end_date, str):
-            end_date = datetime.fromisoformat(end_date).date()
-
-        strategy = None if strategy_value in (None, "all") else strategy_value
-
-        df = list_backtests(start_date=start_date, end_date=end_date, strategy=strategy)
-        if df is None or df.empty:
-            return []
-        return df.to_dict("records")
-    
-    @app.callback(
         Output("version-pattern-hint", "children"),
         Output("version-pattern-hint", "style"),
         Input("backtests-new-version", "value")
@@ -65,7 +42,7 @@ def register_backtests_callbacks(app):
         Output("backtests-detail", "children"),
         Input("backtests-run-dropdown", "value"),
         Input("backtests-refresh-interval", "n_intervals"),
-        prevent_initial_call=False,
+        prevent_initial_call=True,  # Changed to True for proper dropdown behavior
     )
     def update_backtests_detail(run_name, n_intervals):
         from ..repositories.backtests import (

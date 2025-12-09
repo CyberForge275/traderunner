@@ -17,7 +17,7 @@ def register_run_backtest_callback(app):
     
     @app.callback(
         Output("backtests-run-progress", "children"),
-        Output("backtests-run-name-input", "value"),
+        Output("backtests-new-run-name", "value"),  # FIXED: was backtests-run-name-input
         Output("backtests-refresh-interval", "disabled"),
         Input("backtests-run-button", "n_clicks"),
         State("backtests-new-strategy", "value"),
@@ -29,7 +29,7 @@ def register_run_backtest_callback(app):
         State("explicit-start-date", "date"),
         State("explicit-end-date", "date"),
         State("backtests-new-run-name", "value"),
-        State("backtests-run-params", "value"),
+        # REMOVED: State("backtests-run-params", "value") - no longer in layout
         # InsideBar version management (from plugin)
         State("insidebar-version-dropdown", "value"),
         State("insidebar-new-version", "value"),
@@ -55,7 +55,7 @@ def register_run_backtest_callback(app):
         explicit_start,
         explicit_end,
         run_name,
-        params_str,
+        # REMOVED: params_str
         # InsideBar version
         insidebar_strategy_version,
         insidebar_new_version,
@@ -140,17 +140,6 @@ def register_run_backtest_callback(app):
             ])
             return error_msg, run_name, True
         
-        # Parse params string if provided (legacy)
-        config_params = {}
-        if params_str:
-            try:
-                for item in params_str.split(','):
-                    if '=' in item:
-                        k, v = item.split('=', 1)
-                        config_params[k.strip()] = v.strip()
-            except Exception:
-                pass
-        
         # Calculate start/end dates based on mode
         if date_mode == "days_back":
             # Calculate from anchor date and days back
@@ -180,9 +169,9 @@ def register_run_backtest_callback(app):
         end_date_str = end_date.isoformat() if end_date else None
         
         # Build strategy parameters dict from UI inputs
-        strategy_params = {}
+        config_params = {}
         if strategy in ["insidebar_intraday", "insidebar_intraday_v2"]:
-            strategy_params = {
+            config_params = {
                 "atr_period": insidebar_atr_period or 14,
                 "min_mother_bar_size": insidebar_min_mother_bar or 0.5,
                 "breakout_confirmation": bool(insidebar_breakout_confirm and "true" in insidebar_breakout_confirm),
@@ -191,6 +180,23 @@ def register_run_backtest_callback(app):
                 "max_pattern_age_candles": insidebar_max_pattern_age or 12,
                 "execution_lag": insidebar_execution_lag or 0,
             }
+        
+        # Handle session filter for InsideBar strategy if provided
+        if strategy == "insidebar_intraday" and session_filter_input and session_filter_input.strip():
+            try:
+                from src.strategies.inside_bar.config import SessionFilter
+                session_strings = [s.strip() for s in session_filter_input.split(",") if s.strip()]
+                session_filter = SessionFilter.from_strings(session_strings)
+                # Store as list of strings for YAML serialization
+                config_params["session_filter"] = session_filter.to_strings()
+            except Exception as e:
+                # Invalid session filter format - show error
+                error_msg = html.Div([
+                    html.H4("❌ Invalid Session Filter", className="text-danger"),
+                    html.P(f"Error: {str(e)}"),
+                    html.P("Format: HH:MM-HH:MM or HH:MM-HH:MM,HH:MM-HH:MM"),
+                ])
+                return error_msg, run_name, True
         
         job_id = service.start_backtest(
             run_name=run_name,
