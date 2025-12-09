@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 from pathlib import Path
 from typing import List
@@ -40,7 +40,7 @@ def _parse_symbols(symbols: str | None, universe_file: str | None) -> List[str]:
 def cmd_ensure_intraday(args: argparse.Namespace) -> int:
     ensure_layout()
     symbols = _parse_symbols(args.symbols, args.universe_file)
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     start = args.start or (now - timedelta(days=2)).date().isoformat()
     end = args.end or now.date().isoformat()
 
@@ -106,7 +106,7 @@ def cmd_ensure_intraday(args: argparse.Namespace) -> int:
 def cmd_fetch_daily(args: argparse.Namespace) -> int:
     ensure_layout()
     symbols = _parse_symbols(args.symbols, args.universe_file)
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     start = args.start or (now - timedelta(days=120)).date().isoformat()
     end = args.end or now.date().isoformat()
 
