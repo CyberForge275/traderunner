@@ -11,6 +11,19 @@ from dash import dcc, html, dash_table
 import dash_bootstrap_components as dbc
 
 
+def _get_strategy_options():
+    """Get strategy options from STRATEGY_REGISTRY."""
+    from apps.streamlit.state import STRATEGY_REGISTRY
+    
+    return [
+        {
+            "label": f"{meta.label} ({meta.name})",
+            "value": meta.name
+        }
+        for meta in STRATEGY_REGISTRY.values()
+    ]
+
+
 def create_pre_papertrade_layout():
     """
     Create the Pre-PaperTrade Lab tab layout.
@@ -98,40 +111,63 @@ def create_pre_papertrade_layout():
                                     dbc.CardHeader("Strategy Configuration"),
                                     dbc.CardBody(
                                         [
-                                            dbc.Label("Strategy:"),
+                                            # Strategy Selection
+                                            dbc.Label("Select Strategy Version:", className="fw-bold"),
                                             dcc.Dropdown(
                                                 id="pre-papertrade-strategy",
-                                                options=[
-                                                    {"label": "Inside Bar", "value": "inside_bar"},
-                                                    {"label": "Rudometkin MOC", "value": "rudometkin_moc"},
-                                                ],
-                                                value="inside_bar",
+                                                options=_get_strategy_options(),
+                                                value="insidebar_intraday",  # Default to V1
+                                                clearable=False,
                                                 className="mb-3",
                                             ),
+                                            html.Small(
+                                                id="strategy-description",
+                                                className="text-muted mb-3 d-block",
+                                                children="Inside Bar Intraday - Pattern breakout strategy"
+                                            ),
                                             
+                                            html.Hr(),
+                                            
+                                            # Symbols
                                             dbc.Label("Symbols (comma-separated):"),
                                             dbc.Input(
                                                 id="pre-papertrade-symbols",
+                                                type="text",
                                                 placeholder="AAPL,TSLA,NVDA",
-                                                value="AAPL,TSLA,NVDA",
+                                                value="",
                                                 className="mb-3",
                                             ),
                                             
+                                            # Timeframe
                                             dbc.Label("Timeframe:"),
                                             dcc.Dropdown(
                                                 id="pre-papertrade-timeframe",
                                                 options=[
-                                                    {"label": "1 Minute (M1)", "value": "M1"},
-                                                    {"label": "5 Minutes (M5)", "value": "M5"},
-                                                    {"label": "15 Minutes (M15)", "value": "M15"},
-                                                    {"label": "Daily (D)", "value": "D"},
+                                                    {"label": "M1 (1 minute)", "value": "M1"},
+                                                    {"label": "M5 (5 minutes)", "value": "M5"},
+                                                    {"label": "M15 (15 minutes)", "value": "M15"},
+                                                    {"label": "M30 (30 minutes)", "value": "M30"},
+                                                    {"label": "H1 (1 hour)", "value": "H1"},
+                                                    {"label": "D (Daily)", "value": "D"},
                                                 ],
                                                 value="M5",
+                                                clearable=False,
                                                 className="mb-3",
                                             ),
                                             
-                                            # Strategy-specific config will be injected here
-                                            html.Div(id="pre-papertrade-strategy-config"),
+                                            html.Hr(),
+                                            
+                                            # Strategy Parameters (for now, static - Phase 3 will make dynamic)
+                                            html.Div(
+                                                id="strategy-parameters-container",
+                                                children=[
+                                                    dbc.Label("Strategy Parameters:", className="fw-bold mb-2"),
+                                                    html.Small(
+                                                        "Basic parameters shown. Advanced parameters passed automatically based on strategy version.",
+                                                        className="text-muted d-block mb-3"
+                                                    ),
+                                                ]
+                                            ),
                                         ]
                                     ),
                                 ],

@@ -39,6 +39,27 @@ def register_pre_papertrade_callbacks(app):
             )
 
     @app.callback(
+        Output("strategy-description", "children"),
+        Input("pre-papertrade-strategy", "value"),
+    )
+    def update_strategy_description(strategy):
+        """Update strategy description when selection changes."""
+        from dash import html
+        from apps.streamlit.state import STRATEGY_REGISTRY
+        
+        if not strategy:
+            return html.Small("Select a strategy", className="text-muted")
+        
+        metadata = STRATEGY_REGISTRY.get(strategy)
+        if not metadata:
+            return html.Small("Unknown strategy", className="text-danger")
+        
+        return html.Small(
+            f"{metadata.label} - {metadata.strategy_name}",
+            className="text-muted"
+        )
+
+    @app.callback(
         Output("pre-papertrade-status", "children"),
         Output("pre-papertrade-status", "color"),
         Output("signals-table", "data"),
@@ -209,38 +230,3 @@ def register_pre_papertrade_callbacks(app):
             )
 
         raise PreventUpdate
-
-    @app.callback(
-        Output("pre-papertrade-strategy-config", "children"),
-        Input("pre-papertrade-strategy", "value"),
-    )
-    def update_strategy_config(strategy):
-        """Update strategy-specific configuration inputs."""
-        from dash import dcc, html
-        import dash_bootstrap_components as dbc
-
-        if strategy == "inside_bar":
-            return [
-                dbc.Label("Risk/Reward Ratio:", className="mt-2"),
-                dcc.Input(
-                    id="inside-bar-rr-ratio",
-                    type="number",
-                    value=2.0,
-                    step=0.1,
-                    min=1.0,
-                    max=5.0,
-                    className="form-control mb-2",
-                ),
-                dbc.Label("Volume Filter:"),
-                dbc.Checklist(
-                    id="inside-bar-volume-filter",
-                    options=[{"label": "Enable volume filter", "value": True}],
-                    value=[True],
-                ),
-            ]
-        elif strategy == "rudometkin_moc":
-            return [
-                html.P("No additional configuration required", className="text-muted mt-2"),
-            ]
-        else:
-            return []
