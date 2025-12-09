@@ -86,6 +86,37 @@ def register_run_backtest_callback(app):
         timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
         run_name = f"{timestamp}_{run_name.strip()}"
         
+        # CRITICAL: Validate version is provided (mandatory for strategy lab progression)
+        import re
+        version_to_use = None
+        
+        # Check if strategy supports versioning
+        if strategy in ["insidebar_intraday", "insidebar_intraday_v2"]:
+            # First check if new version provided
+            if insidebar_new_version and insidebar_new_version.strip():
+                # Validate format
+                pattern = r'^v\d+\.\d{2}$'
+                if re.match(pattern, insidebar_new_version.strip()):
+                    version_to_use = insidebar_new_version.strip()
+                else:
+                    error_msg = html.Div([
+                        html.Span("❌ Invalid version format. ", style={"color": "red", "fontWeight": "bold"}),
+                        html.Span(f"Use pattern v#.## (e.g., v1.01, v2.00). You entered: '{insidebar_new_version}'"),
+                    ])
+                    return error_msg, run_name, True
+            elif insidebar_strategy_version:
+                # Use selected version from dropdown
+                version_to_use = insidebar_strategy_version
+            else:
+                # NO VERSION PROVIDED - Block execution
+                error_msg = html.Div([
+                    html.Span("❌ Version required. ", style={"color": "red", "fontWeight": "bold"}),
+                    html.Br(),
+                    html.Span("Select an existing version from dropdown OR enter a new version (e.g., v1.01)", 
+                             style={"fontSize": "0.9em"}),
+                ], style={"padding": "8px", "backgroundColor": "#ffebee", "borderLeft": "3px solid red"})
+                return error_msg, run_name, True
+        
         # Validate inputs
         if not strategy or not symbols_str or not timeframe:
             return html.Div("❌ Please select strategy, symbols, and timeframe", style={"color": "red"}), run_name, True
