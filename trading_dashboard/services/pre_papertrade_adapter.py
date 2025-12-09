@@ -381,41 +381,37 @@ class PrePaperTradeAdapter:
                 f"({effective_start.date()} to {data_end.date() if data_end < target_end else target_date})"
             )
             
-            # STEP 2: Run strategy detection on FULL dataset (with lookback)
+            # Run strategy detection WITH lookback-aware data
             # This allows indicators to calculate correctly
             strategy_signals = self._run_strategy_detection(
                 strategy, symbol, df_with_lookback, config_params
             )
             
-            # STEP 3: Filter signals to ONLY target_date
-            # Important: Only include signals detected ON the replay date
-            # This prevents "future" signals from appearing in results
-            filtered_signals = []
-            for sig in strategy_signals:
-                sig_time = pd.to_datetime(sig['detected_at'])
-                # Make timezone-naive for comparison
-                if hasattr(sig_time, 'tz') and sig_time.tz is not None:
-                    sig_time = sig_time.tz_localize(None)
-                if target_date_ts_naive <= sig_time < target_end:
-                    filtered_signals.append(sig)
+            # STEP 3: Filter signals to ONLY those generated on the target_date
+            # We ran detection on full history but only care about today's signals
+            filtered_signals = [
+                sig for sig in strategy_signals
+                if sig.get('detected_at') and 
+                pd.to_datetime(sig['detected_at']).date() == target_date_ts_naive.date()
+            ]
             
-            if len(filtered_signals) < len(strategy_signals):
-                self.progress_callback(
-                    f" {symbol}: Filtered {len(strategy_signals)} total signals → "
-                    f"{len(filtered_signals)} from target date {target_date}"
-                )
+            self.progress_callback(
+                f"  {symbol}: {len(strategy_signals)} total signals, "
+                f"{len(filtered_signals)} from target date {target_date}"
+            )
             
-            signals.extend(filtered_signals)
+            all_signals.extend(filtered_signals)
         
-        self.progress_callback(f"Writing {len(signals)} signals to database...")
+        self.progress_callback(f"\n✅ Generated {len(all_signals)} signals total")
         
         # Write signals to database
-        self._write_signals_to_db(signals, source="pre_papertrade_replay")
+        if all_signals:
+            self._write_signals_to_db(all_signals, source="time_machine")
         
         return {
             "status": "completed",
-            "signals_generated": len(signals),
-            "signals": signals,
+            "signals_generated": len(all_signals),
+            "signals": all_signals,
             "mode": "replay",
             "replay_date": target_date,
             "lookback_days": lookback_days,
