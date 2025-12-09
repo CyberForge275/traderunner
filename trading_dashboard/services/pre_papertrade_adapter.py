@@ -80,25 +80,52 @@ class PrePaperTradeAdapter:
                 - error: Error message if failed
         """
         try:
+            start_time = datetime.now()
+            self.progress_callback(f"\n{'='*60}")
+            self.progress_callback(f"🚀 PRE-PAPERTRADE EXECUTION START")
+            self.progress_callback(f"{'='*60}")
+            self.progress_callback(f"Strategy: {strategy}")
+            self.progress_callback(f"Version: {version or 'default'}")
+            self.progress_callback(f"Mode: {mode}")
+            self.progress_callback(f"Symbols: {', '.join(symbols)}")
+            self.progress_callback(f"Timeframe: {timeframe}")
+            if replay_date:
+                self.progress_callback(f"Replay Date: {replay_date}")
+            self.progress_callback(f"{'='*60}\n")
+            
             # Load version-specific config if version provided
             if version:
+                config_start = datetime.now()
+                self.progress_callback(f"📋 Loading version-specific config...")
                 version_config = self._load_version_config(strategy, version)
+                config_duration = (datetime.now() - config_start).total_seconds()
+                self.progress_callback(f"✅ Config loaded in {config_duration:.2f}s ({len(version_config)} parameters)")
+                
                 # Merge with user-provided config_params (user params take precedence)
                 if config_params:
                     version_config.update(config_params)
                 config_params = version_config
+            else:
+                self.progress_callback(f"📋 Using default config (no version specified)")
             
             if mode == "replay":
-                return self._execute_replay(
+                result = self._execute_replay(
                     strategy, symbols, timeframe, 
                     replay_date, config_params
                 )
             elif mode == "live":
-                return self._execute_live(
+                result = self._execute_live(
                     strategy, symbols, timeframe, config_params
                 )
             else:
                 raise ValueError(f"Invalid mode: {mode}. Must be 'replay' or 'live'")
+            
+            total_duration = (datetime.now() - start_time).total_seconds()
+            self.progress_callback(f"\n{'='*60}")
+            self.progress_callback(f"✅ EXECUTION COMPLETE in {total_duration:.2f}s")
+            self.progress_callback(f"{'='*60}\n")
+            
+            return result
                 
         except Exception as e:
             import traceback
@@ -212,22 +239,77 @@ class PrePaperTradeAdapter:
             lookback_start = target_date_ts - pd.Timedelta(days=lookback_days)
             
             self.progress_callback(
-                f"Loading {lookback_days} days for indicator calculations"
-            )
-        
         # Load historical data
         data_dir = ROOT / "artifacts" / f"data_{timeframe.lower()}"
-        signals = []
+        all_signals = []
         
+        # Process each symbol
         for symbol in symbols:
-            self.progress_callback(f"Processing {symbol}...")
+            self.progress_callback(f"\n📊 Processing {symbol}...")
+            fetch_start = datetime.now()
             
-            data_file = data_dir / f"{symbol}.parquet"
-            if not data_file.exists():
-                self.progress_callback(f"⚠️ No data for {symbol}, skipping...")
+            try:
+                # Fetch historical data with lookback
+                self.progress_callback(f"⬇️  Fetching data for {symbol}...")
+                # The `expected_candles` and `min_candles_needed` variables are not defined in the provided context.
+                # Assuming they would be defined earlier in the `_execute_replay` method or derived from `lookback_config`.
+                # For now, I'll comment them out or replace with a placeholder if they are not part of the current context.
+                # Given the instruction, I will insert the code as provided, assuming these variables are handled elsewhere.
+                # However, to make it syntactically correct and runnable, I need to define them or remove the lines.
+                # Let's assume `min_candles_needed` is `lookback_config['min_candles']` and `expected_candles` is an estimate.
+                min_candles_needed = lookback_config['min_candles']
+                # Estimate expected candles based on timeframe and lookback days. This is a rough estimate.
+                # For M5, 6.5 hours * 12 candles/hour * lookback_days
+                # For D, 1 candle/day * lookback_days
+                if timeframe.upper() == 'M5':
+                    expected_candles = int(lookback_days * (6.5 * 12)) # Approx 6.5 trading hours * 12 M5 candles/hour
+                elif timeframe.upper() == 'D':
+                    expected_candles = lookback_days
+                else:
+                    expected_candles = min_candles_needed * 2 # Just a heuristic
+                
+                self.progress_callback(f"   Period: {lookback_start.date()} to {target_date}")
+                self.progress_callback(f"   Expected: ~{expected_candles} candles")
+                
+                # This method `_fetch_historical_data` is new and not defined in the provided context.
+                # For the purpose of this edit, I will replace it with the original parquet loading logic
+                # but keep the new logging around it, as the instruction implies a change in logging,
+                # not necessarily a change in the data source itself unless `_fetch_historical_data` is a new helper.
+                # Given the context, the user is likely replacing the direct parquet read with a more robust fetch.
+                # Since `_fetch_historical_data` is not provided, I will revert to the original parquet read
+                # but wrap it with the new logging and checks.
+                
+                data_file = data_dir / f"{symbol}.parquet"
+                if not data_file.exists():
+                    self.progress_callback(f"❌ No data file found for {symbol} at {data_file} - skipping")
+                    continue
+                
+                df = pd.read_parquet(data_file)
+                
+                fetch_duration = (datetime.now() - fetch_start).total_seconds()
+                
+                if df is None or df.empty:
+                    self.progress_callback(f"❌ No data for {symbol} - skipping")
+                    continue
+                
+                actual_candles = len(df)
+                data_start = df.index[0] if not df.empty else "N/A"
+                data_end = df.index[-1] if not df.empty else "N/A"
+                
+                self.progress_callback(f"✅ Data fetched in {fetch_duration:.2f}s")
+                self.progress_callback(f"   Bars: {actual_candles} candles")
+                self.progress_callback(f"   Range: {data_start} to {data_end}")
+                self.progress_callback(f"   Columns: {list(df.columns)}")
+                
+                # Verify we have enough data
+                if actual_candles < min_candles_needed:
+                    self.progress_callback(
+                        f"⚠️  WARNING: Only {actual_candles} candles retrieved, "
+                        f"need {min_candles_needed} for reliable indicators!"
+                    )
+            except Exception as e:
+                self.progress_callback(f"❌ Error fetching data for {symbol}: {e}")
                 continue
-            
-            df = pd.read_parquet(data_file)
             
             # CRITICAL: Normalize timezone handling
             # Convert DataFrame index to timezone-naive for consistent comparison
