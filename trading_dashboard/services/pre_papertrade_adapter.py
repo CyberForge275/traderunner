@@ -99,6 +99,57 @@ class PrePaperTradeAdapter:
                 "ended_at": datetime.now().isoformat(),
             }
     
+    def _get_lookback_periods(
+        self,
+        strategy: str,
+        timeframe: str
+    ) -> Dict[str, int]:
+        """
+        Get lookback period requirements for a strategy.
+        
+        Strategies need historical data before the target date to calculate
+        indicators like ATR(14), SMA(200), etc. This method returns the
+        minimum lookback requirements based on the strategy and timeframe.
+        
+        Args:
+            strategy: Strategy name (e.g., 'inside_bar', 'rudometkin_moc')
+            timeframe: Timeframe (M1, M5, M15, D, etc.)
+            
+        Returns:
+            Dictionary with:
+                - min_candles: Minimum number of candles needed
+                - min_days: Minimum number of days needed
+                - description: What indicators need this lookback
+        """
+        # Strategy-specific lookback requirements
+        # Based on actual strategy code analysis
+        LOOKBACK_CONFIG = {
+            'inside_bar': {
+                'min_candles': 50,  # ATR(14) + buffer for pattern detection
+                'min_days': 3,      # For intraday, load at least 3 days
+                'description': 'ATR(14) calculation + pattern lookback'
+            },
+            'rudometkin_moc': {
+                'min_candles': 300,  # SMA(200) + buffer for other indicators
+                'min_days': 300,     # For daily data (SMA200 + ADX, CRSI, ATR40)
+                'description': 'SMA(200), ADX, ATR40, CRSI calculations'
+            }
+        }
+        
+        # Get config for strategy, or use conservative defaults
+        config = LOOKBACK_CONFIG.get(strategy, {
+            'min_candles': 100,  # Default: generous buffer
+            'min_days': 5,       # For intraday strategies
+            'description': 'Default safety buffer for indicators'
+        })
+        
+        self.progress_callback(
+            f"Lookback requirement: {config['min_candles']} candles "
+            f"({config['description']})"
+        )
+        
+        return config
+    
     def _execute_replay(
         self,
         strategy: str,
@@ -126,7 +177,33 @@ class PrePaperTradeAdapter:
         else:
             target_date = (datetime.now().date() - pd.Timedelta(days=1)).isoformat()
         
+        target_date_ts = pd.to_datetime(target_date)
         self.progress_callback(f"Replaying session from {target_date}...")
+        
+        # CRITICAL: Get lookback requirements for indicator calculations
+        # Strategies need historical data (e.g., ATR needs 14 candles, SMA200 needs 200 days)
+        lookback_config = self._get_lookback_periods(strategy, timeframe)
+        
+        # Calculate lookback start date based on timeframe
+        if timeframe.upper() in ['M1', 'M5', 'M15', 'M30', 'H1', 'H4']:
+            # Intraday: Load multiple days to ensure enough candles
+            # Example: M5 with 50 candles = 250 minutes ≈ 4.2 hours
+            # We load full days to ensure market hours coverage
+            lookback_days = max(lookback_config['min_days'], 3)  # At least 3 days
+            lookback_start = target_date_ts - pd.Timedelta(days=lookback_days)
+            
+            self.progress_callback(
+                f"Loading {lookback_days} days of {timeframe} data "
+                f"for {lookback_config['min_candles']} candle lookback"
+            )
+        else:
+            # Daily or higher: Use day count directly
+            lookback_days = lookback_config['min_days']
+            lookback_start = target_date_ts - pd.Timedelta(days=lookback_days)
+            
+            self.progress_callback(
+                f"Loading {lookback_days} days for indicator calculations"
+            )
         
         # Load historical data
         data_dir = ROOT / "artifacts" / f"data_{timeframe.lower()}"
@@ -142,22 +219,61 @@ class PrePaperTradeAdapter:
             
             df = pd.read_parquet(data_file)
             
-            # Filter for single day
-            # Corrected from user's proposed `df[(df.index >= target_date) & (df.index < target_date)]`
-            # which would always result in an empty DataFrame.
-            # This filters for data points on the target_date.
-            df = df[(df.index >= target_date) & (df.index < pd.to_datetime(target_date) + pd.Timedelta(days=1))]
+            # Get data bounds for logging
+            data_start = df.index.min()
+            data_end = df.index.max()
             
-            if df.empty:
-                self.progress_callback(f"⚠️ No data for {symbol} on {target_date}, skipping...")
+            # Check if lookback_start is before available data
+            if lookback_start < data_start:
+                actual_lookback_days = (target_date_ts - data_start).days
+                self.progress_callback(
+                    f"⚠️ {symbol}: Requested {lookback_days}-day lookback, "
+                    f"but data starts at {data_start.date()}. "
+                    f"Using {actual_lookback_days} days of available history."
+                )
+                effective_start = data_start
+            else:
+                effective_start = lookback_start
+            
+            # STEP 1: Load data WITH lookback buffer (from lookback_start to target_end)
+            # This ensures indicators have enough historical data
+            target_end = target_date_ts + pd.Timedelta(days=1)
+            df_with_lookback = df[(df.index >= effective_start) & (df.index < target_end)]
+            
+            if df_with_lookback.empty:
+                self.progress_callback(
+                    f"⚠️ No data for {symbol} in range {effective_start.date()} to {target_date}, skipping..."
+                )
                 continue
             
-            # Run strategy detection
-            strategy_signals = self._run_strategy_detection(
-                strategy, symbol, df, config_params
+            self.progress_callback(
+                f" {symbol}: Loaded {len(df_with_lookback)} candles "
+                f"({effective_start.date()} to {data_end.date() if data_end < target_end else target_date})"
             )
             
-            signals.extend(strategy_signals)
+            # STEP 2: Run strategy detection on FULL dataset (with lookback)
+            # This allows indicators to calculate correctly
+            strategy_signals = self._run_strategy_detection(
+                strategy, symbol, df_with_lookback, config_params
+            )
+            
+            # STEP 3: Filter signals to ONLY target_date
+            # Important: Only include signals detected ON the replay date
+            # This prevents "future" signals from appearing in results
+            target_date_end = target_date_ts + pd.Timedelta(days=1)
+            filtered_signals = []
+            for sig in strategy_signals:
+                sig_time = pd.to_datetime(sig['detected_at'])
+                if target_date_ts <= sig_time < target_date_end:
+                    filtered_signals.append(sig)
+            
+            if len(filtered_signals) < len(strategy_signals):
+                self.progress_callback(
+                    f" {symbol}: Filtered {len(strategy_signals)} total signals → "
+                    f"{len(filtered_signals)} from target date {target_date}"
+                )
+            
+            signals.extend(filtered_signals)
         
         self.progress_callback(f"Writing {len(signals)} signals to database...")
         
@@ -170,6 +286,7 @@ class PrePaperTradeAdapter:
             "signals": signals,
             "mode": "replay",
             "replay_date": target_date,
+            "lookback_days": lookback_days,
             "ended_at": datetime.now().isoformat(),
         }
     
