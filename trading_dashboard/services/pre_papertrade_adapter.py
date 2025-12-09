@@ -101,12 +101,38 @@ class PrePaperTradeAdapter:
                 config_duration = (datetime.now() - config_start).total_seconds()
                 self.progress_callback(f"✅ Config loaded in {config_duration:.2f}s ({len(version_config)} parameters)")
                 
-                # Merge with user-provided config_params (user params take precedence)
-                if config_params:
-                    version_config.update(config_params)
-                config_params = version_config
+                # Ensure required parameters are present with defaults
+                # Strategy classes validate against their schema, so we must provide required fields
+                if strategy in ["insidebar_intraday", "insidebar_intraday_v2"]:
+                    defaults = {
+                        "atr_period": 14,
+                        "risk_reward_ratio": 2.0,
+                        "min_mother_bar_size": 0.5,
+                        "breakout_confirmation": True,
+                        "inside_bar_mode": "inclusive",
+                    }
+                    # Merge: defaults first, then version config, then user params
+                    final_config = {**defaults, **version_config}
+                    if config_params:
+                        final_config.update(config_params)
+                    config_params = final_config
+                else:
+                    # Merge with user-provided config_params (user params take precedence)
+                    if config_params:
+                        version_config.update(config_params)
+                    config_params = version_config
             else:
                 self.progress_callback(f"📋 Using default config (no version specified)")
+                # Provide defaults even when no version
+                if config_params is None:
+                    if strategy in ["insidebar_intraday", "insidebar_intraday_v2"]:
+                        config_params = {
+                            "atr_period": 14,
+                            "risk_reward_ratio": 2.0,
+                            "min_mother_bar_size": 0.5,
+                            "breakout_confirmation": True,
+                            "inside_bar_mode": "inclusive",
+                        }
             
             if mode == "replay":
                 result = self._execute_replay(
