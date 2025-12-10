@@ -119,6 +119,30 @@ def register_chart_callbacks(app):
             timezone = pytz.timezone("Europe/Berlin")
             tz_label = "Berlin"
         
+        # ====================================================================
+        # CRITICAL: Check live data availability FIRST, before parquet data
+        # This ensures the status is always checked, even if parquet is empty
+        # ==================================================================
+        from ..repositories.candles import check_live_data_availability
+        availability = check_live_data_availability(selected_date)
+        
+        # LOG RESULTS
+        logger.info(f"🔍 Live data availability result: {availability}")
+        
+        # Determine live data status (fast, no candle loading)
+        if availability['available']:
+            live_class = "status-dot online"
+            symbol_count = availability['symbol_count']
+            timeframes = ', '.join(availability['timeframes'])
+            live_text = f"Live ({symbol_count} symbols)"
+            live_count = f"Timeframes: {timeframes}"
+            logger.info(f"✅ Setting status to ONLINE: {live_text}")
+        else:
+            live_class = "status-dot offline"
+            live_text = "No live data"
+            live_count = ""
+            logger.warning(f"❌ Setting status to OFFLINE")
+        
         # Get candle data with selected timeframe and date
         df = get_candle_data(symbol, timeframe=timeframe, hours=24, reference_date=selected_date)
         
@@ -166,7 +190,8 @@ def register_chart_callbacks(app):
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)'
             )
-            return fig, "status-dot offline", "No live data", ""
+            # FIXED: Return with live data status from check above, not hardcoded offline
+            return fig, live_class, live_text, live_count
         
         # Convert timestamps to selected timezone
         if 'timestamp' in df.columns:
