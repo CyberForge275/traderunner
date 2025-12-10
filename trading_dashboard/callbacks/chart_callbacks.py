@@ -72,13 +72,13 @@ def register_chart_callbacks(app):
         # NOTE: Do NOT output to chart-data-source-mode here - Active Patterns callback owns it
         Input("chart-symbol-selector", "value"),
         Input("chart-refresh-btn", "n_clicks"),
-        Input("timeframe-M1-btn", "n_clicks"),
-        Input("timeframe-M5-btn", "n_clicks"),
-        Input("timeframe-M15-btn", "n_clicks"),
-        Input("timeframe-H1-btn", "n_clicks"),
+        Input("tf-m1", "n_clicks"),  # Fixed: was timeframe-M1-btn
+        Input("tf-m5", "n_clicks"),  # Fixed: was timeframe-M5-btn
+        Input("tf-m15", "n_clicks"),  # Fixed: was timeframe-M15-btn
+        Input("tf-h1", "n_clicks"),  # Fixed: was timeframe-H1-btn
         Input("tz-ny-btn", "n_clicks"),
         Input("tz-berlin-btn", "n_clicks"),
-        Input("selected-date", "date"),
+        Input("chart-date-picker", "date"),  # Fixed: was selected-date
         Input("market-session-toggles", "value"),
         State("chart-data-source-mode", "children")  # Read current mode
     )
@@ -100,19 +100,17 @@ def register_chart_callbacks(app):
             selected_date = datetime.fromisoformat(selected_date).date()
             logger.info(f"📅 Converted to date object: {selected_date}")
         
-        # Determine which timeframe was clicked
-        triggered_id = ctx.triggered_id if ctx.triggered else "tf-m5"
+        # Determine which timeframe button was clicked
+        triggered_id = ctx.triggered_id if ctx.triggered else None
         
-        timeframe_map = {
-            "tf-m1": "M1",
-            "tf-m5": "M5",
-            "tf-m15": "M15",
-            "tf-h1": "H1",
-            "chart-symbol-selector": "M5",  # Default when switching symbols
-            "chart-refresh-btn": "M5"  # Default when refreshing
-        }
-        
-        timeframe = timeframe_map.get(triggered_id, "M5")
+        if triggered_id == "tf-m1":
+            timeframe = "M1"
+        elif triggered_id == "tf-m15":
+            timeframe = "M15"
+        elif triggered_id == "tf-h1":
+            timeframe = "H1"
+        else:
+            timeframe = "M5"  # Default
         
         # Determine timezone (default to Berlin)
         if triggered_id == "tz-ny-btn":
