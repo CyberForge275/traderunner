@@ -39,6 +39,32 @@ curl http://192.168.178.55:8080/healthz && curl http://192.168.178.55:8090/healt
 
 ---
 
+## Deploy traderunner (Git-Based) ✅ RECOMMENDED
+
+// turbo
+
+**Proper Git-based deployment (version controlled):**
+```bash
+cd /home/mirko/data/workspace/droid/traderunner
+./deploy-git.sh
+```
+
+This script:
+1. ✅ Validates all changes are committed and pushed to GitHub
+2. 📥 Pulls exact commit from GitHub on server (via `git pull`)
+3. 📦 Updates dependencies
+4. ♻️  Restarts trading-dashboard-v2 service
+5. ✅ Verifies deployment (commit hash matches)
+6. 🏥 Health check on dashboard
+
+**Benefits over rsync:**
+- Full version tracking (know exactly what's deployed)
+- Easy rollback (git checkout previous commit)
+- Audit trail (git log shows deployment history)
+- Team awareness (everyone can see from GitHub)
+
+---
+
 ## Manual Deploy (Fallback)
 
 // turbo-all
@@ -52,7 +78,7 @@ ssh mirko@192.168.178.55
 ```bash
 cd /opt/trading/marketdata-stream && git pull origin main
 cd /opt/trading/automatictrader-api && git pull origin main
-cd /opt/trading/traderunner && git pull origin feature/v2-architecture
+# Note: traderunner uses rsync deployment (see above)
 ```
 
 3. Install any new dependencies:
@@ -63,18 +89,19 @@ cd /opt/trading/automatictrader-api && source .venv/bin/activate && pip install 
 
 4. Restart all services:
 ```bash
-sudo systemctl restart marketdata-stream signal-processor automatictrader-api automatictrader-worker
+sudo systemctl restart marketdata-stream signal-processor automatictrader-api automatictrader-worker trading-dashboard-v2
 ```
 
 5. Verify services:
 ```bash
-sudo systemctl status marketdata-stream automatictrader-api automatictrader-worker --no-pager
+sudo systemctl status marketdata-stream automatictrader-api automatictrader-worker trading-dashboard-v2 --no-pager
 ```
 
 6. Check health endpoints:
 ```bash
 curl http://localhost:8080/healthz
 curl http://localhost:8090/health
+curl http://localhost:9001
 ```
 
 ---
