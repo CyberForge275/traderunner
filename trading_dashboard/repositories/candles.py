@@ -115,6 +115,7 @@ def get_candle_data(symbol: str, timeframe: str = "M5", hours: int = 24, referen
     # If parquet file exists but no data for selected date, return empty DataFrame
     from pathlib import Path
     from ..config import TRADERUNNER_DIR
+    from datetime import date as date_type, datetime
     
     timeframe_dirs = {
         "M1": "data_m1",
@@ -129,7 +130,21 @@ def get_candle_data(symbol: str, timeframe: str = "M5", hours: int = 24, referen
     if parquet_path.exists():
         return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
     
-    # Fallback: Generate mock data only for symbols without parquet files (development)
+    # CRITICAL: Never generate mock data for future dates
+    if reference_date is not None:
+        if isinstance(reference_date, str):
+            ref_date = datetime.fromisoformat(reference_date).date()
+        elif isinstance(reference_date, date_type):
+            ref_date = reference_date
+        else:
+            ref_date = reference_date.date() if hasattr(reference_date, 'date') else None
+        
+        # Check if date is in the future
+        if ref_date and ref_date > date_type.today():
+            print(f"Requested future date {ref_date} for {symbol} - returning empty")
+            return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+    
+    # Fallback: Generate mock data only for symbols without parquet files AND past/present dates
     return generate_mock_candles(symbol, hours, timeframe, reference_date)
 
 
