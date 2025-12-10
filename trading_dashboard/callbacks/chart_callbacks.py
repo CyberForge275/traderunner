@@ -285,8 +285,18 @@ def register_chart_callbacks(app):
             live_count = ""
             logger.warning(f"❌ Setting status to OFFLINE")
         
-        # Create chart WITHOUT live data overlay (keep parquet only)
-        # Live data will be added later when we implement on-demand loading
+        # Load live candles if availability check showed they exist
+        df_live = None
+        if availability['available']:
+            from ..repositories.candles import get_live_candle_data
+            logger.info(f"📡 Loading live candles for {symbol} {timeframe}...")
+            df_live = get_live_candle_data(symbol, timeframe, selected_date, limit=500)
+            if not df_live.empty:
+                logger.info(f"✅ Loaded {len(df_live)} live candles")
+            else:
+                logger.warning(f"⚠️ Availability showed data but query returned empty")
+        
+        # Create chart with both parquet and live data
         fig = create_candlestick_chart(
             df=df,
             symbol=symbol,
@@ -294,7 +304,7 @@ def register_chart_callbacks(app):
             entry_price=entry_price,
             stop_loss=stop_loss,
             take_profit=take_profit,
-            df_live=None  # Don't load live candles yet
+            df_live=df_live  # Pass live data for overlay
         )
         
         # Update chart title with timezone
