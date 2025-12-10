@@ -168,8 +168,16 @@ def register_chart_callbacks(app):
             live_symbols_display = None
             logger.warning(f"❌ Setting status to OFFLINE")
         
-        # Get candle data with selected timeframe and date
-        df = get_candle_data(symbol, timeframe=timeframe, hours=24, reference_date=selected_date)
+        # Get candle data using intelligent adapter (routes to database or parquet)
+        from ..repositories.data_adapter import get_data_adapter
+        adapter = get_data_adapter()
+        df = adapter.get_candles(
+            symbol=symbol,
+            timeframe=timeframe,
+            reference_date=selected_date,
+            hours=24,
+            limit=500
+        )
         
         # Check if data is available for selected date
         if df.empty:
@@ -310,16 +318,9 @@ def register_chart_callbacks(app):
             live_count = ""
             logger.warning(f"❌ Setting status to OFFLINE")
         
-        # Load live candles if availability check showed they exist
-        df_live = None
-        if availability['available']:
-            from ..repositories.candles import get_live_candle_data
-            logger.info(f"📡 Loading live candles for {symbol} {timeframe}...")
-            df_live = get_live_candle_data(symbol, timeframe, selected_date, limit=500)
-            if not df_live.empty:
-                logger.info(f"✅ Loaded {len(df_live)} live candles")
-            else:
-                logger.warning(f"⚠️ Availability showed data but query returned empty")
+        # Note: Adapter already handles live data for today's date
+        # No need for separate live candle loading
+        df_live = None  # Reserved for future overlay feature (live on top of historic)
         
         # Create chart with both parquet and live data
         fig = create_candlestick_chart(
