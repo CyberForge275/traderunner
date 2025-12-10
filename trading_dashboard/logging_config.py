@@ -68,6 +68,34 @@ def setup_logging():
     charts_logger.addHandler(charts_handler)
     charts_logger.setLevel(logging.DEBUG)
     
+    # Pre-PaperTrade Lab specific handler
+    ppt_logger = logging.getLogger('trading_dashboard.services.pre_papertrade')
+    ppt_handler = logging.handlers.RotatingFileHandler(
+        LOGS_DIR / 'pre_papertrade.log',
+        maxBytes=10*1024*1024,  # 10MB
+        backupCount=5
+    )
+    ppt_handler.setLevel(logging.DEBUG)
+    ppt_formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    ppt_handler.setFormatter(ppt_formatter)
+    ppt_logger.addHandler(ppt_handler)
+    ppt_logger.setLevel(logging.DEBUG)
+    
+    # Pre-PaperTrade signals handler (signal generation details)
+    signals_logger = logging.getLogger('trading_dashboard.services.pre_papertrade.signals')
+    signals_handler = logging.handlers.RotatingFileHandler(
+        LOGS_DIR / 'pre_papertrade_signals.log',
+        maxBytes=5*1024*1024,  # 5MB
+        backupCount=3
+    )
+    signals_handler.setLevel(logging.INFO)
+    signals_handler.setFormatter(ppt_formatter)
+    signals_logger.addHandler(signals_handler)
+    signals_logger.setLevel(logging.INFO)
+    
     # Error file handler (errors only)
     error_handler = logging.handlers.RotatingFileHandler(
         ERRORS_LOG,
@@ -85,4 +113,5 @@ def setup_logging():
     logging.info("✅ Logging configured successfully")
     logging.info(f"📁 Dashboard logs: {DASHBOARD_LOG}")
     logging.info(f"📊 Charts logs: {CHARTS_LOG}")
+    logging.info(f"🧪 Pre-PaperTrade logs: {LOGS_DIR / 'pre_papertrade.log'}")
     logging.info(f"❌ Error logs: {ERRORS_LOG}")

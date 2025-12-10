@@ -56,6 +56,26 @@ class PrePaperTradeAdapter:
         if not self.signals_db_path.exists():
             self.signals_db_path = ROOT / "artifacts" / "signals.db"
     
+    def __enter__(self):
+        """Enter context manager - enables 'with' statement usage."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exit context manager - cleanup resources.
+        
+        Args:
+            exc_type: Exception type if raised
+            exc_val: Exception value if raised
+            exc_tb: Exception traceback if raised
+            
+        Returns:
+            False to propagate exceptions (don't suppress them)
+        """
+        # Cleanup: flush any pending logs, close connections, etc.
+        # Currently no resources that need explicit cleanup
+        return False  # Don't suppress exceptions
+    
     def execute_strategy(
         self,
         strategy: str,
@@ -85,8 +105,38 @@ class PrePaperTradeAdapter:
                 - signals: List of signal dictionaries
                 - error: Error message if failed
         """
+        import logging
+        
+        # Set up logger
+        logger = logging.getLogger('trading_dashboard.services.pre_papertrade')
+        signals_logger = logging.getLogger('trading_dashboard.services.pre_papertrade.signals')
+        
+        # Initialize metrics tracking
+        metrics = {
+            'symbols_total': len(symbols),
+            'symbols_processed': 0,
+            'symbols_failed': 0,
+            'data_fetch_time': 0.0,
+            'strategy_run_time': 0.0,
+            'db_write_time': 0.0,
+            'signals_generated': 0,
+        }
+        
         try:
             start_time = datetime.now()
+            
+            logger.info("="*60)
+            logger.info("🚀 PRE-PAPERTRADE EXECUTION START")
+            logger.info("="*60)
+            logger.info(f"Strategy: {strategy}")
+            logger.info(f"Version: {version or 'default'}")
+            logger.info(f"Mode: {mode}")
+            logger.info(f"Symbols: {', '.join(symbols)}")
+            logger.info(f"Timeframe: {timeframe}")
+            if replay_date:
+                logger.info(f"Replay Date: {replay_date}")
+            logger.info("="*60)
+            
             self.progress_callback(f"\n{'='*60}")
             self.progress_callback(f"🚀 PRE-PAPERTRADE EXECUTION START")
             self.progress_callback(f"{'='*60}")
@@ -168,8 +218,51 @@ class PrePaperTradeAdapter:
                 raise ValueError(f"Invalid mode: {mode}. Must be 'replay' or 'live'")
             
             total_duration = (datetime.now() - start_time).total_seconds()
+            
+            # Calculate timeline breakdown
+            if total_duration > 0:
+                data_pct = int((metrics['data_fetch_time'] / total_duration) * 100)
+                strategy_pct = int((metrics['strategy_run_time'] / total_duration) * 100)
+                db_pct = int((metrics['db_write_time'] / total_duration) * 100)
+            else:
+                data_pct = strategy_pct = db_pct = 0
+            
+            # Log comprehensive summary
+            logger.info("\n" + "="*60)
+            logger.info("✅ EXECUTION COMPLETE")
+            logger.info("="*60)
+            logger.info(f"Total Time: {total_duration:.2f}s")
+            logger.info(f"Symbols Processed: {metrics['symbols_processed']}/{metrics['symbols_total']}")
+            logger.info(f"Symbols Failed: {metrics['symbols_failed']}")
+            logger.info(f"Signals Generated: {metrics['signals_generated']}")
+            logger.info("")
+            logger.info("EXECUTION TIMELINE:")
+            logger.info(f"├─ Data Fetching:   {metrics['data_fetch_time']:.2f}s ({data_pct}%)")
+            logger.info(f"├─ Strategy Run:    {metrics['strategy_run_time']:.2f}s ({strategy_pct}%)")
+            logger.info(f"├─ DB Write:        {metrics['db_write_time']:.2f}s ({db_pct}%)")
+            logger.info(f"└─ Total:           {total_duration:.2f}s")
+            logger.info("")
+            if total_duration > 0 and metrics['symbols_processed'] > 0:
+                logger.info("PERFORMANCE:")
+                logger.info(f"• Symbols/sec:      {metrics['symbols_processed']/total_duration:.2f}")
+                if metrics['signals_generated'] > 0:
+                    logger.info(f"• Signals/sec:      {metrics['signals_generated']/total_duration:.2f}")
+            logger.info("="*60)
+            
             self.progress_callback(f"\n{'='*60}")
             self.progress_callback(f"✅ EXECUTION COMPLETE in {total_duration:.2f}s")
+            self.progress_callback(f"")
+            self.progress_callback(f"📊 SUMMARY:")
+            self.progress_callback(f"  Symbols Processed: {metrics['symbols_processed']}/{metrics['symbols_total']}")
+            self.progress_callback(f"  Total Signals: {metrics['signals_generated']}")
+            if total_duration > 0:
+                self.progress_callback(f"  Avg Time/Symbol: {total_duration/max(metrics['symbols_processed'], 1):.2f}s")
+            self.progress_callback(f"")
+            self.progress_callback(f"TIMELINE:")
+            self.progress_callback(f"├─ Data Fetching:   {metrics['data_fetch_time']:.2f}s ({data_pct}%)")
+            self.progress_callback(f"├─ Strategy Run:    {metrics['strategy_run_time']:.2f}s ({strategy_pct}%)")
+            self.progress_callback(f"├─ DB Write:        {metrics['db_write_time']:.2f}s ({db_pct}%)")
+            self.progress_callback(f"└─ Total:           {total_duration:.2f}s")
             self.progress_callback(f"{'='*60}\n")
             
             return result
@@ -243,7 +336,13 @@ class PrePaperTradeAdapter:
         config_params: Optional[Dict],
     ) -> Dict:
         """Execute strategy in Time Machine mode - replay a single past trading day."""
+        import logging
+        
+        # Initialize logger for this method
+        logger = logging.getLogger('trading_dashboard.services.pre_papertrade')
+        
         self.progress_callback("Loading strategy module...")
+        logger.info("Loading strategy module...")
         
         # Import strategy modules
         from apps.streamlit.state import STRATEGY_REGISTRY
@@ -294,13 +393,18 @@ class PrePaperTradeAdapter:
         all_signals = []
         
         # Process each symbol
-        for symbol in symbols:
-            self.progress_callback(f"\n📊 Processing {symbol}...")
+        for idx, symbol in enumerate(symbols, 1):
+            progress_pct = int((idx / len(symbols)) * 100)
+            
+            logger.info(f"\n[{idx}/{len(symbols)}] Processing {symbol}... ({progress_pct}%)")
+            self.progress_callback(f"\n[{idx}/{len(symbols)}] 📊 Processing {symbol}... ({progress_pct}%)")
+            
             fetch_start = datetime.now()
             
             try:
                 # Fetch historical data with lookback
-                self.progress_callback(f"⬇️  Fetching data for {symbol}...")
+                logger.debug(f"⬇️  Fetching data for {symbol}...")
+                self.progress_callback(f"  ⬇️  Fetching data...")
                 # The `expected_candles` and `min_candles_needed` variables are not defined in the provided context.
                 # Assuming they would be defined earlier in the `_execute_replay` method or derived from `lookback_config`.
                 # For now, I'll comment them out or replace with a placeholder if they are not part of the current context.
@@ -337,10 +441,15 @@ class PrePaperTradeAdapter:
                 df = pd.read_parquet(data_file)
                 
                 fetch_duration = (datetime.now() - fetch_start).total_seconds()
+                metrics['data_fetch_time'] += fetch_duration
                 
                 if df is None or df.empty:
-                    self.progress_callback(f"❌ No data for {symbol} - skipping")
+                    logger.warning(f"❌ No data for {symbol} - skipping")
+                    self.progress_callback(f"  ❌ No data - skipping")
+                    metrics['symbols_failed'] += 1
                     continue
+                
+                metrics['symbols_processed'] += 1
                 
                 actual_candles = len(df)
                 data_start = df.index[0] if not df.empty else "N/A"
@@ -404,9 +513,19 @@ class PrePaperTradeAdapter:
             
             # Run strategy detection WITH lookback-aware data
             # This allows indicators to calculate correctly
+            logger.debug(f"  🔍 Running strategy detection...")
+            self.progress_callback(f"  🔍 Running strategy...")
+            
+            strategy_start = datetime.now()
             strategy_signals = self._run_strategy_detection(
                 strategy, symbol, df_with_lookback, config_params
             )
+            strategy_duration = (datetime.now() - strategy_start).total_seconds()
+            metrics['strategy_run_time'] += strategy_duration
+            
+            logger.info(f"  ✅ Strategy completed in {strategy_duration:.2f}s")
+            logger.info(f"     Signals: {len(strategy_signals)}")
+            self.progress_callback(f"  ✅ Strategy: {len(strategy_signals)} signals in {strategy_duration:.2f}s")
             
             # STEP 3: Filter signals to ONLY those generated on the target_date
             # We ran detection on full history but only care about today's signals
@@ -416,18 +535,33 @@ class PrePaperTradeAdapter:
                 pd.to_datetime(sig['detected_at']).date() == target_date_ts_naive.date()
             ]
             
-            self.progress_callback(
-                f"  {symbol}: {len(strategy_signals)} total signals, "
+            metrics['signals_generated'] += len(filtered_signals)
+            
+            logger.info(
+                f"  📊 {len(strategy_signals)} total signals, "
                 f"{len(filtered_signals)} from target date {target_date}"
+            )
+            self.progress_callback(
+                f"  📊 {len(strategy_signals)} total, "
+                f"{len(filtered_signals)} from {target_date}"
             )
             
             all_signals.extend(filtered_signals)
         
+        logger.info(f"\n✅ Generated {len(all_signals)} signals total")
         self.progress_callback(f"\n✅ Generated {len(all_signals)} signals total")
         
         # Write signals to database
         if all_signals:
+            db_start = datetime.now()
+            logger.info(f"💾 Writing {len(all_signals)} signals to database...")
+            self.progress_callback(f"💾 Writing signals to database...")
+            
             self._write_signals_to_db(all_signals, source="time_machine")
+            
+            db_duration = (datetime.now() - db_start).total_seconds()
+            metrics['db_write_time'] = db_duration
+            logger.info(f"✅ Database write completed in {db_duration:.2f}s")
         
         return {
             "status": "completed",
