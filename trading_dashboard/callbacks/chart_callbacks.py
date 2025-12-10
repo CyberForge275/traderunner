@@ -133,9 +133,12 @@ def register_chart_callbacks(app):
         if availability['available']:
             live_class = "status-dot online"
             symbol_count = availability['symbol_count']
+            symbols_list = availability.get('symbols', [])
             timeframes = ', '.join(availability['timeframes'])
             live_text = f"Live ({symbol_count} symbols)"
-            live_count = f"Timeframes: {timeframes}"
+            # Show symbol names and timeframes
+            symbols_display = ', '.join(symbols_list) if symbols_list else ''
+            live_count = f"{symbols_display}\nTimeframes: {timeframes}"
             logger.info(f"✅ Setting status to ONLINE: {live_text}")
         else:
             live_class = "status-dot offline"
