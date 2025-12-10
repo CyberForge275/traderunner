@@ -69,7 +69,7 @@ def register_chart_callbacks(app):
         Output("live-data-text", "children"),
         Output("live-data-count", "children"),
         Output("live-symbols-container", "children"),  # Clickable symbols
-        Output("chart-data-source-mode", "children"),  # Reset to parquet on dropdown change
+        # NOTE: Do NOT output to chart-data-source-mode here - Active Patterns callback owns it
         Input("chart-symbol-selector", "value"),
         Input("chart-refresh-btn", "n_clicks"),
         Input("timeframe-M1-btn", "n_clicks"),
@@ -237,7 +237,7 @@ def register_chart_callbacks(app):
                 paper_bgcolor='rgba(0,0,0,0)'
             )
             # FIXED: Return with live data status from check above, not hardcoded offline
-            return fig, live_class, live_text, live_count, live_symbols_display, new_mode
+            return fig, live_class, live_text, live_count, live_symbols_display
         
         # Convert timestamps to selected timezone
         if 'timestamp' in df.columns:
@@ -355,7 +355,7 @@ def register_chart_callbacks(app):
             )
         )
         
-        return fig, live_class, live_text, live_count, live_symbols_display, new_mode
+        return fig, live_class, live_text, live_count, live_symbols_display
     
     @app.callback(
         Output("pattern-details", "children"),
