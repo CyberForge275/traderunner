@@ -243,17 +243,22 @@ def register_chart_callbacks(app):
         from ..repositories.candles import check_live_data_availability
         availability = check_live_data_availability(selected_date)
         
+        # LOG RESULTS
+        logger.info(f"🔍 Live data availability result: {availability}")
+        
         # Determine live data status (fast, no candle loading)
         if availability['available']:
             live_class = "status-dot online"
             symbol_count = availability['symbol_count']
             timeframes = ', '.join(availability['timeframes'])
             live_text = f"Live ({symbol_count} symbols)"
+            logger.info(f"✅ Setting status to ONLINE: {live_text}")
             live_count = f"Timeframes: {timeframes}"
         else:
             live_class = "status-dot offline"
             live_text = "No live data"
             live_count = ""
+            logger.warning(f"❌ Setting status to OFFLINE")
         
         # Create chart WITHOUT live data overlay (keep parquet only)
         # Live data will be added later when we implement on-demand loading

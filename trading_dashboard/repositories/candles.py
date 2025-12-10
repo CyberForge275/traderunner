@@ -309,6 +309,8 @@ def check_live_data_availability(date=None) -> dict:
     import logging
     
     logger = logging.getLogger(__name__)
+    logger.info("=" * 80)
+    logger.info("🔍 LIVE DATA AVAILABILITY CHECK STARTED")
     
     # Try to connect
     db_paths = [
@@ -316,20 +318,29 @@ def check_live_data_availability(date=None) -> dict:
         Path.home() / "data/workspace/droid/marketdata-stream/data/market_data.db"
     ]
     
+    logger.info(f"📂 Checking database paths: {db_paths}")
+    
     conn = None
     for db_path in db_paths:
+        logger.info(f"  Checking: {db_path}")
+        logger.info(f"  Exists: {db_path.exists()}")
         if db_path.exists():
             try:
-                conn = sqlite3.connect(str(db_path), timeout=2.0)  # 2 second timeout
+                conn = sqlite3.connect(str(db_path), timeout=2.0)
+                logger.info(f"  ✅ Connected to: {db_path}")
                 break
             except Exception as e:
-                logger.warning(f"Could not connect to {db_path}: {e}")
+                logger.error(f"  ❌ Connection failed: {e}")
     
     if not conn:
+        logger.warning("❌ NO DATABASE CONNECTION - Returning unavailable")
+        logger.info("=" * 80)
         return {'available': False, 'symbol_count': 0, 'timeframes': []}
     
     try:
         query_date = date if date else date_type.today()
+        logger.info(f"📅 Query date: {query_date} (type: {type(query_date)})")
+        logger.info(f"📅 ISO format: {query_date.isoformat()}")
         
         # Fast query - just count symbols, don't load data
         query = """
@@ -339,27 +350,40 @@ def check_live_data_availability(date=None) -> dict:
             GROUP BY interval
         """
         
+        logger.info(f"🔍 Executing query with date: {query_date.isoformat()}")
         cursor = conn.execute(query, (query_date.isoformat(),))
         results = cursor.fetchall()
         
+        logger.info(f"📊 Query results: {results}")
+        logger.info(f"📊 Result count: {len(results)}")
+        
         if results:
             timeframes = [row[0] for row in results]
-            total_symbols = max(row[1] for row in results)  # Max symbols across timeframes
-            logger.debug(f"Live data available: {total_symbols} symbols, timeframes: {timeframes}")
+            total_symbols = max(row[1] for row in results)
+            logger.info(f"✅ DATA AVAILABLE!")
+            logger.info(f"  Symbols: {total_symbols}")
+            logger.info(f"  Timeframes: {timeframes}")
+            logger.info("=" * 80)
             return {
                 'available': True,
                 'symbol_count': total_symbols,
                 'timeframes': timeframes
             }
         else:
+            logger.warning(f"❌ NO RESULTS from query for date {query_date.isoformat()}")
+            logger.info("=" * 80)
             return {'available': False, 'symbol_count': 0, 'timeframes': []}
             
     except Exception as e:
-        logger.error(f"Error checking live data availability: {e}")
+        logger.error(f"❌ ERROR in availability check: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        logger.info("=" * 80)
         return {'available': False, 'symbol_count': 0, 'timeframes': []}
     finally:
         if conn:
             conn.close()
+            logger.debug("Database connection closed")
 
 
 def get_live_candle_data(
