@@ -25,6 +25,9 @@ for path in [str(SRC), str(APPS_DIR), str(STREAMLIT_DIR)]:
     if path not in sys.path:
         sys.path.insert(0, path)
 
+# Import DataManager for auto-download capability
+from data.data_manager import DataManager
+
 
 class PrePaperTradeAdapter:
     """
@@ -55,6 +58,20 @@ class PrePaperTradeAdapter:
         # For local testing, use a local path
         if not self.signals_db_path.exists():
             self.signals_db_path = ROOT / "artifacts" / "signals.db"
+        
+        # Initialize DataManager for auto-download capability
+        import os
+        eodhd_key = os.getenv("EODHD_API_KEY") or os.getenv("EODHD_API_TOKEN")
+        self.data_manager = DataManager(
+            data_dir=str(ROOT / "data"),
+            cache_enabled=True,
+            eodhd_api_key=eodhd_key
+        )
+        logger_dm = logging.getLogger('trading_dashboard.services.pre_papertrade')
+        if eodhd_key:
+            logger_dm.info(f"✅ DataManager initialized with EODHD integration (key: {eodhd_key[:8]}...)")
+        else:
+            logger_dm.warning("⚠️  DataManager initialized WITHOUT EODHD key (auto-download will fail)")
     
     def __enter__(self):
         """Enter context manager - enables 'with' statement usage."""
@@ -425,20 +442,29 @@ class PrePaperTradeAdapter:
                 self.progress_callback(f"   Period: {lookback_start.date()} to {target_date}")
                 self.progress_callback(f"   Expected: ~{expected_candles} candles")
                 
-                # This method `_fetch_historical_data` is new and not defined in the provided context.
-                # For the purpose of this edit, I will replace it with the original parquet loading logic
-                # but keep the new logging around it, as the instruction implies a change in logging,
-                # not necessarily a change in the data source itself unless `_fetch_historical_data` is a new helper.
-                # Given the context, the user is likely replacing the direct parquet read with a more robust fetch.
-                # Since `_fetch_historical_data` is not provided, I will revert to the original parquet read
-                # but wrap it with the new logging and checks.
-                
-                data_file = data_dir / f"{symbol}.parquet"
-                if not data_file.exists():
-                    self.progress_callback(f"❌ No data file found for {symbol} at {data_file} - skipping")
+                # Use DataManager for auto-download capability
+                try:
+                    logger.info(f"🔄 Requesting data via DataManager (auto-download enabled)...")
+                    df = self.data_manager.get_parquet_data(
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        start_date=lookback_start.date(),
+                        end_date=target_date_ts.date(),
+                        base_dir=ROOT / "artifacts",
+                        auto_download=True  # Enable auto-download from EODHD
+                    )
+                    
+                    if df.empty:
+                        logger.warning(f"❌ No data for {symbol} (download may have failed)")
+                        self.progress_callback(f"  ❌ No data available - skipping")
+                        metrics['symbols_failed'] += 1
+                        continue
+                    
+                except Exception as e:
+                    logger.error(f"❌ Error loading data for {symbol}: {e}")
+                    self.progress_callback(f"  ❌ Error loading data - skipping")
+                    metrics['symbols_failed'] += 1
                     continue
-                
-                df = pd.read_parquet(data_file)
                 
                 fetch_duration = (datetime.now() - fetch_start).total_seconds()
                 metrics['data_fetch_time'] += fetch_duration
