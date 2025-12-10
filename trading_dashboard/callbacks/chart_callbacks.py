@@ -68,7 +68,8 @@ def register_chart_callbacks(app):
         Output("live-data-dot", "className"),
         Output("live-data-text", "children"),
         Output("live-data-count", "children"),
-        Output("live-symbols-container", "children"),  # New: clickable symbols
+        Output("live-symbols-container", "children"),  # Clickable symbols
+        Output("chart-data-source-mode", "children"),  # Reset to parquet on dropdown change
         Input("chart-symbol-selector", "value"),
         Input("chart-refresh-btn", "n_clicks"),
         Input("timeframe-M1-btn", "n_clicks"),
@@ -78,9 +79,10 @@ def register_chart_callbacks(app):
         Input("tz-ny-btn", "n_clicks"),
         Input("tz-berlin-btn", "n_clicks"),
         Input("selected-date", "date"),
-        Input("market-session-toggles", "value")
+        Input("market-session-toggles", "value"),
+        State("chart-data-source-mode", "children")  # Read current mode
     )
-    def update_chart(symbol, refresh_clicks, m1_clicks, m5_clicks, m15_clicks, h1_clicks, ny_clicks, berlin_clicks, selected_date, session_toggles):
+    def update_chart(symbol, refresh_clicks, m1_clicks, m5_clicks, m15_clicks, h1_clicks, ny_clicks, berlin_clicks, selected_date, session_toggles, data_source_mode):
         """Update candlestick chart when symbol changes or refresh clicked."""
         from dash import ctx
         from ..repositories.candles import get_candle_data, get_live_candle_data
@@ -168,16 +170,27 @@ def register_chart_callbacks(app):
             live_symbols_display = None
             logger.warning(f"❌ Setting status to OFFLINE")
         
-        # Get candle data using intelligent adapter (routes to database or parquet)
-        from ..repositories.data_adapter import get_data_adapter
-        adapter = get_data_adapter()
-        df = adapter.get_candles(
-            symbol=symbol,
-            timeframe=timeframe,
-            reference_date=selected_date,
-            hours=24,
-            limit=500
-        )
+        # Determine which input triggered callback
+        triggered_id = ctx.triggered_id if ctx.triggered else None
+        
+        # If Symbol dropdown changed, reset to parquet mode
+        new_mode = data_source_mode  # Default: keep current mode
+        if triggered_id == "chart-symbol-selector":
+            new_mode = "parquet"  # Dropdown always uses parquet
+        
+        logger.info(f"📊 Data source mode: {new_mode} (triggered by: {triggered_id})")
+        
+        # Load data based on mode
+        if new_mode == "database":
+            # Active Patterns mode: load from websocket database
+            logger.info(f"   → Loading from DATABASE (market_data.db) for {symbol}")
+            from ..repositories.candles import get_live_candle_data
+            df = get_live_candle_data(symbol, timeframe, selected_date, limit=500)
+        else:
+            # Symbol selector mode: load from parquet files
+            logger.info(f"   → Loading from PARQUET files for {symbol}")
+            from ..repositories.candles import get_candle_data
+            df = get_candle_data(symbol, timeframe=timeframe, hours=24, reference_date=selected_date)
         
         # Check if data is available for selected date
         if df.empty:
@@ -224,7 +237,7 @@ def register_chart_callbacks(app):
                 paper_bgcolor='rgba(0,0,0,0)'
             )
             # FIXED: Return with live data status from check above, not hardcoded offline
-            return fig, live_class, live_text, live_count, live_symbols_display
+            return fig, live_class, live_text, live_count, live_symbols_display, new_mode
         
         # Convert timestamps to selected timezone
         if 'timestamp' in df.columns:
@@ -342,7 +355,7 @@ def register_chart_callbacks(app):
             )
         )
         
-        return fig, live_class, live_text, live_count, live_symbols_display
+        return fig, live_class, live_text, live_count, live_symbols_display, new_mode
     
     @app.callback(
         Output("pattern-details", "children"),

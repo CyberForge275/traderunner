@@ -54,19 +54,20 @@ def register_active_patterns_callback(app):
     
     @app.callback(
         Output("chart-symbol-selector", "value"),
+        Output("chart-data-source-mode", "children"),  # NEW: Set mode
         Input({"type": "pattern-symbol-badge", "symbol": ALL}, "n_clicks"),
         prevent_initial_call=True
     )
     def select_pattern_symbol(n_clicks_list):
-        """When pattern badge clicked, select that symbol in dropdown."""
+        """When pattern badge clicked, select that symbol and set database mode."""
         from dash import ctx
         
         if not ctx.triggered:
-            return no_update
+            return no_update, no_update
         
         # Get the symbol from the clicked badge
         triggered_id = ctx.triggered_id
         if triggered_id and isinstance(triggered_id, dict):
-            return triggered_id['symbol']
+            return triggered_id['symbol'], "database"  # Set mode to database
         
-        return no_update
+        return no_update, no_update

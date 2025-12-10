@@ -67,6 +67,14 @@ def create_charts_layout():
                             },
                             className="custom-dropdown"
                         ),
+                        
+                        # Hidden state: tracks data source mode
+                        html.Div(
+                            id="chart-data-source-mode",
+                            children="parquet",  # Default: parquet mode (Symbol selector)
+                            style={"display": "none"}
+                        ),
+                        
                         html.Hr(),
                         
                         # Market Session Toggles
