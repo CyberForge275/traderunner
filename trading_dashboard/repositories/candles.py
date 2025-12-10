@@ -314,8 +314,8 @@ def get_live_candle_data(
     
     # Try to connect to marketdata.db
     db_paths = [
-        Path("/opt/trading/marketdata-stream/data/marketdata.db"),  # Production
-        Path.home() / "data/workspace/droid/marketdata-stream/data/marketdata.db"  # Local
+        Path("/opt/trading/marketdata-stream/data/market_data.db"),  # Production (correct filename!)
+        Path.home() / "data/workspace/droid/marketdata-stream/data/market_data.db"  # Local
     ]
     
     conn = None
