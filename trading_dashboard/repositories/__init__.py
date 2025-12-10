@@ -20,40 +20,40 @@ def get_connection(db_path: Path) -> Optional[sqlite3.Connection]:
 
 
 def get_watchlist_symbols() -> list[str]:
-    """Get symbols from strategy configuration."""
+    """Get symbols from active strategy deployments (marketdata-stream config)."""
     try:
-        # First try: Read from EODHD_SYMBOLS environment variable (used by marketdata-stream)
+        # Primary source: strategy_deployments.yml from marketdata-stream
+        deployment_config = MARKETDATA_DIR / "config" / "strategy_deployments.yml"
+        
+        if deployment_config.exists():
+            with open(deployment_config) as f:
+                config = yaml.safe_load(f)
+            
+            # Collect all symbols from all enabled deployments
+            all_symbols = set()
+            deployments = config.get('deployments', {})
+            
+            for deployment_id, deployment_config in deployments.items():
+                if deployment_config.get('enabled', False):
+                    symbols = deployment_config.get('symbols', [])
+                    all_symbols.update(symbols)
+            
+            if all_symbols:
+                return sorted(list(all_symbols))
+        
+        # Fallback 1: EODHD_SYMBOLS environment variable
         symbols_env = os.getenv("EODHD_SYMBOLS")
         if symbols_env:
             symbols = [s.strip() for s in symbols_env.split(",")]
             if symbols:
                 return symbols
         
-        # Second try: Read from .env file in marketdata directory
-        env_file = MARKETDATA_DIR / ".env"
-        if env_file.exists():
-            with open(env_file) as f:
-                for line in f:
-                    if line.startswith("EODHD_SYMBOLS="):
-                        symbols_str = line.split("=", 1)[1].strip()
-                        symbols = [s.strip() for s in symbols_str.split(",")]
-                        if symbols:
-                            return symbols
+        # Fallback 2: Default symbols
+        return ["APP", "TSLA", "PLTR", "HOOD"]
         
-        # Third try: Read from strategy_params.yaml
-        if not STRATEGY_CONFIG.exists():
-            return ["AAPL", "MSFT", "TSLA", "NVDA", "PLTR"]
-        
-        with open(STRATEGY_CONFIG) as f:
-            config = yaml.safe_load(f)
-        
-        if 'strategies' in config and 'insidebar' in config['strategies']:
-            return config['strategies']['insidebar'].get('symbols', [])
-        
-        return config.get('symbols', ["AAPL", "MSFT", "TSLA"])
     except Exception as e:
-        print(f"Error loading strategy config: {e}")
-        return ["AAPL", "MSFT", "TSLA"]
+        print(f"Error loading watchlist from strategy deployments: {e}")
+        return ["APP", "TSLA", "PLTR", "HOOD"]
 
 
 def get_available_symbols() -> list[str]:
