@@ -51,7 +51,85 @@ def get_candle_data(symbol: str, timeframe: str = "M5", hours: int = 24, referen
     except Exception as e:
         print(f"Error loading candles from DB: {e}")
     
-    # Fallback: Generate mock data for development
+    # Try to load from parquet files (real data)
+    try:
+        from pathlib import Path
+        from ..config import TRADERUNNER_DIR
+        
+        # Map timeframe to data directory
+        timeframe_dirs = {
+            "M1": "data_m1",
+            "M5": "data_m5", 
+            "M15": "data_m15",
+            "H1": "data_m5"  # Use M5 data for H1 (will resample)
+        }
+        
+        data_dir = timeframe_dirs.get(timeframe, "data_m5")
+        parquet_path = TRADERUNNER_DIR / "artifacts" / data_dir / f"{symbol}.parquet"
+        
+        if parquet_path.exists():
+            # Load parquet file
+            df = pd.read_parquet(parquet_path)
+            
+            # Handle timestamp: it's typically the index
+            if df.index.name == 'timestamp' or isinstance(df.index, pd.DatetimeIndex):
+                df = df.reset_index()
+            
+            # Ensure we have a timestamp column
+            if 'timestamp' not in df.columns:
+                # Try to find timestamp-like column
+                for col in df.columns:
+                    if 'time' in col.lower() or 'date' in col.lower():
+                        df = df.rename(columns={col: 'timestamp'})
+                        break
+            
+            # Normalize column names to lowercase
+            df.columns = [col.lower() if col != 'timestamp' else col for col in df.columns]
+            
+            # Convert timestamp to datetime if needed
+            if 'timestamp' in df.columns:
+                df['timestamp'] = pd.to_datetime(df['timestamp'])
+            
+            # Filter by reference_date if provided
+            if reference_date is not None:
+                from datetime import date as date_type, datetime
+                if isinstance(reference_date, date_type):
+                    ref_date = reference_date
+                else:
+                    ref_date = datetime.fromisoformat(str(reference_date)).date()
+                
+                # Filter to only this date
+                df = df[df['timestamp'].dt.date == ref_date]
+            
+            # If we have data, return it
+            if not df.empty:
+                # Ensure required columns exist
+                required_cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+                if all(col in df.columns for col in required_cols):
+                    return df[required_cols]
+    
+    except Exception as e:
+        print(f"Error loading candles from parquet: {e}")
+    
+    # Only generate mock data if symbol doesn't have a parquet file
+    # If parquet file exists but no data for selected date, return empty DataFrame
+    from pathlib import Path
+    from ..config import TRADERUNNER_DIR
+    
+    timeframe_dirs = {
+        "M1": "data_m1",
+        "M5": "data_m5", 
+        "M15": "data_m15",
+        "H1": "data_m5"
+    }
+    data_dir = timeframe_dirs.get(timeframe, "data_m5")
+    parquet_path = TRADERUNNER_DIR / "artifacts" / data_dir / f"{symbol}.parquet"
+    
+    # If parquet file exists, don't generate mock data - return empty
+    if parquet_path.exists():
+        return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+    
+    # Fallback: Generate mock data only for symbols without parquet files (development)
     return generate_mock_candles(symbol, hours, timeframe, reference_date)
 
 
