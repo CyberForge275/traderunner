@@ -21,6 +21,9 @@ def get_candle_data(symbol: str, timeframe: str = "M5", hours: int = 24, referen
     Returns:
         DataFrame with columns: timestamp, open, high, low, close, volume
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     # For now, return mock data - will be replaced with actual DB query
     # TODO: Connect to actual candle database when available
     
