@@ -12,7 +12,8 @@ def create_candlestick_chart(
     patterns: pd.DataFrame = None,
     entry_price: float = None,
     stop_loss: float = None,
-    take_profit: float = None
+    take_profit: float = None,
+    df_live: pd.DataFrame = None
 ):
     """
     Create an interactive candlestick chart with TradingView-style features.
@@ -50,7 +51,7 @@ def create_candlestick_chart(
         subplot_titles=(f"{symbol} - M5", "Volume")
     )
     
-    # Add candlestick chart
+    # Main candlestick chart
     fig.add_trace(
         go.Candlestick(
             x=df['timestamp'],
@@ -59,13 +60,31 @@ def create_candlestick_chart(
             low=df['low'],
             close=df['close'],
             name="OHLC",
-            increasing_line_color='#3fb950',  # Green
-            decreasing_line_color='#f85149'   # Red
+            increasing=dict(line=dict(color='#3fb950'), fillcolor='#3fb950'),
+            decreasing=dict(line=dict(color='#f85149'), fillcolor='#f85149')
         ),
         row=1, col=1
     )
     
-    # Add volume bars
+    # Overlay live data if available
+    if df_live is not None and not df_live.empty:
+        fig.add_trace(
+            go.Candlestick(
+                x=df_live['timestamp'],
+                open=df_live['open'],
+                high=df_live['high'],
+                low=df_live['low'],
+                close=df_live['close'],
+                name="Live Data",
+                increasing=dict(line=dict(color='#00ff00', width=2), fillcolor='#00ff00'),
+                decreasing=dict(line=dict(color='#ff0000', width=2), fillcolor='#ff0000'),
+                opacity=0.8,
+                showlegend=True
+            ),
+            row=1, col=1
+        )
+    
+    # Volume bars
     colors = ['#3fb950' if close >= open else '#f85149' 
               for close, open in zip(df['close'], df['open'])]
     

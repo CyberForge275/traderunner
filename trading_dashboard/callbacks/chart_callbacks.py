@@ -65,6 +65,9 @@ def register_chart_callbacks(app):
     
     @app.callback(
         Output("candlestick-chart", "figure"),
+        Output("live-data-dot", "className"),
+        Output("live-data-text", "children"),
+        Output("live-data-count", "children"),
         Input("chart-symbol-selector", "value"),
         Input("chart-refresh-btn", "n_clicks"),
         Input("tf-m1", "n_clicks"),
@@ -79,7 +82,7 @@ def register_chart_callbacks(app):
     def update_chart(symbol, refresh_clicks, m1_clicks, m5_clicks, m15_clicks, h1_clicks, ny_clicks, berlin_clicks, selected_date, session_toggles):
         """Update candlestick chart when symbol changes or refresh clicked."""
         from dash import ctx
-        from ..repositories.candles import get_candle_data
+        from ..repositories.candles import get_candle_data, get_live_candle_data
         from ..repositories import get_recent_patterns
         from ..components.candlestick import create_candlestick_chart
         import pytz
@@ -163,7 +166,7 @@ def register_chart_callbacks(app):
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)'
             )
-            return fig
+            return fig, "status-dot offline", "No live data", ""
         
         # Convert timestamps to selected timezone
         if 'timestamp' in df.columns:
@@ -218,7 +221,7 @@ def register_chart_callbacks(app):
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)'
             )
-            return fig
+            return fig, "status-dot offline", "No live data", ""
         
         # Get patterns for this symbol
         patterns = get_recent_patterns(hours=24)
@@ -236,14 +239,32 @@ def register_chart_callbacks(app):
             stop_loss = latest.get('stop_loss')
             take_profit = latest.get('take_profit')
         
-        # Create chart
+        # Fetch live data
+        df_live = get_live_candle_data(symbol, timeframe, selected_date)
+        
+        # Determine live data status
+        if not df_live.empty:
+            live_class = "status-dot online"
+            live_text = f"Live ({len(df_live)} candles)"
+            try:
+                last_time = df_live['timestamp'].max().astimezone(timezone).strftime('%H:%M:%S')
+                live_count = f"Last: {last_time}"
+            except:
+                live_count = ""
+        else:
+            live_class = "status-dot offline"
+            live_text = "No live data"
+            live_count = ""
+        
+        # Create chart (will enhance component to overlay live data)
         fig = create_candlestick_chart(
             df=df,
             symbol=symbol,
             patterns=patterns,
             entry_price=entry_price,
             stop_loss=stop_loss,
-            take_profit=take_profit
+            take_profit=take_profit,
+            df_live=df_live if not df_live.empty else None
         )
         
         # Update chart title with timezone
@@ -255,7 +276,7 @@ def register_chart_callbacks(app):
             )
         )
         
-        return fig
+        return fig, live_class, live_text, live_count
     
     @app.callback(
         Output("pattern-details", "children"),

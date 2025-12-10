@@ -282,3 +282,93 @@ def generate_mock_candles(symbol: str, hours: int = 24, timeframe: str = "M5", r
     df = pd.DataFrame(data)
     
     return df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
+
+
+def get_live_candle_data(
+    symbol: str,
+    timeframe: str,
+    date=None,
+    limit: int = 500
+) -> pd.DataFrame:
+    """
+    Get live candle data from marketdata.db (marketdata-stream service).
+    
+    This reads intraday candles that are actively being built from WebSocket ticks.
+    Falls back gracefully if the database is not available.
+    
+    Args:
+        symbol: Stock symbol
+        timeframe: M1, M5, M15
+        date: Date to query (default: today)
+        limit: Max rows to return
+        
+    Returns:
+        DataFrame with columns: timestamp, open, high, low, close, volume
+        Empty DataFrame if no data or database unavailable
+    """
+    import logging
+    from pathlib import Path
+    from datetime import date as date_type
+    
+    logger = logging.getLogger(__name__)
+    
+    # Try to connect to marketdata.db
+    db_paths = [
+        Path("/opt/trading/marketdata-stream/data/marketdata.db"),  # Production
+        Path.home() / "data/workspace/droid/marketdata-stream/data/marketdata.db"  # Local
+    ]
+    
+    conn = None
+    for db_path in db_paths:
+        if db_path.exists():
+            try:
+                conn = sqlite3.connect(str(db_path))
+                logger.debug(f"Connected to marketdata.db at {db_path}")
+                break
+            except Exception as e:
+                logger.warning(f"Could not connect to {db_path}: {e}")
+    
+    if not conn:
+        logger.debug("marketdata.db not available - returning empty DataFrame")
+        return pd.DataFrame()
+    
+    try:
+        # Use today if no date specified
+        query_date = date if date else date_type.today()
+        
+        # Convert timeframe to interval name in DB (M5 → M5, M1 → M1, etc.)
+        interval = timeframe
+        
+        # Query candles for the specified date
+        # timestamp is in milliseconds in the database
+        query = """
+            SELECT timestamp, open, high, low, close, volume
+            FROM candles
+            WHERE symbol = ?
+            AND interval = ?
+            AND DATE(timestamp/1000, 'unixepoch') = ?
+            ORDER BY timestamp ASC
+            LIMIT ?
+        """
+        
+        df = pd.read_sql_query(
+            query,
+            conn,
+            params=(symbol, interval, query_date.isoformat(), limit)
+        )
+        
+        if not df.empty:
+            # Convert timestamp from milliseconds to datetime
+            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms', utc=True)
+            logger.info(f"📡 Loaded {len(df)} live candles for {symbol} {timeframe} on {query_date}")
+        else:
+            logger.debug(f"No live candles found for {symbol} {timeframe} on {query_date}")
+        
+        return df
+        
+    except Exception as e:
+        logger.error(f"Error querying marketdata.db: {e}")
+        return pd.DataFrame()
+    finally:
+        if conn:
+            conn.close()
