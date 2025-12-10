@@ -17,9 +17,27 @@ AUTH_PASSWORD = os.getenv("DASHBOARD_PASS", "admin")
 BASE_DIR = Path(__file__).parent.parent
 TRADERUNNER_DIR = BASE_DIR
 
-# Use environment variables with server-appropriate defaults
-MARKETDATA_DIR = Path(os.getenv("MARKETDATA_DIR", "/opt/trading/marketdata-stream"))
-AUTOMATICTRADER_DIR = Path(os.getenv("AUTOMATICTRADER_DIR", "/opt/trading/automatictrader-api"))
+# Smart path detection for local vs server deployment
+# Server paths (production)
+MARKETDATA_DIR_SERVER = Path(os.getenv("MARKETDATA_DIR", "/opt/trading/marketdata-stream"))
+AUTOMATICTRADER_DIR_SERVER = Path(os.getenv("AUTOMATICTRADER_DIR", "/opt/trading/automatictrader-api"))
+
+# Local workspace paths (development)
+MARKETDATA_DIR_LOCAL = BASE_DIR.parent / "marketdata-stream"
+AUTOMATICTRADER_DIR_LOCAL = BASE_DIR.parent.parent / "automatictrader-api"
+
+# Auto-detect environment: use server paths if they exist, otherwise use local
+if MARKETDATA_DIR_SERVER.exists():
+    MARKETDATA_DIR = MARKETDATA_DIR_SERVER
+else:
+    MARKETDATA_DIR = MARKETDATA_DIR_LOCAL
+    print(f"Using local MARKETDATA_DIR: {MARKETDATA_DIR}")
+
+if AUTOMATICTRADER_DIR_SERVER.exists():
+    AUTOMATICTRADER_DIR = AUTOMATICTRADER_DIR_SERVER
+else:
+    AUTOMATICTRADER_DIR = AUTOMATICTRADER_DIR_LOCAL
+    print(f"Using local AUTOMATICTRADER_DIR: {AUTOMATICTRADER_DIR}")
 
 # Databases
 SIGNALS_DB = MARKETDATA_DIR / "data" / "signals.db"
