@@ -103,11 +103,14 @@ def create_candlestick_chart(
     if patterns is not None and not patterns.empty:
         for _, pattern in patterns.iterrows():
             # Highlight Inside Bar with yellow rectangle
+            # Pattern markers (rectangles)
+            pattern_timestamp = pd.to_datetime(pattern.get('detected_at', pattern.get('created_at')))
+            
             fig.add_shape(
                 type="rect",
                 xref="x", yref="y",
-                x0=pattern.get('master_start', pattern['timestamp']),
-                x1=pattern.get('master_end', pattern['timestamp']),
+                x0=pattern.get('master_start', pattern_timestamp),
+                x1=pattern.get('master_end', pattern_timestamp),
                 y0=pattern.get('master_low', 0),
                 y1=pattern.get('master_high', 0),
                 line=dict(color='#d29922', width=2),
