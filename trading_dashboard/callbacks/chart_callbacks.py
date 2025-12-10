@@ -1,4 +1,3 @@
-```
 """
 Chart callback - Updates candlestick chart based on symbol selection
 """
