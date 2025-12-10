@@ -62,6 +62,31 @@ def filter_market_hours(df, include_pre, include_after, timezone):
 
 def register_chart_callbacks(app):
     """Register callbacks for chart interactivity."""
+    import logging
+    logger = logging.getLogger(__name__)
+    from dash import ALL
+    
+    # Callback for live symbol badges (same as pattern badges)
+    @app.callback(
+        Output("chart-symbol-selector", "value"),
+        Output("chart-data-source-mode", "children"),
+        Input({"type": "live-symbol-badge", "symbol": ALL}, "n_clicks"),
+        prevent_initial_call=True
+    )
+    def select_live_symbol(n_clicks_list):
+        """When live symbol badge clicked, select that symbol and set database mode."""
+        from dash import ctx, no_update
+        
+        if not ctx.triggered:
+            return no_update, no_update
+        
+        # Get the symbol from the clicked badge
+        triggered_id = ctx.triggered_id
+        if triggered_id and isinstance(triggered_id, dict):
+            logger.info(f"🟢 Live symbol badge clicked: {triggered_id['symbol']}")
+            return triggered_id['symbol'], "database"  # Set mode to database
+        
+        return no_update, no_update
     
     @app.callback(
         Output("candlestick-chart", "figure"),
@@ -144,11 +169,11 @@ def register_chart_callbacks(app):
             import dash_bootstrap_components as dbc
             from dash import html
             symbol_badges = [
-                dbc.Badge(
+                dbc.Button(
                     sym,
-                    href=f"?symbol={sym}",
                     color="success",
-                    className="me-1 mb-1",
+                    size="sm",
+                    className="me-2 mb-2",
                     style={
                         "cursor": "pointer",
                         "fontSize": "0.85rem",
