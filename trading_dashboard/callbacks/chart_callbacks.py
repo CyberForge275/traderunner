@@ -239,24 +239,24 @@ def register_chart_callbacks(app):
             stop_loss = latest.get('stop_loss')
             take_profit = latest.get('take_profit')
         
-        # Fetch live data
-        df_live = get_live_candle_data(symbol, timeframe, selected_date)
+        # OPTIMIZED: Fast availability check instead of loading all candles
+        from ..repositories.candles import check_live_data_availability
+        availability = check_live_data_availability(selected_date)
         
-        # Determine live data status
-        if not df_live.empty:
+        # Determine live data status (fast, no candle loading)
+        if availability['available']:
             live_class = "status-dot online"
-            live_text = f"Live ({len(df_live)} candles)"
-            try:
-                last_time = df_live['timestamp'].max().astimezone(timezone).strftime('%H:%M:%S')
-                live_count = f"Last: {last_time}"
-            except:
-                live_count = ""
+            symbol_count = availability['symbol_count']
+            timeframes = ', '.join(availability['timeframes'])
+            live_text = f"Live ({symbol_count} symbols)"
+            live_count = f"Timeframes: {timeframes}"
         else:
             live_class = "status-dot offline"
             live_text = "No live data"
             live_count = ""
         
-        # Create chart (will enhance component to overlay live data)
+        # Create chart WITHOUT live data overlay (keep parquet only)
+        # Live data will be added later when we implement on-demand loading
         fig = create_candlestick_chart(
             df=df,
             symbol=symbol,
@@ -264,7 +264,7 @@ def register_chart_callbacks(app):
             entry_price=entry_price,
             stop_loss=stop_loss,
             take_profit=take_profit,
-            df_live=df_live if not df_live.empty else None
+            df_live=None  # Don't load live candles yet
         )
         
         # Update chart title with timezone

@@ -284,6 +284,81 @@ def generate_mock_candles(symbol: str, hours: int = 24, timeframe: str = "M5", r
     return df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
 
 
+def check_live_data_availability(date=None) -> dict:
+    """
+    Fast lightweight check if live data exists for a date.
+    
+    Does NOT load actual candles - just checks if data exists.
+    Much faster than loading full candles (< 100ms vs 30+ seconds).
+    
+    Args:
+        date: Date to check (default: today)
+        
+    Returns:
+        {
+            'available': bool,
+            'symbol_count': int,
+            'timeframes': list[str]
+        }
+    """
+    from pathlib import Path
+    from datetime import date as date_type
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # Try to connect
+    db_paths = [
+        Path("/opt/trading/marketdata-stream/data/market_data.db"),
+        Path.home() / "data/workspace/droid/marketdata-stream/data/market_data.db"
+    ]
+    
+    conn = None
+    for db_path in db_paths:
+        if db_path.exists():
+            try:
+                conn = sqlite3.connect(str(db_path), timeout=2.0)  # 2 second timeout
+                break
+            except Exception as e:
+                logger.warning(f"Could not connect to {db_path}: {e}")
+    
+    if not conn:
+        return {'available': False, 'symbol_count': 0, 'timeframes': []}
+    
+    try:
+        query_date = date if date else date_type.today()
+        
+        # Fast query - just count symbols, don't load data
+        query = """
+            SELECT interval, COUNT(DISTINCT symbol) as symbol_count
+            FROM candles
+            WHERE DATE(timestamp/1000, 'unixepoch') = ?
+            GROUP BY interval
+        """
+        
+        cursor = conn.execute(query, (query_date.isoformat(),))
+        results = cursor.fetchall()
+        
+        if results:
+            timeframes = [row[0] for row in results]
+            total_symbols = max(row[1] for row in results)  # Max symbols across timeframes
+            logger.debug(f"Live data available: {total_symbols} symbols, timeframes: {timeframes}")
+            return {
+                'available': True,
+                'symbol_count': total_symbols,
+                'timeframes': timeframes
+            }
+        else:
+            return {'available': False, 'symbol_count': 0, 'timeframes': []}
+            
+    except Exception as e:
+        logger.error(f"Error checking live data availability: {e}")
+        return {'available': False, 'symbol_count': 0, 'timeframes': []}
+    finally:
+        if conn:
+            conn.close()
+
+
 def get_live_candle_data(
     symbol: str,
     timeframe: str,
