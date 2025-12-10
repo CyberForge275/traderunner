@@ -144,8 +144,9 @@ def get_candle_data(symbol: str, timeframe: str = "M5", hours: int = 24, referen
             print(f"Requested future date {ref_date} for {symbol} - returning empty")
             return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
     
-    # Fallback: Generate mock data only for symbols without parquet files AND past/present dates
-    return generate_mock_candles(symbol, hours, timeframe, reference_date)
+    # If parquet file doesn't exist, return empty - NO MOCK DATA in production
+    logger.info(f"❌ No parquet file for {symbol} - returning empty DataFrame")
+    return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
 
 
 def generate_mock_candles(symbol: str, hours: int = 24, timeframe: str = "M5", reference_date = None) -> pd.DataFrame:

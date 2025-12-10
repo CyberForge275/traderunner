@@ -56,6 +56,37 @@ def get_watchlist_symbols() -> list[str]:
         return ["AAPL", "MSFT", "TSLA"]
 
 
+def get_available_symbols() -> list[str]:
+    """
+    Get list of symbols that actually have parquet data files.
+    Scans data_m1/, data_m5/, data_m15/ directories for .parquet files.
+    
+    Returns:
+        Sorted list of unique symbol names (without .parquet extension)
+    """
+    from pathlib import Path
+    from ..config import TRADERUNNER_DIR
+    
+    symbols = set()
+    
+    # Scan all data directories for parquet files
+    for data_dir in ["data_m1", "data_m5", "data_m15"]:
+        parquet_dir = TRADERUNNER_DIR / "artifacts" / data_dir
+        
+        if parquet_dir.exists():
+            # Get all .parquet files and extract symbol names
+            for parquet_file in parquet_dir.glob("*.parquet"):
+                symbol = parquet_file.stem  # filename without .parquet extension
+                symbols.add(symbol)
+    
+    # Return sorted list
+    if not symbols:
+        # Fallback if no parquet files found
+        return ["AAPL", "MSFT", "NVDA", "TSLA"]
+    
+    return sorted(list(symbols))
+
+
 def get_recent_patterns(hours: int = 24) -> pd.DataFrame:
     """Get recent pattern detections from signals.db."""
     try:

@@ -108,3 +108,4 @@ Thumbs.db
 
 # Temporary project analysis folder
 tmp/
+logs/*.log

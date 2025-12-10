@@ -31,6 +31,9 @@ from trading_dashboard.callbacks.date_selection_callback import register_date_se
 from trading_dashboard.callbacks.symbol_selector_callback import register_symbol_selector_callbacks
 from trading_dashboard.callbacks.timestamp_prefix_callback import register_timestamp_prefix_callback
 
+# Setup logging FIRST
+from trading_dashboard.logging_config import setup_logging
+setup_logging()
 
 # Initialize Dash app with dark theme
 app = dash.Dash(

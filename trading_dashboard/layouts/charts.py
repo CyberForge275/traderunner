@@ -6,12 +6,13 @@ import dash_bootstrap_components as dbc
 from datetime import datetime
 
 from ..components.candlestick import get_chart_config
-from ..repositories import get_watchlist_symbols
+from ..repositories import get_available_symbols
 
 
 def create_charts_layout():
     """Create the Charts tab layout."""
-    symbols = get_watchlist_symbols()
+    # Get symbols from actual parquet files (not config)
+    symbols = get_available_symbols()
     
     return html.Div([
         # Controls row at top

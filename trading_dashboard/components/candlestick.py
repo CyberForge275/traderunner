@@ -24,13 +24,20 @@ def create_candlestick_chart(
         entry_price, stop_loss, take_profit: Order levels to display
     """
     if df.empty:
-        # Empty chart placeholder
+        # Empty chart placeholder with correct symbol
         fig = go.Figure()
         fig.add_annotation(
-            text="No data available",
+            text=f"📊 No stock data available for {symbol}",
             xref="paper", yref="paper",
             x=0.5, y=0.5, showarrow=False,
-            font=dict(size=20, color="var(--text-secondary)")
+            font=dict(size=20, color="#8b949e")
+        )
+        fig.update_layout(
+            template="plotly_dark",
+            paper_bgcolor='#0d1117',
+            plot_bgcolor='#0d1117',
+            title=f"{symbol} - No Data Available",
+            font=dict(color='#f0f6fc')
         )
         return fig
     

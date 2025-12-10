@@ -84,10 +84,15 @@ def register_chart_callbacks(app):
         from ..components.candlestick import create_candlestick_chart
         import pytz
         from datetime import datetime
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        logger.info(f"📅 update_chart called with selected_date RAW: {selected_date}, type: {type(selected_date)}")
         
         # Convert selected_date string to date object
         if isinstance(selected_date, str):
             selected_date = datetime.fromisoformat(selected_date).date()
+            logger.info(f"📅 Converted to date object: {selected_date}")
         
         # Determine which timeframe was clicked
         triggered_id = ctx.triggered_id if ctx.triggered else "tf-m5"
