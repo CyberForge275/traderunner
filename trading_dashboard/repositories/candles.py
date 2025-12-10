@@ -294,6 +294,9 @@ def check_live_data_availability(date=None) -> dict:
     Does NOT load actual candles - just checks if data exists.
     Much faster than loading full candles (< 100ms vs 30+ seconds).
     
+    IMPORTANT: Only checks for symbols in strategy_deployments.yml (configured symbols),
+    not all symbols in the database.
+    
     Args:
         date: Date to check (default: today)
         
@@ -301,6 +304,7 @@ def check_live_data_availability(date=None) -> dict:
         {
             'available': bool,
             'symbol_count': int,
+            'symbols': list[str],  # Configured symbols that have data
             'timeframes': list[str]
         }
     """
@@ -312,7 +316,17 @@ def check_live_data_availability(date=None) -> dict:
     logger.info("=" * 80)
     logger.info("🔍 LIVE DATA AVAILABILITY CHECK STARTED")
     
-    # Try to connect
+    # Get configured symbols from strategy deployments
+    from ..repositories import get_watchlist_symbols
+    configured_symbols = get_watchlist_symbols()
+    logger.info(f"📋 Configured symbols: {configured_symbols}")
+    
+    if not configured_symbols:
+        logger.warning("❌ No configured symbols found")
+        logger.info("=" * 80)
+        return {'available': False, 'symbol_count': 0, 'symbols': [], 'timeframes': []}
+    
+    # Try to connect to marketdata.db
     db_paths = [
         Path("/opt/trading/marketdata-stream/data/market_data.db"),
         Path.home() / "data/workspace/droid/marketdata-stream/data/market_data.db"
@@ -335,51 +349,58 @@ def check_live_data_availability(date=None) -> dict:
     if not conn:
         logger.warning("❌ NO DATABASE CONNECTION - Returning unavailable")
         logger.info("=" * 80)
-        return {'available': False, 'symbol_count': 0, 'timeframes': []}
+        return {'available': False, 'symbol_count': 0, 'symbols': [], 'timeframes': []}
     
     try:
         query_date = date if date else date_type.today()
         logger.info(f"📅 Query date: {query_date} (type: {type(query_date)})")
         logger.info(f"📅 ISO format: {query_date.isoformat()}")
         
-        # Fast query - just count symbols, don't load data
-        query = """
-            SELECT interval, COUNT(DISTINCT symbol) as symbol_count
+        # Query for configured symbols only
+        placeholders = ','.join('?' * len(configured_symbols))
+        query = f"""
+            SELECT interval, symbol
             FROM candles
-            WHERE DATE(timestamp/1000, 'unixepoch') = ?
-            GROUP BY interval
+            WHERE symbol IN ({placeholders})
+            AND DATE(timestamp/1000, 'unixepoch') = ?
+            GROUP BY interval, symbol
+            ORDER BY interval, symbol
         """
         
-        logger.info(f"🔍 Executing query with date: {query_date.isoformat()}")
-        cursor = conn.execute(query, (query_date.isoformat(),))
+        params = tuple(configured_symbols) + (query_date.isoformat(),)
+        logger.info(f"🔍 Executing query for symbols: {configured_symbols}")
+        cursor = conn.execute(query, params)
         results = cursor.fetchall()
         
         logger.info(f"📊 Query results: {results}")
         logger.info(f"📊 Result count: {len(results)}")
         
         if results:
-            timeframes = [row[0] for row in results]
-            total_symbols = max(row[1] for row in results)
+            # Get unique timeframes and symbols that have data
+            timeframes = sorted(set(row[0] for row in results))
+            symbols_with_data = sorted(set(row[1] for row in results))
+            
             logger.info(f"✅ DATA AVAILABLE!")
-            logger.info(f"  Symbols: {total_symbols}")
+            logger.info(f"  Symbols: {symbols_with_data} (count: {len(symbols_with_data)})")
             logger.info(f"  Timeframes: {timeframes}")
             logger.info("=" * 80)
             return {
                 'available': True,
-                'symbol_count': total_symbols,
+                'symbol_count': len(symbols_with_data),
+                'symbols': symbols_with_data,
                 'timeframes': timeframes
             }
         else:
             logger.warning(f"❌ NO RESULTS from query for date {query_date.isoformat()}")
             logger.info("=" * 80)
-            return {'available': False, 'symbol_count': 0, 'timeframes': []}
+            return {'available': False, 'symbol_count': 0, 'symbols': [], 'timeframes': []}
             
     except Exception as e:
         logger.error(f"❌ ERROR in availability check: {e}")
         import traceback
         logger.error(traceback.format_exc())
         logger.info("=" * 80)
-        return {'available': False, 'symbol_count': 0, 'timeframes': []}
+        return {'available': False, 'symbol_count': 0, 'symbols': [], 'timeframes': []}
     finally:
         if conn:
             conn.close()
