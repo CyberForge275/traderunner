@@ -1,7 +1,8 @@
+```
 """
 Chart callback - Updates candlestick chart based on symbol selection
 """
-from dash import Input, Output
+from dash import Input, Output, State
 import pandas as pd
 
 
