@@ -68,15 +68,16 @@ def register_chart_callbacks(app):
         Output("live-data-dot", "className"),
         Output("live-data-text", "children"),
         Output("live-data-count", "children"),
+        Output("live-symbols-container", "children"),  # New: clickable symbols
         Input("chart-symbol-selector", "value"),
         Input("chart-refresh-btn", "n_clicks"),
-        Input("tf-m1", "n_clicks"),
-        Input("tf-m5", "n_clicks"),
-        Input("tf-m15", "n_clicks"),
-        Input("tf-h1", "n_clicks"),
+        Input("timeframe-M1-btn", "n_clicks"),
+        Input("timeframe-M5-btn", "n_clicks"),
+        Input("timeframe-M15-btn", "n_clicks"),
+        Input("timeframe-H1-btn", "n_clicks"),
         Input("tz-ny-btn", "n_clicks"),
         Input("tz-berlin-btn", "n_clicks"),
-        Input("chart-date-picker", "date"),
+        Input("selected-date", "date"),
         Input("market-session-toggles", "value")
     )
     def update_chart(symbol, refresh_clicks, m1_clicks, m5_clicks, m15_clicks, h1_clicks, ny_clicks, berlin_clicks, selected_date, session_toggles):
@@ -137,13 +138,34 @@ def register_chart_callbacks(app):
             timeframes = ', '.join(availability['timeframes'])
             live_text = f"Live ({symbol_count} symbols)"
             # Show symbol names and timeframes
-            symbols_display = ', '.join(symbols_list) if symbols_list else ''
-            live_count = f"{symbols_display}\nTimeframes: {timeframes}"
+            live_count = f"Timeframes: {timeframes}"
+            
+            # Create clickable symbol badges
+            import dash_bootstrap_components as dbc
+            from dash import html
+            symbol_badges = [
+                dbc.Badge(
+                    sym,
+                    href=f"?symbol={sym}",
+                    color="success",
+                    className="me-1 mb-1",
+                    style={
+                        "cursor": "pointer",
+                        "fontSize": "0.85rem",
+                        "padding": "0.35rem 0.65rem"
+                    },
+                    id={"type": "live-symbol-badge", "symbol": sym}
+                )
+                for sym in symbols_list
+            ]
+            live_symbols_display = html.Div(symbol_badges, style={"display": "flex", "flexWrap": "wrap", "gap": "5px"})
+            
             logger.info(f"✅ Setting status to ONLINE: {live_text}")
         else:
             live_class = "status-dot offline"
             live_text = "No live data"
             live_count = ""
+            live_symbols_display = None
             logger.warning(f"❌ Setting status to OFFLINE")
         
         # Get candle data with selected timeframe and date
@@ -194,7 +216,7 @@ def register_chart_callbacks(app):
                 paper_bgcolor='rgba(0,0,0,0)'
             )
             # FIXED: Return with live data status from check above, not hardcoded offline
-            return fig, live_class, live_text, live_count
+            return fig, live_class, live_text, live_count, live_symbols_display
         
         # Convert timestamps to selected timezone
         if 'timestamp' in df.columns:
@@ -319,7 +341,7 @@ def register_chart_callbacks(app):
             )
         )
         
-        return fig, live_class, live_text, live_count
+        return fig, live_class, live_text, live_count, live_symbols_display
     
     @app.callback(
         Output("pattern-details", "children"),

@@ -39,16 +39,17 @@ def create_charts_layout():
                             ]),
                         ], style={"marginBottom": "15px"}),
                         
-                        html.Div([
-                            html.H5("📡 Live Data", style={"marginBottom": "10px", "color": "#00d26a"}),
-                            html.Div(id="live-data-indicator", children=[
-                                html.Div([
-                                    html.Span("⚫", id="live-data-dot", className="status-dot offline"),
-                                    html.Span("Checking...", id="live-data-text", style={"marginLeft": "8px", "fontSize": "0.85rem"})
-                                ])
-                            ]),
-                            html.P(id="live-data-count", children="", className="text-muted", style={"fontSize": "0.75rem", "marginTop": "5px"})
-                        ], style={"marginBottom": "15px"}),
+                      # Live Data Section
+        html.Div([
+            html.H5("📡 Live Data", style={"marginBottom": "10px", "color": "#00d26a"}),
+            html.Div(id="live-data-indicator", children=[
+                html.Span(className="status-dot offline", id="live-data-dot"),
+                html.Span("Checking...", id="live-data-text", style={"marginLeft": "8px"})
+            ]),
+            html.Div(id="live-symbols-container", style={"marginTop": "10px"}),  # Clickable symbols
+            html.P(id="live-data-count", children="", className="text-muted", 
+                   style={"fontSize": "0.75rem", "marginTop": "5px"})
+        ], style={"marginBottom": "15px"}),
                         
                         html.Hr(),
                         
