@@ -63,10 +63,6 @@ def register_chart_callbacks(app):
     
     @app.callback(
         Output("candlestick-chart", "figure"),
-        Output("live-data-dot", "className"),
-        Output("live-data-text", "children"),
-        Output("live-data-count", "children"),
-        Output("live-symbols-container", "children"),
         Input("chart-symbol-selector", "value"),
         Input("chart-refresh-btn", "n_clicks"),
         Input("tf-m1", "n_clicks"),
@@ -222,7 +218,7 @@ def register_chart_callbacks(app):
                 font=dict(size=18)
             )
             
-            return fig, live_class, live_text, live_count, live_symbols_display
+            return fig
         
         # === 6. Prepare data: Convert to DataFrame with datetime index ===
         if 'timestamp' in df.columns:
@@ -318,7 +314,7 @@ def register_chart_callbacks(app):
         # TODO: Add pattern markers from get_recent_patterns()
         # This would be added as annotations after builder returns
         
-        return fig, live_class, live_text, live_count, live_symbols_display
+        return fig
     
     @app.callback(
         Output("pattern-details", "children"),
