@@ -165,10 +165,15 @@ def register_chart_callbacks(app):
             live_symbols_display = None
         
         # === 4. Fetch OHLCV data (domain layer) ===
-        # Determine data source mode
-        new_mode = data_source_mode
-        if triggered_id == "chart-symbol-selector":
-            new_mode = "parquet"  # Dropdown always uses parquet
+        # Determine data source mode - respect mode set by badge clicks
+        logger.info(f"📍 Triggered by: {triggered_id}, Current mode: {data_source_mode}")
+        # Only default to parquet if mode wasn't explicitly set by a badge click
+        if data_source_mode == "database":
+            # Badge click explicitly set database mode - respect it!
+            new_mode = "database"
+        else:
+            # Default to parquet for dropdown selections and other triggers
+            new_mode = "parquet"
         
         logger.info(f"   Data source: {new_mode}, triggered by: {triggered_id}")
         
