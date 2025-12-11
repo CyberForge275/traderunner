@@ -90,6 +90,45 @@ def create_charts_layout():
                             style={"fontSize": "0.85rem", "marginTop": "10px"}
                         ),
                         html.P("Default: Regular hours only", className="text-muted", style={"fontSize": "0.75rem", "marginTop": "5px"}),
+                        
+                        html.Hr(),
+                        
+                        # Strategy Indicators Section (NEW)
+                        html.H5("📊 Strategy Indicators", style={"marginTop": "20px", "fontSize": "0.9rem"}),
+                        html.P(
+                            "Select strategy to show indicators:",
+                            className="text-muted",
+                            style={"fontSize": "0.75rem", "marginBottom": "10px"}
+                        ),
+                        
+                        # Strategy selector
+                        dcc.Dropdown(
+                            id="indicator-strategy-selector",
+                            options=[
+                                {"label": "None", "value": "none"},
+                                {"label": "InsideBar Strategy", "value": "inside_bar"},
+                                {"label": "MA Crossover", "value": "ma_crossover"},
+                            ],
+                            value="none",
+                            clearable=False,
+                            style={
+                                "backgroundColor": "#2b2b2b",
+                                "color": "#ffffff",
+                                "border": "1px solid #555",
+                                "fontSize": "0.85rem"
+                            },
+                            className="custom-dropdown"
+                        ),
+                        
+                        # Indicator toggles (permanent element, options updated by callback)
+                        dbc.Checklist(
+                            id="indicator-toggles",
+                            options=[],  # Populated by callback
+                            value=[],
+                            switch=True,
+                            style={"fontSize": "0.80rem", "marginTop": "10px"}
+                        ),
+                        
                         html.Hr(),
                         
                         html.H5("Timeframe", style={"marginTop": "20px"}),

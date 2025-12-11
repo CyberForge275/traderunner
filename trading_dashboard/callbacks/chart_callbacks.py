@@ -39,6 +39,29 @@ def register_chart_callbacks(app):
     """Register callbacks for chart interactivity."""
     
     @app.callback(
+        Output("indicator-toggles", "options"),
+        Input("indicator-strategy-selector", "value")
+    )
+    def update_indicator_options(strategy_name):
+        """Update indicator toggle options based on selected strategy."""
+        from ..services.strategy_indicators import get_available_indicators
+        
+        if strategy_name == "none" or not strategy_name:
+            return []  # Empty options
+        
+        # Get available indicators for this strategy
+        available = get_available_indicators(strategy_name)
+        
+        if not available:
+            return []
+        
+        # Return options for checklist
+        return [
+            {"label": f" {ind.replace('_', ' ').upper()}", "value": ind}
+            for ind in available
+        ]
+    
+    @app.callback(
         Output("candlestick-chart", "figure"),
         Output("live-data-dot", "className"),
         Output("live-data-text", "children"),
@@ -54,11 +77,14 @@ def register_chart_callbacks(app):
         Input("tz-berlin-btn", "n_clicks"),
         Input("chart-date-picker", "date"),
         Input("market-session-toggles", "value"),
+        Input("indicator-strategy-selector", "value"),
+        State("indicator-toggles", "value"),  # Changed to State - prevents initial error
         State("chart-data-source-mode", "children")
     )
     def update_chart(
         symbol, refresh_clicks, m1_clicks, m5_clicks, m15_clicks, h1_clicks,
-        ny_clicks, berlin_clicks, selected_date, session_toggles, data_source_mode
+        ny_clicks, berlin_clicks, selected_date, session_toggles,
+        indicator_strategy, indicator_toggles, data_source_mode
     ):
         """
         Update candlestick chart - orchestrates data fetching and chart building.
@@ -215,29 +241,78 @@ def register_chart_callbacks(app):
             # Fallback if no timestamp column
             ohlcv = df[['open', 'high', 'low', 'close', 'volume']]
         
-        # === 7. Compute indicators (optional - keep simple for now) ===
-        indicators = {}
-        # Future: Add MA, RSI, etc. based on UI toggles
-        # indicators["ma_20"] = ohlcv["close"].rolling(20).mean()
-        
-        # === 8. Build chart configuration ===
+        # === 7. Apply session filtering for indicator computation ===
+        # We need to filter data BEFORE computing indicators, but builder also filters
+        # So we do it here inline to avoid importing private functions
         include_pre = 'pre' in (session_toggles or [])
         include_after = 'after' in (session_toggles or [])
         session_mode = _determine_session_mode(include_pre, include_after)
         
+        # Filter data for indicator computation (inline, not importing private _filter_session)
+        if session_mode == "all":
+            ohlcv_for_indicators = ohlcv
+        else:
+            # Simple inline filtering logic
+            import pytz
+            ny_tz = pytz.timezone('America/New_York')
+            
+            # Convert to NY time for filtering
+            df_temp = ohlcv.copy()
+            if df_temp.index.tz is None:
+                df_temp.index = df_temp.index.tz_localize('UTC')
+            df_temp.index = df_temp.index.tz_convert(ny_tz)
+            
+            hour = df_temp.index.hour
+            minute = df_temp.index.minute
+            
+            if session_mode == "rth":
+                mask = ((hour == 9) & (minute >= 30)) | ((hour >= 10) & (hour < 16))
+            elif session_mode == "premarket_rth":
+                mask = (hour >= 4) & (hour < 16)
+            elif session_mode == "rth_afterhours":
+                mask = ((hour == 9) & (minute >= 30)) | ((hour >= 10) & (hour < 20))
+            elif session_mode == "all_extended":
+                mask = (hour >= 4) & (hour < 20)
+            else:
+                mask = pd.Series([True] * len(ohlcv), index=ohlcv.index)
+            
+            ohlcv_for_indicators = ohlcv[mask]
+        
+        logger.info(f"📊 Session filter for indicators: {session_mode} ({len(ohlcv)} → {len(ohlcv_for_indicators)} bars)")
+        
+        # === 8. Compute indicators on FILTERED data ===
+        from ..services.strategy_indicators import compute_strategy_indicators
+        
+        indicators = {}
+        
+        # Compute strategy indicators if selected
+        if indicator_strategy and indicator_strategy != "none" and indicator_toggles:
+            try:
+                indicators = compute_strategy_indicators(
+                    indicator_strategy,
+                    ohlcv_for_indicators,  # Use filtered data!
+                    indicator_toggles
+                )
+                logger.info(f"🎨 Computed {len(indicators)} indicators: {list(indicators.keys())}")
+            except Exception as e:
+                logger.error(f"Error computing indicators: {e}")
+                # Continue without indicators
+        
+        # === 9. Build chart configuration ===
+        # Builder will do its own filtering
         config = PriceChartConfig(
             show_volume=True,
             show_grid=True,
             show_rangeslider=False,
-            session_mode=session_mode,
+            session_mode=session_mode,  # Builder filters again
             theme_mode="dark",
             title=f"{symbol} - {timeframe} ({tz_label} Time)",
             height=680,
         )
         
-        # === 9. Build chart (visualization layer - NO domain logic) ===
+        # === 10. Build chart (visualization layer) ===
         logger.info(f"🎨 Building chart with config: {config.session_mode}, volume={config.show_volume}")
-        fig = build_price_chart(ohlcv, indicators, config)
+        fig = build_price_chart(ohlcv, indicators, config)  # Builder filters OHLCV
         
         # === 10. Pattern overlays (future enhancement) ===
         # TODO: Add pattern markers from get_recent_patterns()
