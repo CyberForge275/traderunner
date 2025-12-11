@@ -21,13 +21,17 @@ def register_live_data_callback(app):
         """Update live data indicator and clickable symbol badges."""
         from ..repositories.candles import check_live_data_availability
         
-        # Check if any live data is available
-        available_symbols = check_live_data_availability()
+        # Check if any live data is available (returns dict)
+        availability = check_live_data_availability()
         
-        if available_symbols:
+        if availability.get('available', False):
             live_class = "status-dot online"
-            live_text = "Live data streaming"
-            live_count = f"({len(available_symbols)} symbols)"
+            symbols_list = availability.get('symbols', [])
+            symbol_count = availability.get('symbol_count', 0)
+            timeframes = availability.get('timeframes', [])
+            
+            live_text = f"Live ({symbol_count} symbols)"
+            live_count = f"Timeframes: {', '.join(timeframes)}"
             
             # Create clickable badges for each symbol
             symbol_badges = [
@@ -44,7 +48,7 @@ def register_live_data_callback(app):
                     },
                     id={"type": "live-symbol-badge", "symbol": sym}
                 )
-                for sym in available_symbols
+                for sym in symbols_list
             ]
             live_symbols_display = html.Div(
                 symbol_badges,

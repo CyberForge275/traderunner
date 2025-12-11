@@ -23,6 +23,7 @@ from trading_dashboard.callbacks.timeframe_callbacks import register_timeframe_c
 from trading_dashboard.callbacks.timezone_callbacks import register_timezone_callbacks
 from trading_dashboard.callbacks.history_callbacks import register_history_callbacks
 from trading_dashboard.callbacks.active_patterns_callback import register_active_patterns_callback
+from trading_dashboard.callbacks.live_data_callback import register_live_data_callback
 from trading_dashboard.callbacks.backtests_callbacks import register_backtests_callbacks
 from trading_dashboard.callbacks.run_backtest_callback import register_run_backtest_callback
 from trading_dashboard.callbacks.pre_papertrade_callbacks import register_pre_papertrade_callbacks
@@ -158,6 +159,7 @@ register_timeframe_callbacks(app)
 register_timezone_callbacks(app)
 register_history_callbacks(app)
 register_active_patterns_callback(app)
+register_live_data_callback(app)  #  NEW: Live data badges callback
 register_backtests_callbacks(app)
 register_run_backtest_callback(app)
 register_pre_papertrade_callbacks(app)
