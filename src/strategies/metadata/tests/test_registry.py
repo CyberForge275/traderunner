@@ -11,8 +11,8 @@ from pathlib import Path
 import tempfile
 import time
 
-from strategies.metadata.registry import StrategyRegistry
-from strategies.metadata.schema import (
+from src.strategies.metadata.registry import StrategyRegistry
+from src.strategies.metadata.schema import (
     StrategyMetadata,
     StrategyCapabilities,
     DataRequirements,

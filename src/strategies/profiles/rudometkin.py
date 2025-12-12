@@ -5,7 +5,7 @@ Rudometkin MOC Strategy Profile
 Metadata profile for Rudometkin Market-on-Close strategy.
 """
 
-from strategies.metadata.schema import (
+from src.strategies.metadata.schema import (
     StrategyMetadata,
     StrategyCapabilities,
     DataRequirements,

@@ -7,7 +7,7 @@ Tests all validation rules, serialization, and edge cases.
 
 import pytest
 from datetime import datetime
-from strategies.metadata.schema import (
+from src.strategies.metadata.schema import (
     StrategyMetadata,
     StrategyCapabilities,
     DataRequirements,

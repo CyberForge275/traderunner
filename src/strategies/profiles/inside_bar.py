@@ -5,7 +5,7 @@ InsideBar Strategy Profiles
 Metadata profiles for InsideBar strategy (v1 and v2).
 """
 
-from strategies.metadata.schema import (
+from src.strategies.metadata.schema import (
     StrategyMetadata,
     StrategyCapabilities,
     DataRequirements,
