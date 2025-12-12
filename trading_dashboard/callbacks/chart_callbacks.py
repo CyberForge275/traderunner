@@ -76,12 +76,13 @@ def register_chart_callbacks(app):
         Input("market-session-toggles", "value"),
         Input("indicator-strategy-selector", "value"),
         State("indicator-toggles", "value"),  # Changed to State - prevents initial error
-        State("chart-data-source-mode", "children")
+        State("chart-data-source-mode", "children"),
+        State("d1-day-range", "value")  # NEW: Configurable day range for D1
     )
     def update_chart(
         symbol, refresh_clicks, m1_clicks, m5_clicks, m15_clicks, h1_clicks, d1_clicks,
         ny_clicks, berlin_clicks, selected_date, session_toggles,
-        indicator_strategy, indicator_toggles, data_source_mode
+        indicator_strategy, indicator_toggles, data_source_mode, d1_day_range
     ):
         """
         Update candlestick chart - orchestrates data fetching and chart building.
@@ -186,12 +187,22 @@ def register_chart_callbacks(app):
         else:
             # Symbol selector mode: load from parquet files
             logger.info(f"   → Loading from PARQUET for {symbol}")
-            df = get_candle_data(
-                symbol,
-                timeframe=timeframe,
-                hours=24,
-                reference_date=selected_date
-            )
+            
+            # Use days_back for D1, hours for other timeframes
+            if timeframe == "D1":
+                df = get_candle_data(
+                    symbol,
+                    timeframe=timeframe,
+                    days_back=d1_day_range or 180,  # Use UI selection or default
+                    reference_date=selected_date
+                )
+            else:
+                df = get_candle_data(
+                    symbol,
+                    timeframe=timeframe,
+                    hours=24,
+                    reference_date=selected_date
+                )
         
         # === 5. Handle empty data early ===
         if df.empty:

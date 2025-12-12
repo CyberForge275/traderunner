@@ -8,15 +8,16 @@ from datetime import datetime, timedelta
 from ..config import MARKETDATA_DIR
 
 
-def get_candle_data(symbol: str, timeframe: str = "M5", hours: int = 24, reference_date = None) -> pd.DataFrame:
+def get_candle_data(symbol: str, timeframe: str = "M5", hours: int = 24, reference_date = None, days_back: int = None) -> pd.DataFrame:
     """
     Get candle data for charting.
     
     Args:
         symbol: Stock symbol  
-        timeframe: M1, M5, M15, H1
-        hours: Hours of history to fetch
+        timeframe: M1, M5, M15, H1, D1
+        hours: Hours of history to fetch (for intraday)
         reference_date: Specific date to fetch data for (date object or None for current)
+        days_back: Days to load for D1 timeframe (overrides hours for daily data)
     
     Returns:
         DataFrame with columns: timestamp, open, high, low, close, volume
@@ -82,8 +83,11 @@ def get_candle_data(symbol: str, timeframe: str = "M5", hours: int = 24, referen
                 from ..data_loading.loaders.daily_data_loader import DailyDataLoader
                 loader = DailyDataLoader()
                 
-                # Load last 100 days of daily data
-                df = loader.load_data(symbol, days_back=100)
+                # Use configurable days_back (default 180 if not specified)
+                days_to_load = days_back if days_back is not None else 180
+                logger.info(f"   Loading {days_to_load} days of daily data")
+                
+                df = loader.load_data(symbol, days_back=days_to_load)
                 
                 if not df.empty:
                     logger.info(f"✅ Loaded {len(df)} daily candles for {symbol}")

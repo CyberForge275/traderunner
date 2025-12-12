@@ -148,6 +148,29 @@ def create_charts_layout():
                             style={"width": "100%", "marginTop": "10px"}
                         ),
                         html.P("Select trading day", className="text-muted", style={"fontSize": "0.85rem", "marginTop": "5px"}),
+                        
+                        html.Hr(),
+                        html.H5("📅 D1 Day Range", style={"marginTop": "20px", "fontSize": "0.9rem"}),
+                        dcc.Dropdown(
+                            id="d1-day-range",
+                            options=[
+                                {"label": "30 Days", "value": 30},
+                                {"label": "60 Days", "value": 60},
+                                {"label": "90 Days (3 Mo)", "value": 90},
+                                {"label": "180 Days (6 Mo)", "value": 180},
+                                {"label": "365 Days (1 Year)", "value": 365},
+                            ],
+                            value=180,  # Better default: 6 months
+                            clearable=False,
+                            style={
+                                "backgroundColor": "#2b2b2b",
+                                "color": "#ffffff",
+                                "border": "1px solid #555",
+                                "fontSize": "0.85rem"
+                            },
+                            className="custom-dropdown"
+                        ),
+                        html.P("Days to display for D1 timeframe", className="text-muted", style={"fontSize": "0.75rem", "marginTop": "5px"}),
                         html.Hr(),
                         html.H5("Pattern Info", id="pattern-info-header", style={"marginTop": "20px"}),
                         html.Div(id="pattern-details", children=[
