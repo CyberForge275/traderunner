@@ -42,6 +42,19 @@ class DailyDataLoader:
                                end_date='2024-12-31')
     """
     
+    def _get_data_dir(self) -> Path:
+        """Get D1 data directory from central Settings."""
+        from src.core.settings import get_settings
+        settings = get_settings()
+        data_dir = settings.data_d1_dir
+        
+        # Ensure directory exists
+        if not data_dir.exists():
+            data_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Created D1 data directory: {data_dir}")
+        
+        return data_dir
+    
     def __init__(self, data_dir: Optional[str] = None):
         """
         Initialize daily data loader.
@@ -51,8 +64,7 @@ class DailyDataLoader:
                      Auto-detects if None
         """
         if data_dir is None:
-            # Auto-detect data directory
-            # Consistent with M1/M5/M15 structure in artifacts/
+            # Auto-detect data directory using Settings
             self.data_dir = self._get_data_dir()
         else:
             self.data_dir = Path(data_dir)
