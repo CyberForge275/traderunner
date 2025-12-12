@@ -302,12 +302,15 @@ def register_chart_callbacks(app):
                 # Continue without indicators
         
         # === 9. Build chart configuration ===
+        # IMPORTANT: Daily data (D1) has no session concept - always show all data
+        chart_session_mode = "all" if timeframe == "D1" else session_mode
+        
         # Builder will do its own filtering
         config = PriceChartConfig(
             show_volume=True,
             show_grid=True,
             show_rangeslider=False,
-            session_mode=session_mode,  # Builder filters again
+            session_mode=chart_session_mode,  # Use 'all' for daily data
             theme_mode="dark",
             title=f"{symbol} - {timeframe} ({tz_label} Time)",
             height=680,
