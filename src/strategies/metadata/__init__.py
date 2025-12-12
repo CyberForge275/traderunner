@@ -29,12 +29,14 @@ from .schema import (
     DataRequirements,
     DeploymentInfo,
 )
+from .registry import StrategyRegistry
 
 __all__ = [
     "StrategyMetadata",
     "StrategyCapabilities",
     "DataRequirements",
     "DeploymentInfo",
+    "StrategyRegistry",
 ]
 
 __version__ = "1.0.0"

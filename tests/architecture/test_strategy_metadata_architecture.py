@@ -43,9 +43,9 @@ class TestStrategyMetadataArchitecture:
     
     def test_dashboard_uses_central_registry(self):
         """Dashboard should import from src.strategies.metadata."""
-        helpers_file = TRADING_DASHBOARD / "utils" / "strategy_helpers.py"
+        helpers_file = PROJECT_ROOT / "trading_dashboard" / "utils" / "strategy_helpers.py"
         
-        assert helpers_file.exists(), "strategy_helpers.py not found"
+        assert helpers_file.exists(), f"strategy_helpers.py not found at {helpers_file}"
         
         content = helpers_file.read_text()
         
