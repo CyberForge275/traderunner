@@ -1,116 +1,106 @@
 """
-Strategy Registry Utilities
+Strategy Helper Utilities - UPDATED to use Central Registry
+============================================================
 
-This module provides utilities to dynamically load strategy names from the 
-source of truth (STRATEGY_REGISTRY in state.py) to prevent hardcoding mismatches.
-
-Usage in dashboard layouts:
-    from trading_dashboard.utils.strategy_helpers import get_strategy_options
-    
-    dcc.Dropdown(
-        id="backtests-new-strategy",
-        options=get_strategy_options(),
-        value=get_default_strategy(),
-        ...
-    )
+Helper functions for accessing strategy metadata.
+Now uses src.strategies.metadata.StrategyRegistry as Single Source of Truth.
 """
 
-import sys
-from pathlib import Path
-from typing import List, Dict, Optional
-
-# Ensure apps directory is in path
-ROOT = Path(__file__).resolve().parents[2]
-APPS_DIR = ROOT / "apps"
-if str(APPS_DIR) not in sys.path:
-    sys.path.insert(0, str(APPS_DIR))
+from typing import Dict, Optional
+from src.strategies.metadata import StrategyRegistry, StrategyMetadata
+from src.strategies.profiles import (
+    INSIDE_BAR_V1_PROFILE,
+    INSIDE_BAR_V2_PROFILE,
+    RUDOMETKIN_MOC_PROFILE,
+)
 
 
-def get_strategy_registry() -> Dict:
+# Initialize registry with profiles on module load
+_registry = StrategyRegistry()
+
+# Register all known strategies
+for profile in [INSIDE_BAR_V1_PROFILE, INSIDE_BAR_V2_PROFILE, RUDOMETKIN_MOC_PROFILE]:
+    if not _registry.exists(profile.strategy_id):
+        _registry.register(profile)
+
+
+def get_registry() -> StrategyRegistry:
     """
-    Get the STRATEGY_REGISTRY from apps/streamlit/state.py.
-    
-    This is the single source of truth for available strategies.
+    Get the central StrategyRegistry instance.
     
     Returns:
-        Dictionary mapping strategy keys to StrategyMetadata objects
+        StrategyRegistry singleton
     """
-    try:
-        from apps.streamlit.state import STRATEGY_REGISTRY
-        return STRATEGY_REGISTRY
-    except ImportError as e:
-        print(f"Warning: Could not import STRATEGY_REGISTRY: {e}")
-        return {}
+    return _registry
 
 
-def get_strategy_options() -> List[Dict[str, str]]:
+def get_strategy_metadata(strategy_id: str) -> Optional[StrategyMetadata]:
     """
-    Get dropdown options for strategy selection.
-    
-    Dynamically loads from STRATEGY_REGISTRY to ensure consistency.
-    
-    Returns:
-        List of dicts with 'label' and 'value' keys for Dash dropdown
-    """
-    registry = get_strategy_registry()
-    
-    # Map strategy keys to human-readable labels
-    label_map = {
-        "insidebar_intraday": "Inside Bar",
-        "insidebar_intraday_v2": "Inside Bar V2",
-        "rudometkin_moc_mode": "Rudometkin",
-    }
-    
-    options = []
-    for key, metadata in registry.items():
-        label = label_map.get(key, metadata.label if hasattr(metadata, 'label') else key)
-        options.append({"label": label, "value": key})
-    
-    # Sort by label for consistent ordering
-    options.sort(key=lambda x: x["label"])
-    
-    return options
-
-
-def get_default_strategy() -> Optional[str]:
-    """
-    Get the default strategy key.
-    
-    Returns:
-        Default strategy key (first alphabetically) or None if no strategies
-    """
-    options = get_strategy_options()
-    if not options:
-        return None
-    
-    # Return "Inside Bar" as default if available, otherwise first option
-    for opt in options:
-        if opt["label"] == "Inside Bar":
-            return opt["value"]
-    
-    return options[0]["value"]
-
-
-def validate_strategy_name(strategy_name: str) -> bool:
-    """
-    Validate that a strategy name exists in the registry.
+    Get strategy metadata by ID.
     
     Args:
-        strategy_name: Strategy key to validate
+        strategy_id: Strategy identifier
         
     Returns:
-        True if valid, False otherwise
+        StrategyMetadata or None if not found
     """
-    registry = get_strategy_registry()
-    return strategy_name in registry
+    return _registry.get_or_none(strategy_id)
 
 
-def get_available_strategies() -> List[str]:
+def get_all_strategies() -> Dict[str, StrategyMetadata]:
     """
-    Get list of all available strategy keys.
+    Get all registered strategies as dict.
     
     Returns:
-        List of strategy keys
+        Dictionary mapping strategy_id to StrategyMetadata
     """
-    registry = get_strategy_registry()
-    return list(registry.keys())
+    return {meta.strategy_id: meta for meta in _registry.list_all()}
+
+
+def get_strategy_display_names() -> Dict[str, str]:
+    """
+    Get mapping of strategy_id to display_name.
+    
+    Returns:
+        Dictionary mapping strategy_id to display_name
+    """
+    return {meta.strategy_id: meta.display_name for meta in _registry.list_all()}
+
+
+def get_live_capable_strategies() -> Dict[str, StrategyMetadata]:
+    """
+    Get strategies that support live trading.
+    
+    Returns:
+        Dictionary of live-capable strategies
+    """
+    live_strategies = _registry.get_by_capability(
+        lambda cap: cap.supports_live_trading
+    )
+    return {meta.strategy_id: meta for meta in live_strategies}
+
+
+def get_backtest_capable_strategies() -> Dict[str, StrategyMetadata]:
+    """
+    Get strategies that support backtesting.
+    
+    Returns:
+        Dictionary of backtest-capable strategies
+    """
+    backtest_strategies = _registry.get_by_capability(
+        lambda cap: cap.supports_backtest
+    )
+    return {meta.strategy_id: meta for meta in backtest_strategies}
+
+
+def get_pre_papertrade_capable_strategies() -> Dict[str, StrategyMetadata]:
+    """
+    Get strategies that support pre-papertrading.
+    
+    Returns:
+        Dictionary of pre-papertrade-capable strategies
+    """
+    pre_paper_strategies = _registry.get_by_capability(
+        lambda cap: cap.supports_pre_papertrade
+    )
+    return {meta.strategy_id: meta for meta in pre_paper_strategies}
