@@ -1,10 +1,19 @@
 """
-Candle data retrieval for charts
+Candles Repository
+==================
+
+Centralized access to market data for charts and analysis.
+Uses central TradingSettings for all database paths.
 """
+
 import sqlite3
+from pathlib import Path
+from typing import Optional
 import pandas as pd
+import logging
 from datetime import datetime, timedelta
 
+from src.core.settings import get_settings
 from ..config import MARKETDATA_DIR
 
 
