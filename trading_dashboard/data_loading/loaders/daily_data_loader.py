@@ -53,20 +53,7 @@ class DailyDataLoader:
         if data_dir is None:
             # Auto-detect data directory
             # Consistent with M1/M5/M15 structure in artifacts/
-            candidates = [
-                Path('/opt/trading/traderunner/artifacts/data_d1'),  # Debian server
-                Path.home() / 'data' / 'workspace' / 'droid' / 'traderunner' / 'artifacts' / 'data_d1',  # Local
-                Path(__file__).parent.parent.parent.parent / 'artifacts' / 'data_d1'  # Relative
-            ]
-            
-            for path in candidates:
-                if path.exists():
-                    self.data_dir = path
-                    break
-            else:
-                # Use first candidate as default (create if needed)
-                self.data_dir = candidates[0]
-                self.data_dir.mkdir(parents=True, exist_ok=True)
+            self.data_dir = self._get_data_dir()
         else:
             self.data_dir = Path(data_dir)
         

@@ -34,20 +34,19 @@ class DatabaseLoader:
             backfill_enabled: Auto-backfill missing data (default: True)
             api_key: EODHD API key (optional)
         """
+        def _get_db_path(self) -> Path:
+            """Get database path from central Settings."""
+            from src.core.settings import get_settings
+            settings = get_settings()
+            return settings.market_data_db_path
+            
         # Auto-detect database path if not provided
         if db_path is None:
-            db_paths = [
-                Path("/opt/trading/marketdata-stream/data/market_data.db"),
-                Path.home() / "data/workspace/droid/marketdata-stream/data/market_data.db"
-            ]
-            for path in db_paths:
-                if path.exists():
-                    db_path = str(path)
-                    logger.info(f"Auto-detected database: {db_path}")
-                    break
+            db_path = str(self._get_db_path())
+            logger.info(f"Using database from settings: {db_path}")
             
-            if db_path is None:
-                raise FileNotFoundError("Market data database not found")
+            if not Path(db_path).exists():
+                raise FileNotFoundError(f"Market data database not found at {db_path}")
         
         self.db_path = db_path
         self.backfill_enabled = backfill_enabled

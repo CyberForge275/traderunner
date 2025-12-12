@@ -391,25 +391,23 @@ def check_live_data_availability(date=None) -> dict:
         logger.info("=" * 80)
         return {'available': False, 'symbol_count': 0, 'symbols': [], 'timeframes': []}
     
-    # Try to connect to marketdata.db
-    db_paths = [
-        Path("/opt/trading/marketdata-stream/data/market_data.db"),
-        Path.home() / "data/workspace/droid/marketdata-stream/data/market_data.db"
-    ]
+    # Use central Settings for DB path
+    settings = get_settings()
+    db_path = settings.market_data_db_path
     
-    logger.info(f"📂 Checking database paths: {db_paths}")
+    if not db_path.exists():
+        logger.warning(f"❌ market_data.db not found at: {db_path} - Returning unavailable")
+        logger.info("=" * 80)
+        return {'available': False, 'symbol_count': 0, 'symbols': [], 'timeframes': []}
+    
+    logger.info(f"📂 Using market_data DB: {db_path}")
     
     conn = None
-    for db_path in db_paths:
-        logger.info(f"  Checking: {db_path}")
-        logger.info(f"  Exists: {db_path.exists()}")
-        if db_path.exists():
-            try:
-                conn = sqlite3.connect(str(db_path), timeout=2.0)
-                logger.info(f"  ✅ Connected to: {db_path}")
-                break
-            except Exception as e:
-                logger.error(f"  ❌ Connection failed: {e}")
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=2.0)
+        logger.info(f"  ✅ Connected to: {db_path}")
+    except Exception as e:
+        logger.error(f"  ❌ Connection failed: {e}")
     
     if not conn:
         logger.warning("❌ NO DATABASE CONNECTION - Returning unavailable")
@@ -500,10 +498,15 @@ def get_live_candle_data(
     
     logger = logging.getLogger(__name__)
     
+    # Use central Settings for DB path
+    from src.core.settings import get_settings
+    settings = get_settings()
+    configured_db_path = settings.market_data_db_path
+
     # Try to connect to marketdata.db
     db_paths = [
         Path("/opt/trading/marketdata-stream/data/market_data.db"),  # Production (correct filename!)
-        Path.home() / "data/workspace/droid/marketdata-stream/data/market_data.db"  # Local
+        configured_db_path # Local or configured path
     ]
     
     conn = None
