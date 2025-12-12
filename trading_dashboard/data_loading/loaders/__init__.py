@@ -1,7 +1,8 @@
-"""Data loaders for trading dashboard."""
+"""Data loading utilities."""
 
-from .eodhd_backfill import EODHDBackfill
-from .database_loader import DatabaseLoader
+# Only import loaders that don't have external deps
+# EODHDBackfill requires aiohttp - import only when needed
 from .daily_data_loader import DailyDataLoader
+from .database_loader import DatabaseLoader
 
-__all__ = ['EODHDBackfill', 'DatabaseLoader', 'DailyDataLoader']
+__all__ = ['DailyDataLoader', 'DatabaseLoader']
