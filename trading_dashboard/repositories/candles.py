@@ -87,27 +87,53 @@ def get_candle_data(symbol: str, timeframe: str = "M5", hours: int = 24, referen
         
         # Special handling for D1 (Daily data from yearly universe files)
         if timeframe == "D1":
-            logger.info(f"📅 Loading daily data for {symbol}")
+            logger.info(f"=" * 80)
+            logger.info(f"📅 DAILY DATA (D1) LOADING FOR {symbol}")
+            logger.info(f"=" * 80)
+            logger.info(f"   days_back: {days_back}")
+            logger.info(f"   reference_date: {reference_date}")
+            
             try:
                 from ..data_loading.loaders.daily_data_loader import DailyDataLoader
+                logger.info(f"   ✅ DailyDataLoader imported")
+                
                 loader = DailyDataLoader()
+                logger.info(f"   ✅ Loader initialized: {loader.data_dir}")
+                
+                # Check if data directory exists and has files
+                import os
+                if loader.data_dir.exists():
+                    files = os.listdir(loader.data_dir)
+                    logger.info(f"   ✅ Directory exists with {len(files)} files: {files}")
+                else:
+                    logger.error(f"   ❌ Directory does not exist: {loader.data_dir}")
+                    return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                 
                 # Use configurable days_back (default 180 if not specified)
                 days_to_load = days_back if days_back is not None else 180
-                logger.info(f"   Loading {days_to_load} days of daily data")
+                logger.info(f"   Loading {days_to_load} days of daily data...")
                 
                 df = loader.load_data(symbol, days_back=days_to_load)
                 
                 if not df.empty:
-                    logger.info(f"✅ Loaded {len(df)} daily candles for {symbol}")
+                    logger.info(f"   ✅ SUCCESS: Loaded {len(df)} daily candles for {symbol}")
+                    logger.info(f"   Columns: {list(df.columns)}")
+                    logger.info(f"   Index type: {type(df.index)}")
+                    logger.info(f"   First row: {df.iloc[0].to_dict() if len(df) > 0 else 'N/A'}")
+                    logger.info(f"   Date range: {df['timestamp'].min()} to {df['timestamp'].max()}")
+                    logger.info(f"=" * 80)
                     return df
                 else:
-                    logger.warning(f"⚠️  No daily data for {symbol}")
+                    logger.warning(f"   ⚠️  DataFrame is EMPTY for {symbol}")
+                    logger.warning(f"=" * 80)
                     return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
             except Exception as e:
-                logger.error(f"❌ Error loading daily data: {e}")
+                logger.error(f"   ❌ EXCEPTION in daily data loading:")
+                logger.error(f"   Error type: {type(e).__name__}")
+                logger.error(f"   Error message: {str(e)}")
                 import traceback
-                logger.error(traceback.format_exc())
+                logger.error(f"   Traceback:\n{traceback.format_exc()}")
+                logger.error(f"=" * 80)
                 return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         
         # For intraday (M1/M5/M15/H1), use parquet files

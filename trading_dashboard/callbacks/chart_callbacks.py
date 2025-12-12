@@ -190,12 +190,23 @@ def register_chart_callbacks(app):
             
             # Use days_back for D1, hours for other timeframes
             if timeframe == "D1":
+                logger.info(f"🔍 CHART CALLBACK: D1 timeframe selected")
+                logger.info(f"   Symbol: {symbol}")
+                logger.info(f"   Days range: {d1_day_range or 180}")
+                logger.info(f"   Reference date: {selected_date}")
+                
                 df = get_candle_data(
                     symbol,
                     timeframe=timeframe,
                     days_back=d1_day_range or 180,  # Use UI selection or default
                     reference_date=selected_date
                 )
+                
+                logger.info(f"🔍 CHART CALLBACK: After get_candle_data")
+                logger.info(f"   DataFrame shape: {df.shape if not df.empty else 'EMPTY'}")
+                if not df.empty:
+                    logger.info(f"   Columns: {list(df.columns)}")
+                    logger.info(f"   Index: {df.index[:3].tolist() if len(df) > 0 else 'N/A'}")
             else:
                 df = get_candle_data(
                     symbol,
