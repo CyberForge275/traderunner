@@ -7,7 +7,6 @@ import sqlite3
 from pathlib import Path
 
 from ..filters.session_filter import SessionFilter
-from .eodhd_backfill import EODHDBackfill
 
 
 logger = logging.getLogger(__name__)
@@ -50,7 +49,19 @@ class DatabaseLoader:
         
         self.db_path = db_path
         self.backfill_enabled = backfill_enabled
-        self.backfiller = EODHDBackfill(api_key) if backfill_enabled else None
+        
+        # Lazy import EODHDBackfill only if backfilling is enabled
+        if backfill_enabled:
+            try:
+                from .eodhd_backfill import EODHDBackfill
+                self.backfiller = EODHDBackfill(api_key)
+            except ImportError:
+                logger.warning("aiohttp not available - backfill disabled")
+                self.backfiller = None
+                self.backfill_enabled = False
+        else:
+            self.backfiller = None
+            
         self.session_filter = SessionFilter()
     
     async def load_candles(
