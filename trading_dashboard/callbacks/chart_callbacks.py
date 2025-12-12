@@ -168,22 +168,27 @@ def register_chart_callbacks(app):
             live_symbols_display = None
         
         # === 4. Fetch OHLCV data (domain layer) ===
-        # Determine data source mode - respect mode set by badge clicks
+        # Determine data source mode based on trigger
         logger.info(f"📍 Triggered by: {triggered_id}, Current mode: {data_source_mode}")
         
-        # CRITICAL FIX: D1 data ONLY exists in parquet files, never in database!
-        # Database contains only intraday data (M1, M5, M15)
-        if timeframe == "D1":
-            new_mode = "parquet"  # FORCE parquet for D1
-            logger.info(f"   ⚡ FORCING PARQUET mode for D1 (daily data not in database)")
-        elif data_source_mode == "database":
-            # Badge click explicitly set database mode - respect it for intraday
-            new_mode = "database"
-        else:
-            # Default to parquet for dropdown selections and other triggers
-            new_mode = "parquet"
+        # Timeframe button clicks should use parquet for symbol selector mode
+        # Badge clicks should use database for Active Patterns mode
+        timeframe_triggers = {'tf-m1', 'tf-m5', 'tf-m15', 'tf-h1', 'tf-d1'}
         
-        logger.info(f"   Data source: {new_mode}, triggered by: {triggered_id}, timeframe: {timeframe}")
+        if triggered_id in timeframe_triggers or triggered_id == 'chart-symbol-selector':
+            # User clicked timeframe or selected symbol → use parquet (symbol selector mode)
+            new_mode = "parquet"
+            logger.info(f"   → Timeframe/Symbol selector clicked → PARQUET mode")
+        elif data_source_mode == "database":
+            # Badge explicitly set database mode → keep it (Active Patterns mode)
+            new_mode = "database"
+            logger.info(f"   → Active Patterns badge mode → DATABASE mode")
+        else:
+            # Default to parquet
+            new_mode = "parquet"
+            logger.info(f"   → Default → PARQUET mode")
+        
+        logger.info(f"   Final: source={new_mode}, trigger={triggered_id}, tf={timeframe}")
         
         if new_mode == "database":
             # Active Patterns mode: load from websocket database
