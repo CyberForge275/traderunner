@@ -64,10 +64,40 @@ def get_candle_data(symbol: str, timeframe: str = "M5", hours: int = 24, referen
             "M1": "data_m1",
             "M5": "data_m5", 
             "M15": "data_m15",
-            "H1": "data_m5"  # Use M5 data for H1 (will resample)
+            "H1": "data_m5",  # Use M5 data for H1 (will resample)
+            "D1": "data_d1"   # Daily data
         }
         
-        data_dir = timeframe_dirs.get(timeframe, "data_m5")
+        # CRITICAL FIX: Don't fallback to M5 if timeframe not supported!
+        if timeframe not in timeframe_dirs:
+            logger.warning(f"⚠️  Unsupported timeframe: {timeframe}")
+            return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        
+        data_dir = timeframe_dirs[timeframe]
+        
+        # Special handling for D1 (Daily data from yearly universe files)
+        if timeframe == "D1":
+            logger.info(f"📅 Loading daily data for {symbol}")
+            try:
+                from ..data_loading.loaders.daily_data_loader import DailyDataLoader
+                loader = DailyDataLoader()
+                
+                # Load last 100 days of daily data
+                df = loader.load_data(symbol, days_back=100)
+                
+                if not df.empty:
+                    logger.info(f"✅ Loaded {len(df)} daily candles for {symbol}")
+                    return df
+                else:
+                    logger.warning(f"⚠️  No daily data for {symbol}")
+                    return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+            except Exception as e:
+                logger.error(f"❌ Error loading daily data: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+                return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        
+        # For intraday (M1/M5/M15/H1), use parquet files
         parquet_path = TRADERUNNER_DIR / "artifacts" / data_dir / f"{symbol}.parquet"
         
         if parquet_path.exists():
@@ -120,32 +150,63 @@ def get_candle_data(symbol: str, timeframe: str = "M5", hours: int = 24, referen
     from ..config import TRADERUNNER_DIR
     from datetime import date as date_type, datetime
     
+    # Map timeframe to data directory
     timeframe_dirs = {
         "M1": "data_m1",
         "M5": "data_m5", 
         "M15": "data_m15",
-        "H1": "data_m5"
+        "H1": "data_m5",  # Use M5 data for H1 (will resample)
+        "D1": "data_d1"   # Daily data
     }
-    data_dir = timeframe_dirs.get(timeframe, "data_m5")
+    
+    # CRITICAL FIX: Don't fallback to M5 if timeframe not supported!
+    # This was causing M5 data to show for M15/D1 when no data available
+    if timeframe not in timeframe_dirs:
+        logger.warning(f"⚠️  Unsupported timeframe: {timeframe}")
+        return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+    
+    data_dir = timeframe_dirs[timeframe]
+    
+    # Special handling for D1 (Daily data from yearly universe files)
+    if timeframe == "D1":
+        logger.info(f"📅 Loading daily data for {symbol}")
+        try:
+            from ..data_loading.loaders.daily_data_loader import DailyDataLoader
+            loader = DailyDataLoader()
+            
+            # Load last 100 days of daily data
+            df = loader.load_data(symbol, days_back=100)
+            
+            if not df.empty:
+                logger.info(f"✅ Loaded {len(df)} daily candles for {symbol}")
+                return df
+            else:
+                logger.warning(f"⚠️  No daily data for {symbol}")
+                return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        except Exception as e:
+            logger.error(f"❌ Error loading daily data: {e}")
+            return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+    
+    # For intraday data (M1/M5/M15/H1), use parquet files
     parquet_path = TRADERUNNER_DIR / "artifacts" / data_dir / f"{symbol}.parquet"
     
     # If parquet file exists, don't generate mock data - return empty
     if parquet_path.exists():
+        logger.info(f"📁 Found parquet for {symbol} {timeframe}: {parquet_path}")
         return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
     
     # CRITICAL: Never generate mock data for future dates
     if reference_date is not None:
         if isinstance(reference_date, str):
-            ref_date = datetime.fromisoformat(reference_date).date()
-        elif isinstance(reference_date, date_type):
-            ref_date = reference_date
-        else:
-            ref_date = reference_date.date() if hasattr(reference_date, 'date') else None
+            reference_date = datetime.fromisoformat(reference_date).date()
+        elif isinstance(reference_date, datetime):
+            reference_date = reference_date.date()
         
-        # Check if date is in the future
-        if ref_date and ref_date > date_type.today():
-            print(f"Requested future date {ref_date} for {symbol} - returning empty")
-            return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        # Check if reference_date is in the future
+        if isinstance(reference_date, date_type):
+            if reference_date > datetime.now().date():
+                logger.warning(f"Requested future date {reference_date}, returning empty")
+                return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
     
     # If parquet file doesn't exist, return empty - NO MOCK DATA in production
     logger.info(f"❌ No parquet file for {symbol} - returning empty DataFrame")
