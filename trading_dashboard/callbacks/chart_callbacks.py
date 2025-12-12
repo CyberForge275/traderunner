@@ -69,6 +69,7 @@ def register_chart_callbacks(app):
         Input("tf-m5", "n_clicks"),
         Input("tf-m15", "n_clicks"),
         Input("tf-h1", "n_clicks"),
+        Input("tf-d1", "n_clicks"),  # NEW: D1 daily timeframe
         Input("tz-ny-btn", "n_clicks"),
         Input("tz-berlin-btn", "n_clicks"),
         Input("chart-date-picker", "date"),
@@ -78,7 +79,7 @@ def register_chart_callbacks(app):
         State("chart-data-source-mode", "children")
     )
     def update_chart(
-        symbol, refresh_clicks, m1_clicks, m5_clicks, m15_clicks, h1_clicks,
+        symbol, refresh_clicks, m1_clicks, m5_clicks, m15_clicks, h1_clicks, d1_clicks,
         ny_clicks, berlin_clicks, selected_date, session_toggles,
         indicator_strategy, indicator_toggles, data_source_mode
     ):
@@ -116,6 +117,7 @@ def register_chart_callbacks(app):
             "tf-m1": "M1",
             "tf-m15": "M15",
             "tf-h1": "H1",
+            "tf-d1": "D1",  # NEW: Daily timeframe
         }
         timeframe = timeframe_map.get(triggered_id, "M5")  # Default M5
         

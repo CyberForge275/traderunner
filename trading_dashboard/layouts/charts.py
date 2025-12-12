@@ -137,6 +137,7 @@ def create_charts_layout():
                             dbc.Button("M5", id="tf-m5", size="sm", active=True, color="primary"),
                             dbc.Button("M15", id="tf-m15", size="sm", outline=True, color="secondary"),
                             dbc.Button("H1", id="tf-h1", size="sm", outline=True, color="secondary"),
+                            dbc.Button("D1", id="tf-d1", size="sm", outline=True, color="secondary"),
                         ], vertical=True, style={"width": "100%", "marginTop": "10px"}),
                         html.Hr(),
                         html.H5("Date", style={"marginTop": "20px"}),
