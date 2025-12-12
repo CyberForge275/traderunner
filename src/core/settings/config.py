@@ -41,154 +41,96 @@ class Environment(str, Enum):
     PRODUCTION = "production"
 
 
-class TradingSettings(BaseSettings):
+@dataclass
+class TradingSettings:
     """
     Central configuration for trading system.
     
-    All hard-coded paths should be eliminated and configured here.
+    All hard-coded paths are eliminated and configured here.
     """
     
     # ===== Environment =====
-    environment: Environment = Field(
-        default=Environment.DEV,
-        description="Deployment environment"
-    )
+    environment: Environment = field(default=Environment.DEV)
     
     # ===== Project Roots =====
-    project_root: Path = Field(
-        default_factory=lambda: Path(__file__).resolve().parents[3],
-        description="Project root directory"
-    )
+    project_root: Path = field(default_factory=lambda: Path(__file__).resolve().parents[3])
+    
+    # ===== Production Detection =====
+    is_production_server: bool = field(default=False)
+    production_base_path: Path = field(default_factory=lambda: Path("/opt/trading"))
     
     # ===== Data Directories =====
-    data_root: Path = Field(
-        default=None,
-        description="Root directory for market data"
-    )
-    
-    data_m1_dir: Optional[Path] = Field(
-        default=None,
-        description="M1 intraday data directory"
-    )
-    
-    data_m5_dir: Optional[Path] = Field(
-        default=None,
-        description="M5 intraday data directory"
-    )
-    
-    data_m15_dir: Optional[Path] = Field(
-        default=None,
-        description="M15 intraday data directory"
-    )
-    
-    data_h1_dir: Optional[Path] = Field(
-        default=None,
-        description="H1 intraday data directory"
-    )
-    
-    data_d1_dir: Optional[Path] = Field(
-        default=None,
-        description="D1 daily data directory"
-    )
+    data_root: Optional[Path] = None
+    data_m1_dir: Optional[Path] = None
+    data_m5_dir: Optional[Path] = None
+    data_m15_dir: Optional[Path] = None
+    data_h1_dir: Optional[Path] = None
+    data_d1_dir: Optional[Path] = None
     
     # ===== Artifacts =====
-    artifacts_root: Path = Field(
-        default=None,
-        description="Root directory for artifacts (signals, backtests, etc.)"
-    )
-    
-    signals_dir: Optional[Path] = Field(
-        default=None,
-        description="Generated signals directory"
-    )
-    
-    backtests_dir: Optional[Path] = Field(
-        default=None,
-        description="Backtest results directory"
-    )
+    artifacts_root: Optional[Path] = None
+    signals_dir: Optional[Path] = None
+    backtests_dir: Optional[Path] = None
     
     # ===== Configuration =====
-    config_root: Path = Field(
-        default=None,
-        description="Strategy configuration files directory"
-    )
+    config_root: Optional[Path] = None
     
     # ===== Logs =====
-    logs_root: Path = Field(
-        default=None,
-        description="Log files directory"
-    )
+    logs_root: Optional[Path] = None
     
     # ===== Databases =====
-    signals_db_path: Path = Field(
-        default=None,
-        description="Path to signals.db SQLite database"
-    )
+    signals_db_path: Optional[Path] = None
+    market_data_db_path: Optional[Path] = None
+    analytics_db_path: Optional[Path] = None
     
-    market_data_db_path: Path = Field(
-        default=None,
-        description="Path to market_data.db SQLite database"
-    )
+    # ===== External Directories =====
+    marketdata_stream_dir: Optional[Path] = None
+    automatictrader_api_dir: Optional[Path] = None
     
-    analytics_db_path: Optional[Path] = Field(
-        default=None,
-        description="Path to analytics database"
-    )
-    
-    # ===== ClickHouse (Optional) =====
-    clickhouse_host: Optional[str] = Field(
-        default=None,
-        description="ClickHouse host"
-    )
-    
-    clickhouse_port: int = Field(
-        default=8123,
-        description="ClickHouse HTTP port"
-    )
-    
-    clickhouse_database: Optional[str] = Field(
-        default=None,
-        description="ClickHouse database name"
-    )
-    
-    # ===== External Services =====
-    eodhd_api_key: Optional[str] = Field(
-        default=None,
-        description="EODHD API key for data fetching"
-    )
-    
-    # ===== External Directories (for integration) =====
-    marketdata_stream_dir: Optional[Path] = Field(
-        default=None,
-        description="marketdata-stream project directory"
-    )
-    
-    automatictrader_api_dir: Optional[Path] = Field(
-        default=None,
-        description="automatictrader-api project directory"
-    )
-    
-    # ===== Server Paths (Production) =====
-    is_production_server: bool = Field(
-        default=False,
-        description="Whether running on production server"
-    )
-    
-    production_base_path: Path = Field(
-        default=Path("/opt/trading"),
-        description="Base path on production server"
-    )
-    
-    def __init__(self, **kwargs):
+    def __post_init__(self):
         """Initialize settings and compute derived paths."""
-        super().__init__(**kwargs)
+        # Load from environment variables
+        self._load_from_env()
         
-        # Auto-detect production environment
+        # Auto-detect production
         if self.production_base_path.exists() and not self.data_root:
             self.is_production_server = True
         
-        # Set defaults based on environment
+        # Set defaults
         self._set_defaults()
+    
+    def _load_from_env(self):
+        """Load settings from environment variables."""
+        # Environment
+        env_str = os.getenv("TRADING_ENVIRONMENT", "dev")
+        try:
+            self.environment = Environment(env_str)
+        except ValueError:
+            pass
+        
+        # Production detection
+        if os.getenv("TRADING_IS_PRODUCTION_SERVER", "").lower() == "true":
+            self.is_production_server = True
+        
+        prod_base = os.getenv("TRADING_PRODUCTION_BASE_PATH")
+        if prod_base:
+            self.production_base_path = Path(prod_base)
+        
+        # Data directories
+        if data_root := os.getenv("TRADING_DATA_ROOT"):
+            self.data_root = Path(data_root)
+        if data_m1 := os.getenv("TRADING_DATA_M1_DIR"):
+            self.data_m1_dir = Path(data_m1)
+        if data_m5 := os.getenv("TRADING_DATA_M5_DIR"):
+            self.data_m5_dir = Path(data_m5)
+        if data_d1 := os.getenv("TRADING_DATA_D1_DIR"):
+            self.data_d1_dir = Path(data_d1)
+        
+        # Databases
+        if signals_db := os.getenv("TRADING_SIGNALS_DB_PATH"):
+            self.signals_db_path = Path(signals_db)
+        if market_db := os.getenv("TRADING_MARKET_DATA_DB_PATH"):
+            self.market_data_db_path = Path(market_db)
     
     def _set_defaults(self):
         """Set default paths based on environment."""
@@ -199,6 +141,8 @@ class TradingSettings(BaseSettings):
         else:
             traderunner_root = self.project_root
             marketdata_root = self.project_root.parent / "marketdata-stream"
+            if not marketdata_root.exists():
+                marketdata_root = self.project_root.parent.parent / "marketdata-stream"
         
         # Data root
         if not self.data_root:
@@ -222,10 +166,8 @@ class TradingSettings(BaseSettings):
         # Artifacts
         if not self.artifacts_root:
             self.artifacts_root = traderunner_root / "artifacts"
-        
         if not self.signals_dir:
             self.signals_dir = self.artifacts_root / "signals"
-        
         if not self.backtests_dir:
             self.backtests_dir = self.artifacts_root / "backtests"
         
@@ -252,10 +194,7 @@ class TradingSettings(BaseSettings):
         
         # External directories
         if not self.marketdata_stream_dir:
-            if self.is_production_server:
-                self.marketdata_stream_dir = self.production_base_path / "marketdata-stream"
-            else:
-                self.marketdata_stream_dir = self.project_root.parent / "marketdata-stream"
+            self.marketdata_stream_dir = marketdata_root
         
         if not self.automatictrader_api_dir:
             if self.is_production_server:
@@ -285,12 +224,6 @@ class TradingSettings(BaseSettings):
             raise ValueError(f"Unknown timeframe: {timeframe}")
         
         return timeframe_map[timeframe]
-    
-    class Config:
-        """Pydantic config."""
-        env_file = ".env"
-        env_prefix = "TRADING_"
-        case_sensitive = False
 
 
 # Singleton instance
