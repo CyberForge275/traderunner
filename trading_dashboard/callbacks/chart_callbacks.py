@@ -98,7 +98,7 @@ def register_chart_callbacks(app):
         from ..repositories.candles import (
             get_candle_data,
             get_live_candle_data,
-            check_live_data_availability
+            get_live_symbols_today
         )
         import dash_bootstrap_components as dbc
         from dash import html
@@ -109,12 +109,9 @@ def register_chart_callbacks(app):
         if isinstance(selected_date, str):
             selected_date = datetime.fromisoformat(selected_date).date()
         
-        logger.info(f"📊 Chart update: {symbol} @ {selected_date}")
-        
-        # === 1. Determine timeframe from button clicks ===
+        # Determine which input triggered the callback
         triggered_id = ctx.triggered_id if ctx.triggered else None
         
-        timeframe_map = {
             "tf-m1": "M1",
             "tf-m15": "M15",
             "tf-h1": "H1",
