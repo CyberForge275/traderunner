@@ -54,10 +54,11 @@ class PrePaperTradeAdapter:
                 progress_callback(msg)  # UI callback
         
         self.progress_callback = _log_and_callback
-        self.signals_db_path = Path("/opt/trading/marketdata-stream/data/signals.db")
-        # For local testing, use a local path
-        if not self.signals_db_path.exists():
-            self.signals_db_path = ROOT / "artifacts" / "signals.db"
+        
+        # Use central Settings for paths (eliminates hard-coded paths)
+        from src.core.settings import get_settings
+        settings = get_settings()
+        self.signals_db_path = settings.signals_db_path
         
         # Initialize DataManager for auto-download capability
         import os
