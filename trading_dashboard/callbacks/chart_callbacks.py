@@ -14,6 +14,18 @@ from visualization.plotly import build_price_chart, PriceChartConfig
 logger = logging.getLogger(__name__)
 
 
+# === TIMEFRAME MAPPING (Single Source of Truth) ===
+# Maps timeframe button IDs from layouts/charts.py to timeframe codes
+# Architecture Test: test_timeframe_coverage.py ensures all tf-* buttons are covered
+TIMEFRAME_MAP = {
+    "tf-m1": "M1",
+    "tf-m5": "M5",
+    "tf-m15": "M15",
+    "tf-h1": "H1",
+    "tf-d1": "D1",
+}
+
+
 def _determine_session_mode(include_pre: bool, include_after: bool) -> str:
     """
     Convert session toggles to SessionMode enum value.
@@ -113,13 +125,7 @@ def register_chart_callbacks(app):
         triggered_id = ctx.triggered_id if ctx.triggered else None
         
         # === 1. Determine timeframe ===
-        timeframe_map = {
-            "tf-m1": "M1",
-            "tf-m15": "M15",
-            "tf-h1": "H1",
-            "tf-d1": "D1",  # NEW: Daily timeframe
-        }
-        timeframe = timeframe_map.get(triggered_id, "M5")  # Default M5
+        timeframe = TIMEFRAME_MAP.get(triggered_id, "M5")  # Default M5
         
         # === 2. Determine timezone ===
         if triggered_id == "tz-ny-btn":
