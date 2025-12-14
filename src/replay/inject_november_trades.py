@@ -93,5 +93,21 @@ def inject_trades(signals_db_path: str):
     return inserted
 
 if __name__ == "__main__":
-    db_path = sys.argv[1] if len(sys.argv) > 1 else "/opt/trading/marketdata-stream/data/signals.db"
+    """
+    Main entry point.
+    
+    Uses central Settings for signals database path (configurable via TRADING_SIGNALS_DB_PATH env var).
+    """
+    if len(sys.argv) > 1:
+        db_path = sys.argv[1]
+    else:
+        # Use Settings for default path
+        script_dir = Path(__file__).resolve().parent
+        project_root = script_dir.parent.parent
+        sys.path.insert(0, str(project_root))
+        
+        from src.core.settings import get_settings
+        settings = get_settings()
+        db_path = str(settings.signals_db_path)
+    
     inject_trades(db_path)

@@ -5,7 +5,7 @@ Time Machine Replay - Inject historical backtest signals into Pre-Papertrading L
 This script:
 1. Loads successful backtest run data
 2. Extracts signal generation moments
-3. Injects them into signals.db (with backup)
+3. Injects them into the signals database (with backup)
 4. Allows rollback if needed
 
 NO CHANGES to Pre-Papertrading Lab code - pure external injection!
@@ -30,7 +30,7 @@ class TimeMachine:
             self.backup_path = self._create_backup()
     
     def _create_backup(self) -> Path:
-        """Create timestamped backup of signals.db."""
+        """Create timestamped backup of signals database."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup = self.signals_db.parent / f"signals_backup_{timestamp}.db"
         shutil.copy2(self.signals_db, backup)
@@ -95,7 +95,7 @@ class TimeMachine:
     
     def inject_signals(self, signals: pd.DataFrame, time_shift: timedelta = None):
         """
-        Inject signals into signals.db.
+        Inject signals into the signals database.
         
         Args:
             signals: DataFrame with signal data
@@ -104,7 +104,7 @@ class TimeMachine:
         if time_shift:
             signals['detected_at'] = signals['detected_at'] + time_shift
         
-        # Connect to signals.db
+        # Connect to signals database
         conn = sqlite3.connect(self.signals_db)
         
         try:
@@ -185,10 +185,30 @@ class TimeMachine:
 
 
 def main():
+    """
+    Main entry point for Time Machine replay.
+    
+    Uses central Settings for signals database path (configurable via TRADING_SIGNALS_DB_PATH env var).
+    """
+    # Import Settings for default path resolution
+    import sys
+    from pathlib import Path as PathLib
+    
+    # Add src to path for Settings import
+    script_dir = PathLib(__file__).resolve().parent
+    project_root = script_dir.parent.parent
+    sys.path.insert(0, str(project_root))
+    
+    from src.core.settings import get_settings
+    
+    # Get default signals DB path from Settings
+    settings = get_settings()
+    default_signals_db = str(settings.signals_db_path)
+    
     parser = argparse.ArgumentParser(description="Time Machine: Replay backtest signals")
     parser.add_argument("--run-id", required=True, help="Backtest run ID")
-    parser.add_argument("--signals-db", default="/opt/trading/marketdata-stream/data/signals.db",
-                       help="Path to signals.db")
+    parser.add_argument("--signals-db", default=default_signals_db,
+                       help=f"Path to signals database (default: from Settings)")
     parser.add_argument("--date", help="Replay specific date (YYYY-MM-DD)")
     parser.add_argument("--no-backup", action="store_true", help="Skip backup creation")
     parser.add_argument("--rollback", action="store_true", help="Rollback last injection")
