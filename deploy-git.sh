@@ -6,7 +6,7 @@ set -e  # Exit on error
 
 SERVER="mirko@192.168.178.55"
 PROJECT_DIR="/opt/trading/traderunner"
-BRANCH="feature/v2-architecture"
+BRANCH="feature/enterprise-metadata-ssot"
 SERVICE="trading-dashboard-v2"
 
 echo "=========================================="
