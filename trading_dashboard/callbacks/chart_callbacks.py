@@ -112,6 +112,8 @@ def register_chart_callbacks(app):
         # Determine which input triggered the callback
         triggered_id = ctx.triggered_id if ctx.triggered else None
         
+        # === 1. Determine timeframe ===
+        timeframe_map = {
             "tf-m1": "M1",
             "tf-m15": "M15",
             "tf-h1": "H1",
