@@ -110,7 +110,7 @@ def register_chart_callbacks(app):
         from ..repositories.candles import (
             get_candle_data,
             get_live_candle_data,
-            get_live_symbols_today
+            check_live_data_availability  # This is the actual function used on line 139
         )
         import dash_bootstrap_components as dbc
         from dash import html
