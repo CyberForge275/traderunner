@@ -2,7 +2,7 @@
 Repository for Pre-PaperTrade Lab data access.
 
 Provides access to:
-- Signals database (signals.db)
+- Signals database (configurable via Settings)
 - Signal history and statistics
 """
 
@@ -16,16 +16,20 @@ from typing import Optional
 import pandas as pd
 
 
-# Database paths
-SIGNALS_DB_SERVER = Path("/opt/trading/marketdata-stream/data/signals.db")
-SIGNALS_DB_LOCAL = Path(__file__).resolve().parents[2] / "artifacts" / "signals.db"
-
-
 def _get_signals_db_path() -> Path:
-    """Get the signals database path (server or local)."""
-    if SIGNALS_DB_SERVER.exists():
-        return SIGNALS_DB_SERVER
-    return SIGNALS_DB_LOCAL
+    """
+    Get the signals database path from central Settings.
+    
+    This eliminates hardcoded paths and makes the database location
+    configurable via environment variables.
+    
+    Returns:
+        Path to signals database
+    """
+    from src.core.settings import get_settings
+    
+    settings = get_settings()
+    return settings.signals_db_path
 
 
 def get_signals_summary(
@@ -35,7 +39,7 @@ def get_signals_summary(
     source: Optional[str] = None,
 ) -> pd.DataFrame:
     """
-    Get summary of signals from signals.db.
+    Get summary of signals from the signals database.
     
     Args:
         start_date: Filter signals from this date

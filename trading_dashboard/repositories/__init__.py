@@ -88,7 +88,7 @@ def get_available_symbols() -> list[str]:
 
 
 def get_recent_patterns(hours: int = 24) -> pd.DataFrame:
-    """Get recent pattern detections from signals.db."""
+    """Get recent pattern detections from signals database."""
     try:
         conn = get_connection(SIGNALS_DB)
         if conn is None:

@@ -5,7 +5,7 @@ This adapter executes strategies in two modes:
 - Replay: Run strategy on historical data
 - Live: Run strategy on live market data
 
-Signals are written to signals.db for testing the signal → order pipeline.
+Signals are written to the signals database for testing the signal → order pipeline.
 """
 
 import sys
@@ -36,7 +36,7 @@ class PrePaperTradeAdapter:
     This adapter:
     - Executes strategies on historical or live data
     - Generates signals using strategy core logic
-    - Writes signals to signals.db
+    - Writes signals to the signals database
     - Provides progress callbacks for UI updates
     """
     
@@ -615,7 +615,7 @@ class PrePaperTradeAdapter:
         # 1. Connect to marketdata-stream websocket or database
         # 2. Subscribe to symbol updates
         # 3. Run strategy detection on incoming ticks
-        # 4. Write signals to signals.db in real-time
+        # 4. Write signals to the signals database in real-time
         
         return {
             "status": "failed",
@@ -796,7 +796,7 @@ class PrePaperTradeAdapter:
     
     def _write_signals_to_db(self, signals: List[Dict], source: str):
         """
-        Write signals to signals.db.
+        Write signals to the signals database.
         
         Args:
             signals: List of signal dictionaries

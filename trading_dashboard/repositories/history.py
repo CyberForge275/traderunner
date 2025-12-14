@@ -27,7 +27,7 @@ def get_events_by_date(
     """
     events = []
     
-    # Get pattern detections from signals.db
+    # Get pattern detections from signals database
     try:
         conn = sqlite3.connect(str(SIGNALS_DB))
         query = """
