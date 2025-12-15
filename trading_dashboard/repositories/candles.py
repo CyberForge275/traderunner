@@ -162,7 +162,8 @@ def get_candle_data(symbol: str, timeframe: str = "M5", hours: int = 24, referen
             if 'timestamp' in df.columns:
                 df['timestamp'] = pd.to_datetime(df['timestamp'])
             
-            # Filter by reference_date if provided
+            # Filter by reference_date ONLY if it's explicitly a past date
+            # Don't filter if reference_date is today - show latest data
             if reference_date is not None:
                 from datetime import date as date_type, datetime
                 if isinstance(reference_date, date_type):
@@ -170,8 +171,13 @@ def get_candle_data(symbol: str, timeframe: str = "M5", hours: int = 24, referen
                 else:
                     ref_date = datetime.fromisoformat(str(reference_date)).date()
                 
-                # Filter to only this date
-                df = df[df['timestamp'].dt.date == ref_date]
+                # Only filter if user selected a PAST date (not today)
+                today = datetime.now().date()
+                if ref_date < today:
+                    # User wants historical data - filter to that date
+                    df = df[df['timestamp'].dt.date == ref_date]
+                    logger.info(f"📅 Filtered to historical date: {ref_date}")
+                # If ref_date == today, show all available data (no filtering)
             
             # If we have data, return it
             if not df.empty:
