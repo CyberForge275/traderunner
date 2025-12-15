@@ -22,6 +22,7 @@ import logging
 from datetime import date
 
 from axiom_bt.intraday import IntradayStore, Timeframe
+from trading_dashboard.utils.chart_preprocess import preprocess_for_chart
 from visualization.plotly import build_price_chart, PriceChartConfig
 
 logger = logging.getLogger(__name__)
@@ -105,8 +106,6 @@ def register_charts_backtesting_callbacks(app):
             timeframe = Timeframe(timeframe_str)
             df = intraday_store.load(symbol, timeframe=timeframe)
             
-            rows_after_load = len(df)
-            
             if df.empty:
                 # === EMPTY STATE WITH EXPLANATION ===
                 empty_fig = go.Figure()
@@ -125,51 +124,34 @@ def register_charts_backtesting_callbacks(app):
                 
                 return empty_fig
             
-            # === DATE FILTERING (Optional, in market TZ) ===
-            # Note: This happens BEFORE timezone conversion
+            # === USE HELPER FOR ALL TRANSFORMATIONS ===
+            # Convert selected_date string to date object if provided
+            ref_date = None
             if selected_date:
                 ref_date = pd.to_datetime(selected_date).date()
-                today = date.today()
-                
-                if ref_date < today:
-                    # Historical date - filter to that day
-                    df = df[df.index.date == ref_date]
-                    logger.info(f"📅 Filtered to date: {ref_date}")
             
-            # === DROP NaN ROWS ===
-            rows_before_dropna = len(df)
-            df = df.dropna(subset=['open', 'high', 'low', 'close'])
-            rows_after_dropna = len(df)
+            df_processed, meta = preprocess_for_chart(
+                df=df,
+                source="BACKTEST_PARQUET",
+                ref_date=ref_date,  # Will filter if < today
+                display_tz=display_tz,
+                market_tz="America/New_York"
+            )
             
-            if rows_before_dropna > rows_after_dropna:
-                logger.debug(
-                    f"🧹 Dropped {rows_before_dropna - rows_after_dropna} NaN rows "
-                    f"({rows_after_dropna} valid bars remaining)"
-                )
+            # === LOG METADATA ===
+            logger.info(f"chart_meta {meta}")
             
-            if df.empty:
+            if len(df_processed) == 0:
+                # Empty after preprocessing
                 empty_fig = go.Figure()
                 empty_fig.add_annotation(
                     text=f"📭 No data after filters for {symbol} {timeframe_str}<br>" +
-                         f"<sub>Date filter may have removed all rows</sub>",
+                         f"<sub>Date filter may have removed all rows | rows_after={meta['rows_after']}</sub>",
                     xref="paper", yref="paper",
                     x=0.5, y=0.5, showarrow=False,
                     font=dict(size=16)
                 )
                 return empty_fig
-            
-            # === TIMEZONE CONVERSION FOR DISPLAY ===
-            # CRITICAL: This MUST NOT change row count
-            if display_tz != "America/New_York":
-                df.index = df.index.tz_convert(display_tz)
-            
-            rows_after_tz_conversion = len(df)
-            
-            # === INVARIANT CHECK ===
-            assert rows_after_dropna == rows_after_tz_conversion, (
-                f"TZ conversion changed row count! "
-                f"Before: {rows_after_dropna}, After: {rows_after_tz_conversion}"
-            )
             
             # === BUILD CHART ===
             config = PriceChartConfig(
@@ -178,17 +160,7 @@ def register_charts_backtesting_callbacks(app):
                 show_volume=True,
             )
             
-            fig = build_price_chart(df, indicators=[], config=config)
-            
-            # === FINAL LOGGING ===
-            first_ts = df.index[0] if len(df) > 0 else None
-            last_ts = df.index[-1] if len(df) > 0 else None
-            
-            logger.info(
-                f"source=BACKTEST_PARQUET symbol={symbol} tf={timeframe_str} rows={len(df)} "
-                f"first_ts={first_ts} last_ts={last_ts} "
-                f"market_tz=America/New_York display_tz={display_tz}"
-            )
+            fig = build_price_chart(df_processed, indicators=[], config=config)
             
             return fig
             

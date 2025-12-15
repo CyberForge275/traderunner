@@ -23,6 +23,7 @@ import pandas as pd
 import logging
 
 from trading_dashboard.repositories.live_candles import LiveCandlesRepository
+from trading_dashboard.utils.chart_preprocess import preprocess_for_chart
 from visualization.plotly import build_price_chart, PriceChartConfig
 
 logger = logging.getLogger(__name__)
@@ -100,10 +101,8 @@ def register_charts_live_callbacks(app):
             df = live_repo.load_candles(
                 symbol=symbol,
                 timeframe=timeframe,
-                limit=500  # Hardcoded limit is OK here (not a business rule)
+                limit=500  # Hardcoded limit OK (not a business rule)
             )
-            
-            rows_after_load = len(df)
             
             if df.empty:
                 # === EMPTY STATE WITH EXPLANATION ===
@@ -123,29 +122,29 @@ def register_charts_live_callbacks(app):
                 
                 return empty_fig, "No data", "🔴"
             
-            # === TIMEZONE CONVERSION FOR DISPLAY ===
-            # CRITICAL: This MUST NOT change row count
-            if display_tz != "America/New_York":
-                df.index = df.index.tz_convert(display_tz)
-            
-            rows_after_tz_conversion = len(df)
-            
-            # === INVARIANT CHECK ===
-            assert rows_after_load == rows_after_tz_conversion, (
-                f"TZ conversion changed row count! "
-                f"Before: {rows_after_load}, After: {rows_after_tz_conversion}"
+            # === USE HELPER FOR ALL TRANSFORMATIONS ===
+            df_processed, meta = preprocess_for_chart(
+                df=df,
+                source="LIVE_SQLITE",
+                ref_date=None,  # Live NEVER filters by date
+                display_tz=display_tz,
+                market_tz="America/New_York"
             )
             
-            # === DROP NaN ROWS (after-hours bars) ===
-            rows_before_dropna = len(df)
-            df = df.dropna(subset=['open', 'high', 'low', 'close'])
-            rows_after_dropna = len(df)
+            # === LOG METADATA ===
+            logger.info(f"chart_meta {meta}")
             
-            if rows_before_dropna > rows_after_dropna:
-                logger.debug(
-                    f"🧹 Dropped {rows_before_dropna - rows_after_dropna} NaN rows "
-                    f"({rows_after_dropna} valid bars remaining)"
+            if len(df_processed) == 0:
+                # Empty after preprocessing (e.g., all NaN)
+                empty_fig = go.Figure()
+                empty_fig.add_annotation(
+                    text=f"📭 No valid data after preprocessing for {symbol} {timeframe}<br>" +
+                         f"<sub>source: LIVE_SQLITE | rows_after={meta['rows_after']}</sub>",
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5, showarrow=False,
+                    font=dict(size=16)
                 )
+                return empty_fig, "No valid data", "🔴"
             
             # === GET FRESHNESS ===
             freshness = live_repo.get_freshness(symbol, timeframe)
