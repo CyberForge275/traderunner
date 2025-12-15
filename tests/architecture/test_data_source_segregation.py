@@ -258,3 +258,28 @@ def test_separate_repositories_exist():
     assert 'LiveCandlesRepository' in content, (
         "live_candles.py must contain LiveCandlesRepository class"
     )
+
+
+def test_helper_has_no_source_imports():
+    """Chart preprocessing helper must not import data sources."""
+    helper_path = REPO_ROOT / 'trading_dashboard/utils/chart_preprocess.py'
+    
+    assert helper_path.exists(), (
+        "chart_preprocess.py helper must exist"
+    )
+    
+    with open(helper_path) as f:
+        content = f.read()
+    
+    # Forbidden tokens
+    forbidden = ['sqlite3', 'read_parquet', 'IntradayStore', 'artifacts/data_m']
+    found = [token for token in forbidden if token in content]
+    
+    assert not found, (
+        f"❌ Chart preprocessing helper VIOLATED SOURCE NEUTRALITY!\n"
+        f"File: {helper_path}\n"
+        f"Forbidden tokens found: {found}\n"
+        f"\n"
+        f"Helper must be source-agnostic - NO direct data access.\n"
+        f"It receives DataFrames and transforms them only."
+    )
