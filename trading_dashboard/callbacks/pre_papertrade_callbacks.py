@@ -191,26 +191,64 @@ def register_pre_papertrade_callbacks(app):
                                 True,  # Disable interval
                             )
                     
+                    # NEW: Lifecycle Integration for InsideBar Intraday
+                    # Resolve strategy version for lifecycle tracking
+                    strategy_version_id = None
+                    version_metadata = None
+                    
+                    if strategy_name == "insidebar_intraday":
+                        try:
+                            from trading_dashboard.utils.version_resolver import (
+                                resolve_pre_paper_version,
+                                format_version_for_ui
+                            )
+                            
+                            resolved_version = resolve_pre_paper_version(strategy_name)
+                            strategy_version_id = resolved_version.id
+                            version_metadata = format_version_for_ui(resolved_version)
+                            
+                        except Exception as e:
+                            # Version resolution failed - show clear error
+                            from dash import html
+                            return (
+                                [
+                                    html.H4("❌ Strategy Version Error", className="text-danger"),
+                                    html.P(str(e)),
+                                    html.P(
+                                        "The backend requires a valid strategy version for lifecycle tracking.",
+                                        className="text-muted"
+                                    ),
+                                ],
+                                "danger",
+                                [],
+                                "0",
+                                "0",
+                                "0",
+                                True,  # Disable interval
+                            )
+                    
                     if mode == "live":
                         # Live mode
                         result = adapter.execute_strategy(
                             strategy=strategy_name,
-                            version=version,  # NEW: Pass version
+                            version=version,  # Legacy parameter
                             mode="live",
                             symbols=symbols,
                             timeframe=timeframe,
-                            config_params=config_params if config_params else None,  # NEW
+                            config_params=config_params if config_params else None,
+                            strategy_version_id=strategy_version_id,  # NEW: Lifecycle tracking
                         )
                     else:
                         # Time Machine replay mode
                         result = adapter.execute_strategy(
                             strategy=strategy_name,
-                            version=version,  # NEW: Pass version
+                            version=version,  # Legacy parameter
                             mode="replay",
                             symbols=symbols,
                             timeframe=timeframe,
                             replay_date=replay_date,
-                            config_params=config_params if config_params else None,  # NEW
+                            config_params=config_params if config_params else None,
+                            strategy_version_id=strategy_version_id,  # NEW: Lifecycle tracking
                         )
 
                     if result["status"] == "completed":
@@ -234,8 +272,36 @@ def register_pre_papertrade_callbacks(app):
                         buy_count = sum(1 for s in signals if s["side"] == "BUY")
                         sell_count = sum(1 for s in signals if s["side"] == "SELL")
                         
+                        # Build success message with lifecycle metadata
+                        from dash import html
+                        
+                        status_parts = [
+                            html.Span(f"✅ Completed: {len(signals)} signals generated")
+                        ]
+                        
+                        # Add lifecycle information if available
+                        if "strategy_version" in result:
+                            v = result["strategy_version"]
+                            status_parts.append(html.Br())
+                            status_parts.append(
+                                html.Small(
+                                    f"📋 Version: {v['label']} (ID={v['id']}, Stage={v['lifecycle_stage']})",
+                                    className="text-muted"
+                                )
+                            )
+                        
+                        if "strategy_run_id" in result:
+                            run_id = result["strategy_run_id"]
+                            status_parts.append(html.Br())
+                            status_parts.append(
+                                html.Small(
+                                    f"🏃 Run ID: {run_id}",
+                                    className="text-muted"
+                                )
+                            )
+                        
                         return (
-                            f"✅ Completed: {len(signals)} signals generated",
+                            status_parts,
                             "success",
                             table_data,
                             str(len(signals)),

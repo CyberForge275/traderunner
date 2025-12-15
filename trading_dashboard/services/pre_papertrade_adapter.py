@@ -458,6 +458,14 @@ class PrePaperTradeAdapter:
                     import traceback
                     traceback.print_exc()
             
+            # Enrich result with lifecycle metadata (if available)
+            if run_id:
+                result["strategy_run_id"] = run_id
+            
+            if strategy_version:
+                from trading_dashboard.utils.version_resolver import format_version_for_ui
+                result["strategy_version"] = format_version_for_ui(strategy_version)
+            
             return result
                 
         except Exception as e:
