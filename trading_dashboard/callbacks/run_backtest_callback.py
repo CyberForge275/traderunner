@@ -240,187 +240,138 @@ def register_run_backtest_callback(app):
         prevent_initial_call=True
     )
     def update_pipeline_log(n_intervals, current_job_id):
-        """Fetch and display pipeline execution log incrementally from active job."""
+        """Fetch and display pipeline execution log with progress bar."""
         from pathlib import Path
-        import json
         from dash import no_update
+        from ..utils.backtest_log_utils import (
+            get_pipeline_log_state,
+            format_step_icon,
+            format_step_color,
+        )
+        from ..config import BACKTESTS_DIR
         
         # No active job being tracked
         if not current_job_id:
             return no_update
         
-        # Build path to run_log.json for this job
-        log_path = Path(f"/home/mirko/data/workspace/droid/traderunner/artifacts/backtests/{current_job_id}/run_log.json")
+        # Use utility to parse log
+        log_state = get_pipeline_log_state(current_job_id, BACKTESTS_DIR)
         
-        if not log_path.exists():
-            # Log file not created yet, show waiting message
+        # No log file yet
+        if log_state.total_steps == 0 and log_state.overall_status == "pending":
             return html.Div([
                 html.H6("📋 Pipeline Execution Log", style={"marginTop": "20px", "marginBottom": "10px"}),
-                html.P("⏳ Waiting for pipeline to start writing log...", 
-                       style={"color": "#888", "fontSize": "0.9em"})
+                dbc.Spinner(size="sm", color="primary", spinner_style={"marginRight": "8px"}),
+                html.Span("⏳ Waiting for pipeline to start...", 
+                         style={"color": "#888", "fontSize": "0.9em"})
             ])
         
-        # Try to read log file (may be partially written)
-        try:
-            with open(log_path, 'r') as f:
-                run_log = json.load(f)
-        except json.JSONDecodeError:
-            # File is being written, show last known state or wait
+        # Error reading log
+        if log_state.total_steps == 0 and log_state.overall_status == "error":
             return html.Div([
                 html.H6("📋 Pipeline Execution Log", style={"marginTop": "20px", "marginBottom": "10px"}),
-                html.P("⏳ Log file being updated...", 
-                       style={"color": "#888", "fontSize": "0.9em"})
-            ])
-        except Exception as e:
-            # Unexpected error
-            return html.Div([
-                html.H6("📋 Pipeline Execution Log", style={"marginTop": "20px", "marginBottom": "10px"}),
-                html.P(f"❌ Error reading log: {str(e)}", 
+                html.P(f"❌ Error reading log for run: {current_job_id}", 
                        style={"color": "#dc3545", "fontSize": "0.9em"})
             ])
         
-        # Format log entries incrementally
-        entries = run_log.get('entries', [])
-        status = run_log.get('status', 'running')
+        # Build display with progress bar
+        display_components = []
         
-        if not entries:
-            return html.Div([
-                html.H6("📋 Pipeline Execution Log", style={"marginTop": "20px", "marginBottom": "10px"}),
-                html.P("⏳ Waiting for first step to complete...", 
-                       style={"color": "#888", "fontSize": "0.9em"})
+        # Header with title
+        display_components.append(
+            html.H6("📋 Pipeline Execution", 
+                   style={"marginTop": "20px", "marginBottom": "15px", "fontWeight": "600"})
+        )
+        
+        # Progress bar
+        progress_color = "success" if log_state.overall_status == "success" else \
+                        "danger" if log_state.overall_status == "error" else \
+                        "info"
+        
+        progress_label = f"Step {log_state.completed_steps}/{log_state.total_steps}"
+        if log_state.current_step:
+            progress_label += f": {log_state.current_step}"
+        
+        display_components.append(
+            html.Div([
+                html.Div(progress_label, 
+                        style={"fontSize": "0.85em", "marginBottom": "6px", "fontWeight": "500"}),
+                dbc.Progress(
+                    value=log_state.progress_pct,
+                    color=progress_color,
+                    striped=log_state.overall_status == "running",
+                    animated=log_state.overall_status == "running",
+                    style={"height": "20px", "marginBottom": "16px"},
+                    className="mb-3"
+                )
             ])
+        )
         
-        # Build formatted display
-        log_display = [html.H6("📋 Pipeline Execution", style={"marginTop": "20px", "marginBottom": "15px"})]
+        # Overall status badge
+        if log_state.overall_status == "success":
+            display_components.append(
+                html.Div("✅ Pipeline completed successfully", 
+                        style={"color": "#28a745", "fontWeight": "600", "marginBottom": "12px"})
+            )
+        elif log_state.overall_status == "error":
+            display_components.append(
+                html.Div("❌ Pipeline failed", 
+                        style={"color": "#dc3545", "fontWeight": "600", "marginBottom": "12px"})
+            )
+        elif log_state.overall_status == "running":
+            display_components.append(
+                html.Div([
+                    dbc.Spinner(size="sm", color="primary", spinner_style={"marginRight": "6px"}),
+                    html.Span("🔄 Pipeline running...", style={"fontWeight": "600"})
+                ], style={"color": "#007bff", "marginBottom": "12px"})
+            )
         
-        # Add overall status indicator if completed
-        if status in ['success', 'completed']:
-            log_display.append(html.Div("✅ Pipeline completed successfully", 
-                                        style={"color": "#28a745", "fontWeight": "600", "marginBottom": "12px"}))
-        elif status in ['error', 'failed']:
-            log_display.append(html.Div("❌ Pipeline failed", 
-                                        style={"color": "#dc3545", "fontWeight": "600", "marginBottom": "12px"}))
-        elif status == 'running':
-            log_display.append(html.Div("🔄 Pipeline running...", 
-                                        style={"color": "#007bff", "fontWeight": "600", "marginBottom": "12px"}))
-        
-        # Format each entry
-        for idx, entry in enumerate(entries, 1):
-            kind = entry.get('kind', '')
-            title = entry.get('title', f'Step {idx}')
-            entry_status = entry.get('status', '')
-            duration = entry.get('duration')
+        # Compact step list
+        steps_display = []
+        for idx, step in enumerate(log_state.steps, 1):
+            icon = format_step_icon(step.status)
+            color = format_step_color(step.status)
             
-            # Skip meta entries
-            if kind in ['run_meta', 'step']:
-                continue
+            # Determine if this is the current step
+            is_current = (step.name == log_state.current_step)
             
-            # Status styling
-            status_color = {
-                'success': '#28a745',
-                'error': '#dc3545',
-                'warning': '#ffc107',
-                'info': '#17a2b8',
-            }.get(entry_status, '#6c757d')
+            step_style = {
+                "padding": "8px 12px",
+                "marginBottom": "4px",
+                "borderLeft": f"3px solid {color}",
+                "backgroundColor": "#f8f9fa" if not is_current else "#e3f2fd",
+                "borderRadius": "3px",
+                "fontSize": "0.9em",
+            }
             
-            status_icon = {
-                'success': '✓',
-                'error': '✗',
-                'warning': '⚠',
-            }.get(entry_status, '•')
-            
-            # Build header
-            header_parts = [
-                html.Span(f"Step {idx} • ", style={"fontWeight": "600", "fontSize": "0.9em", "color": "#666"}),
-                html.Span(title, style={"marginRight": "8px"}),
+            step_content = [
+                html.Span(f"{icon} ", style={"marginRight": "6px", "fontSize": "1.1em"}),
+                html.Span(f"{idx}. ", style={"fontWeight": "600", "color": "#666", "marginRight": "4px"}),
+                html.Span(step.name, style={"fontWeight": "500" if is_current else "normal"}),
             ]
             
-            if entry_status:
-                header_parts.append(
-                    html.Span(f"{status_icon} {entry_status}", 
-                             style={"color": status_color, "fontSize": "0.85em", "fontWeight": "500"})
+            # Add duration if available
+            if step.duration is not None:
+                step_content.append(
+                    html.Span(f" ({step.duration:.1f}s)", 
+                             style={"fontSize": "0.85em", "color": "#999", "marginLeft": "6px"})
                 )
             
-            step_header = html.Div(
-                header_parts,
-                style={
-                    "padding": "8px 12px",
-                    "backgroundColor": "#f8f9fa",
-                    "borderLeft": f"3px solid {status_color}",
-                    "marginBottom": "8px",
-                    "borderRadius": "3px",
-                }
-            )
+            # Add current indicator
+            if is_current:
+                step_content.append(
+                    html.Span(" ← current", 
+                             style={"fontSize": "0.8em", "color": "#007bff", 
+                                   "marginLeft": "8px", "fontStyle": "italic"})
+                )
             
-            # Build details
-            details_parts = []
-            
-            if kind == 'command':
-                command = entry.get('command', '')
-                output = entry.get('output', '')
-                return_code = entry.get('return_code')
-                
-                if command:
-                    details_parts.append(
-                        html.Pre(command, style={
-                            "backgroundColor": "#2b2b2b",
-                            "color": "#d4d4d4",
-                            "padding": "8px",
-                            "borderRadius": "3px",
-                            "fontSize": "0.8em",
-                            "overflow": "auto",
-                            "marginBottom": "8px",
-                        })
-                    )
-                
-                info_line_parts = []
-                if return_code is not None:
-                    info_line_parts.append(f"Return code: {return_code}")
-                if duration is not None:
-                    info_line_parts.append(f"Duration: {duration:.2f}s")
-                
-                if info_line_parts:
-                    details_parts.append(
-                        html.P(" • ".join(info_line_parts), 
-                               style={"fontSize": "0.85em", "color": "#666", "margin": "4px 0"})
-                    )
-                
-                if output:
-                    details_parts.append(
-                        html.Pre(output, style={
-                            "backgroundColor": "#272822",
-                            "color": "#f8f8f2",
-                            "padding": "12px",
-                            "borderRadius": "4px",
-                            "fontSize": "0.82em",
-                            "overflow": "auto",
-                            "maxHeight": "300px",
-                            "marginTop": "8px",
-                        })
-                    )
-            
-            elif kind == 'message':
-                message = entry.get('message', '')
-                if message:
-                    details_parts.append(
-                        html.P(message, style={"fontSize": "0.9em", "margin": "8px 0", "color": "#333"})
-                    )
-                if duration is not None:
-                    details_parts.append(
-                        html.P(f"Duration: {duration:.2f}s", 
-                               style={"fontSize": "0.85em", "color": "#666", "margin": "4px 0"})
-                    )
-            
-            # Combine
-            log_display.append(
-                html.Div([
-                    step_header,
-                    html.Div(details_parts, style={"paddingLeft": "12px", "marginBottom": "16px"})
-                ])
-            )
+            steps_display.append(html.Div(step_content, style=step_style))
         
+        display_components.append(html.Div(steps_display, style={"marginTop": "12px"}))
+        
+        # Wrap everything
         return html.Div(
-            log_display,
+            display_components,
             style={
                 "marginTop": "20px",
                 "padding": "16px",
