@@ -277,6 +277,15 @@ def register_chart_callbacks(app):
             
             # Set as index for builder
             ohlcv = df.set_index('timestamp')[['open', 'high', 'low', 'close', 'volume']]
+            
+            # CRITICAL: Drop NaN rows (after-hours/pre-market bars with no data)
+            # Plotly Candlestick cannot handle NaN values
+            rows_before = len(ohlcv)
+            ohlcv = ohlcv.dropna(subset=['open', 'high', 'low', 'close'])
+            rows_after = len(ohlcv)
+            
+            if rows_before > rows_after:
+                logger.info(f"🧹 Dropped {rows_before - rows_after} NaN rows ({rows_after} valid bars remaining)")
         else:
             # Fallback if no timestamp column
             ohlcv = df[['open', 'high', 'low', 'close', 'volume']]
