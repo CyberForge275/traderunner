@@ -161,11 +161,22 @@ def format_run_history_for_table(runs: List[Dict]) -> List[Dict]:
         else:
             date_str = "N/A"
         
+        # Status badge formatting
+        status_raw = run.get("status", "N/A")
+        if status_raw == "completed":
+            status_display = "✅ Completed"
+        elif status_raw == "failed":
+            status_display = "❌ Failed"
+        elif status_raw == "running":
+            status_display = "🔄 Running"
+        else:
+            status_display = status_raw.capitalize() if status_raw != "N/A" else "N/A"
+        
         table_row = {
             "Run ID": run["run_id"],
             "Date/Time": date_str,
             "Mode": run["run_type"].capitalize() if run.get("run_type") else "N/A",
-            "Status": run["status"].capitalize() if run.get("status") else "N/A",
+            "Status": status_display,  # With emoji badge
             "Signals": run.get("signals", "N/A"),
             "Symbols": run.get("symbols", "N/A"),
             "Duration": f"{run['duration_seconds']}s" if run.get("duration_seconds") is not None else "N/A"

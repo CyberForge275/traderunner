@@ -54,15 +54,18 @@ def register_pre_papertrade_callbacks(app):
         
         # Hardcoded strategy descriptions (avoid import issues)
         strategy_descriptions = {
-            "insidebar_intraday": "Inside Bar Intraday - Pattern breakout strategy (V1)",
-            "insidebar_intraday_v2": "Inside Bar Intraday v2 - Enhanced pattern breakout with strict filtering (V2)",
+            "insidebar_intraday": "InsideBar Intraday - Pattern breakout strategy (V1)",
+            "insidebar_intraday_v2": "InsideBar Intraday v2 - Enhanced pattern breakout with strict filtering (V2)",
             "rudometkin_moc_mode": "Rudometkin MOC - Market-On-Close mean reversion system",
         }
         
         if not strategy:
             return html.Small("Select a strategy", className="text-muted")
         
-        description = strategy_descriptions.get(strategy, "Unknown strategy")
+        # Extract base strategy key (handle "strategy|version" format)
+        base_strategy = strategy.split("|")[0] if "|" in strategy else strategy
+        
+        description = strategy_descriptions.get(base_strategy, f"Strategy: {base_strategy.replace('_', ' ').title()}")
         return html.Small(description, className="text-muted")
 
     @app.callback(
@@ -85,6 +88,18 @@ def register_pre_papertrade_callbacks(app):
             return options
         except Exception:
             return []
+    
+    @app.callback(
+        Output("technical-details-collapse", "is_open"),
+        Input("technical-details-toggle", "n_clicks"),
+        State("technical-details-collapse", "is_open"),
+        prevent_initial_call=True
+    )
+    def toggle_technical_details(n_clicks, is_open):
+        """Toggle technical details section visibility."""
+        if n_clicks:
+            return not is_open
+        return is_open
 
     @app.callback(
         [
@@ -282,37 +297,37 @@ def register_pre_papertrade_callbacks(app):
                         buy_count = sum(1 for s in signals if s["side"] == "BUY")
                         sell_count = sum(1 for s in signals if s["side"] == "SELL")
                         
-                        # Build success message with lifecycle metadata
+                        
+                        # Build success message with improved contrast
                         from dash import html
+                        from trading_dashboard.utils.run_summary_utils import build_run_summary
                         
-                        status_parts = [
-                            html.Span(f"✅ Completed: {len(signals)} signals generated")
-                        ]
-                        
-                        # Add lifecycle information if available
-                        if "strategy_version" in result:
-                            v = result["strategy_version"]
-                            status_parts.append(html.Br())
-                            status_parts.append(
-                                html.Small(
-                                    f"📋 Version: {v['label']} (ID={v['id']}, Stage={v['lifecycle_stage']})",
-                                    className="text-muted"
-                                )
+                        # Main success header with better contrast
+                        status_header = html.Div([
+                            html.H5(
+                                f"✅ Completed: {len(signals)} signals generated",
+                                className="mb-0 text-success"
                             )
+                        ], className="p-3 bg-success-subtle border border-success rounded")
                         
-                        if "strategy_run_id" in result:
-                            run_id = result["strategy_run_id"]
-                            status_parts.append(html.Br())
-                            status_parts.append(
-                                html.Small(
-                                    f"🏃 Run ID: {run_id}",
-                                    className="text-muted"
-                                )
-                            )
+                        # Build comprehensive run summary
+                        run_summary = build_run_summary(
+                            result=result,
+                            strategy=strategy,
+                            mode=mode,
+                            symbols_str=symbols_str,
+                            timeframe=timeframe,
+                            replay_date=replay_date,
+                            session_filter_input=session_filter_input,
+                            show_technical_details=True
+                        )
+                        
+                        # Combine header and summary
+                        status_parts = [status_header] + run_summary
                         
                         return (
                             status_parts,
-                            "success",
+                            "light",  # Changed from "success" for better contrast
                             table_data,
                             str(len(signals)),
                             str(buy_count),

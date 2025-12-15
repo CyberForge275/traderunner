@@ -243,7 +243,7 @@ class TestRunHistoryUtils:
         assert "Run ID" in table_data[0]
         assert table_data[0]["Run ID"] == 1
         assert table_data[0]["Mode"] == "Replay"
-        assert table_data[0]["Status"] == "Completed"
+        assert table_data[0]["Status"] == "✅ Completed"  # With emoji badge
         assert table_data[0]["Signals"] == 3
     
     def test_run_history_handles_missing_version_gracefully(self):

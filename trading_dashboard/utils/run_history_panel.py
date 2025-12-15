@@ -72,16 +72,19 @@ def build_run_history_panel(strategy_key: str):
                             },
                             style_header={
                                 "fontWeight": "bold",
-                                "backgroundColor": "#f8f9fa",
+                                "backgroundColor": "#e9ecef",
+                                "color": "#212529",
+                                "border": "1px solid #dee2e6"
                             },
+                            style_data={
+                                "border": "1px solid #dee2e6"
+                            },
+                            # Remove aggressive row coloring - use subtle hover instead
                             style_data_conditional=[
                                 {
-                                    "if": {"filter_query": "{Status} = Completed"},
-                                    "backgroundColor": "#d4edda",
-                                },
-                                {
-                                    "if": {"filter_query": "{Status} = Failed"},
-                                    "backgroundColor": "#f8d7da",
+                                    # Subtle hover effect
+                                    "if": {"state": "active"},
+                                    "backgroundColor": "#f8f9fa",
                                 },
                             ],
                         ),
