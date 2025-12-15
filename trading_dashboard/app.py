@@ -18,6 +18,8 @@ from trading_dashboard.layouts import (
     get_backtests_content,
     get_pre_papertrade_content,
 )
+from trading_dashboard.layouts.charts_live import get_charts_live_content
+from trading_dashboard.layouts.charts_backtesting import get_charts_backtesting_content
 from trading_dashboard.callbacks.chart_callbacks import register_chart_callbacks
 from trading_dashboard.callbacks.timeframe_callbacks import register_timeframe_callbacks
 from trading_dashboard.callbacks.timezone_callbacks import register_timezone_callbacks
@@ -32,6 +34,8 @@ from trading_dashboard.callbacks.date_selection_callback import register_date_se
 from trading_dashboard.callbacks.symbol_selector_callback import register_symbol_selector_callbacks
 from trading_dashboard.callbacks.timestamp_prefix_callback import register_timestamp_prefix_callback
 from trading_dashboard.callbacks.freshness_callback import register_freshness_callback
+from trading_dashboard.callbacks.charts_live_callbacks import register_charts_live_callbacks
+from trading_dashboard.callbacks.charts_backtesting_callbacks import register_charts_backtesting_callbacks
 
 # Setup logging FIRST
 from trading_dashboard.logging_config import setup_logging
@@ -70,7 +74,8 @@ app.layout = html.Div([
         children=[
             dbc.Tab(label="Live Monitor", tab_id="live-monitor"),
             dbc.Tab(label="Portfolio", tab_id="portfolio"),
-            dbc.Tab(label="Charts", tab_id="charts"),
+            dbc.Tab(label="📊 Charts - Live", tab_id="charts-live"),
+            dbc.Tab(label="📈 Charts - Backtesting", tab_id="charts-backtesting"),
             dbc.Tab(label="History", tab_id="history"),
             dbc.Tab(label="Backtests", tab_id="backtests"),
             dbc.Tab(label="Pre-PaperTrade Lab", tab_id="pre-papertrade"),
@@ -120,18 +125,17 @@ def update_content(active_tab, n_intervals):
     # Check what triggered this callback
     triggered_id = ctx.triggered_id if ctx.triggered else None
     
-    # For Charts tab, ONLY update when tab is switched, NOT on interval
-    if active_tab == "charts" and triggered_id == "refresh-interval":
-        # Don't update - return current content without re-rendering
-        from dash import no_update
-        return no_update, time_str, update_str
-    
     if active_tab == "live-monitor":
         content = get_live_monitor_content()
     elif active_tab == "portfolio":
         content = get_portfolio_content()
+    elif active_tab == "charts-live":
+        content = get_charts_live_content()
+    elif active_tab == "charts-backtesting":
+        content = get_charts_backtesting_content()
     elif active_tab == "charts":
-        content = get_charts_content()
+        # Legacy fallback - redirect to backtesting
+        content = get_charts_backtesting_content()
     elif active_tab == "history":
         content = get_history_content()
     elif active_tab == "backtests":
@@ -169,6 +173,8 @@ register_date_selection_callback(app)
 register_symbol_selector_callbacks(app)
 register_timestamp_prefix_callback(app)  # Timestamp prefix display
 register_freshness_callback(app)  # Data freshness indicators
+register_charts_live_callbacks(app)  # NEW: Live Charts tab
+register_charts_backtesting_callbacks(app)  # NEW: Backtesting Charts tab
 
 # Initialize strategy configuration plugins
 # MUST be before if __name__ == "__main__" so gunicorn can import it!
