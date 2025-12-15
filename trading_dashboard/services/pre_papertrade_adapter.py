@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Callable, Literal
 from datetime import datetime, date
 import pandas as pd
+import logging
+import json
 
 # Add necessary paths
 ROOT = Path(__file__).resolve().parents[2]
@@ -94,6 +96,47 @@ class PrePaperTradeAdapter:
         # Currently no resources that need explicit cleanup
         return False  # Don't suppress exceptions
     
+    def _validate_strategy_version(self, version) -> None:
+        """
+        Validate strategy version is eligible for Pre-PaperTrading.
+        
+        Implements gating rules from FACTORY_LABS_AND_STRATEGY_LIFECYCLE_v2.md:
+        - Beta versions (impl_version < 1) are NOT allowed
+        - lifecycle_stage must be >= BACKTEST_APPROVED
+        
+        Args:
+            version: StrategyVersion object from repository
+            
+        Raises:
+            ValueError: If version doesn't meet requirements
+        """
+        from trading_dashboard.repositories.strategy_metadata import LifecycleStage
+        
+        # Gate 1: Beta-Sperre (Beta Lock)
+        if version.impl_version < 1:
+            raise ValueError(
+                f"❌ GATING FAILURE: Beta version not allowed in Pre-PaperTrading.\\n"
+                f"   Strategy: {version.strategy_key}\\n"
+                f"   impl_version: {version.impl_version} (must be >= 1)\\n"
+                f"   label: {version.label}\\n"
+                f"\\n"
+                f"Beta versions (impl_version < 1) are only for Explore/Backtest Labs.\\n"
+                f"Please promote to stable version (impl_version >= 1) first."
+            )
+        
+        # Gate 2: Lifecycle-Sperre (Lifecycle Lock)
+        if version.lifecycle_stage < LifecycleStage.BACKTEST_APPROVED:
+            raise ValueError(
+                f"❌ GATING FAILURE: Strategy version not approved for Pre-PaperTrading.\\n"
+                f"   Strategy: {version.strategy_key}\\n"
+                f"   lifecycle_stage: {version.lifecycle_stage.name}\\n"
+                f"   Required: {LifecycleStage.BACKTEST_APPROVED.name} or higher\\n"
+                f"   label: {version.label}\\n"
+                f"\\n"
+                f"This version has not completed Backtest Lab approval.\\n"
+                f"Please promote lifecycle_stage to BACKTEST_APPROVED first."
+            )
+    
     def execute_strategy(
         self,
         strategy: str,
@@ -101,8 +144,9 @@ class PrePaperTradeAdapter:
         symbols: List[str],
         timeframe: str,
         replay_date: Optional[str] = None,
-        version: Optional[str] = None,  # NEW: Version parameter
+        version: Optional[str] = None,  # Deprecated: Use strategy_version_id instead
         config_params: Optional[Dict] = None,
+        strategy_version_id: Optional[int] = None,  # NEW: Strategy version for lifecycle tracking
     ) -> Dict:
         """
         Execute a strategy in Pre-PaperTrade mode.
@@ -113,8 +157,11 @@ class PrePaperTradeAdapter:
             symbols: List of stock symbols
             timeframe: Timeframe (e.g., 'M5', 'M15', 'D')
             replay_date: Single date for Time Machine replay (YYYY-MM-DD)
-            version: Optional version number (e.g., '1.00', '2.01')
+            version: [DEPRECATED] Optional version number - use strategy_version_id instead
             config_params: Optional strategy configuration parameters
+            strategy_version_id: Optional strategy version ID for lifecycle tracking.
+                If provided, enables gating logic and creates strategy_run record.
+                Required for production use per FACTORY_LABS_AND_STRATEGY_LIFECYCLE_v2.md.
             
         Returns:
             Dictionary with:
@@ -122,6 +169,7 @@ class PrePaperTradeAdapter:
                 - signals_generated: Number of signals generated
                 - signals: List of signal dictionaries
                 - error: Error message if failed
+                - strategy_run_id: Run ID if strategy_version_id was provided
         """
         import logging
         
@@ -139,6 +187,93 @@ class PrePaperTradeAdapter:
             'db_write_time': 0.0,
             'signals_generated': 0,
         }
+        
+        # Lifecycle Integration: Strategy Version & Run Tracking
+        # ========================================================
+        # Per FACTORY_LABS_AND_STRATEGY_LIFECYCLE_v2.md:
+        # - If strategy_version_id provided: enable gating + run tracking
+        # - If not provided: legacy mode (temporary, for migration)
+        
+        run_id = None  # Local variable for this execution (thread-safe)
+        strategy_version = None
+        
+        if strategy_version_id:
+            logger.info(f"📋 Lifecycle mode: Using strategy_version_id={strategy_version_id}")
+            
+            try:
+                from trading_dashboard.repositories.strategy_metadata import (
+                    get_repository,
+                    LabStage,
+                )
+                
+                repo = get_repository()
+                
+                # Load strategy version
+                strategy_version = repo.get_strategy_version_by_id(strategy_version_id)
+                
+                if not strategy_version:
+                    raise ValueError(
+                        f"❌ Strategy version not found: strategy_version_id={strategy_version_id}\\n"
+                        f"Please ensure the version exists in the strategy_version table."
+                    )
+                
+                logger.info(f"   Strategy: {strategy_version.strategy_key}")
+                logger.info(f"   impl_version: {strategy_version.impl_version}")
+                logger.info(f"   profile: {strategy_version.profile_key} v{strategy_version.profile_version}")
+                logger.info(f"   label: {strategy_version.label}")
+                logger.info(f"   lifecycle_stage: {strategy_version.lifecycle_stage.name}")
+                
+                # GATING: Validate version is eligible for Pre-PaperTrading
+                logger.info("🔒 Validating gating rules...")
+                self._validate_strategy_version(strategy_version)
+                logger.info("✅ Gating passed - version approved for Pre-PaperTrade")
+                
+                # Get environment from Settings (NOT from lab!)
+                # Lab = PRE_PAPERTRADE (fachlich), environment = int/prod (technisch)
+                from src.core.settings import get_settings
+                settings = get_settings()
+                environment = getattr(settings, 'environment', 'prod')  # Default to 'prod' if not set
+                
+                # Create strategy run record
+                logger.info(f"📝 Creating strategy_run record (lab=PRE_PAPERTRADE, env={environment})...")
+                
+                run_id = repo.create_strategy_run(
+                    strategy_version_id=strategy_version_id,
+                    lab_stage=LabStage.PRE_PAPERTRADE,
+                    run_type="replay" if mode == "replay" else "live",
+                    environment=environment,
+                    tags=json.dumps({
+                        "symbols": symbols,
+                        "timeframe": timeframe,
+                        "replay_date": replay_date if mode == "replay" else None,
+                    })
+                )
+                
+                logger.info(f"✅ Strategy run created: run_id={run_id}")
+                
+            except ValueError as e:
+                # Gating failure or version not found - user-facing error
+                logger.error(f"Lifecycle validation failed: {e}")
+                return {
+                    "status": "failed",
+                    "error": str(e),
+                    "ended_at": datetime.now().isoformat(),
+                }
+            except Exception as e:
+                # Unexpected error in lifecycle integration
+                logger.error(f"Lifecycle integration error: {type(e).__name__}: {e}")
+                import traceback
+                traceback.print_exc()
+                return {
+                    "status": "failed",
+                    "error": f"Lifecycle integration error: {type(e).__name__}: {e}",
+                    "traceback": traceback.format_exc(),
+                    "ended_at": datetime.now().isoformat(),
+                }
+        else:
+            logger.warning("⚠️  Legacy mode: No strategy_version_id provided")
+            logger.warning("   This mode is temporary and will be deprecated.")
+            logger.warning("   Please use strategy_version_id for production runs.")
         
         try:
             start_time = datetime.now()
@@ -283,10 +418,89 @@ class PrePaperTradeAdapter:
             self.progress_callback(f"└─ Total:           {total_duration:.2f}s")
             self.progress_callback(f"{'='*60}\n")
             
+            # Update strategy run status (if lifecycle mode active)
+            if run_id:
+                logger.info(f"📝 Updating strategy_run status (run_id={run_id})...")
+                
+                try:
+                    from trading_dashboard.repositories.strategy_metadata import get_repository
+                    repo = get_repository()
+                    
+                    # Build metrics_json with NO self-reference
+                    # Use local variables explicitly to avoid "metrics reading from new dict"
+                    num_signals = len(all_signals) if 'all_signals' in locals() else 0
+                    symbols_count = len(symbols)
+                    symbols_ok = metrics['symbols_processed']
+                    symbols_fail = metrics['symbols_failed']
+                    start_iso = start_time.isoformat()
+                    end_iso = datetime.now().isoformat()
+                    
+                    metrics_dict = {
+                        "number_of_signals": num_signals,
+                        "symbols_requested_count": symbols_count,
+                        "symbols_success_count": symbols_ok,
+                        "symbols_error_count": symbols_fail,
+                        "start_time": start_iso,
+                        "end_time": end_iso,
+                    }
+                    
+                    repo.update_strategy_run_status(
+                        run_id=run_id,
+                        status="completed",
+                        metrics_json=metrics_dict
+                    )
+                    
+                    logger.info(f"✅ Strategy run updated: status=completed, signals={num_signals}")
+                    
+                except Exception as e:
+                    # Log but don't fail the entire run if status update fails
+                    logger.error(f"⚠️  Failed to update strategy_run status: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
             return result
                 
         except Exception as e:
             import traceback
+            
+            # Update strategy run to failed status (if lifecycle mode active)
+            if run_id:
+                logger.error(f"📝 Marking strategy_run as failed (run_id={run_id})...")
+                
+                try:
+                    from trading_dashboard.repositories.strategy_metadata import get_repository
+                    repo = get_repository()
+                    
+                    #  Build minimal metrics_json for failed run
+                    # No self-reference - use safe defaults
+                    start_iso = start_time.isoformat() if 'start_time' in locals() else datetime.now().isoformat()
+                    end_iso = datetime.now().isoformat()
+                    symbols_count = len(symbols)
+                    symbols_ok = metrics.get('symbols_processed', 0)
+                    symbols_fail = metrics.get('symbols_failed', 0)
+                    
+                    metrics_dict = {
+                        "number_of_signals": 0,  # Failed run - no signals
+                        "symbols_requested_count": symbols_count,
+                        "symbols_success_count": symbols_ok,
+                        "symbols_error_count": symbols_fail,
+                        "start_time": start_iso,
+                        "end_time": end_iso,
+                    }
+                    
+                    repo.update_strategy_run_status(
+                        run_id=run_id,
+                        status="failed",
+                        error_message=f"{type(e).__name__}: {str(e)}",
+                        metrics_json=metrics_dict
+                    )
+                    
+                    logger.info(f"✅ Strategy run marked as failed")
+                    
+                except Exception as update_error:
+                    # Log but don't override the original exception
+                    logger.error(f"⚠️  Failed to update strategy_run status: {update_error}")
+            
             return {
                 "status": "failed",
                 "error": f"{type(e).__name__}: {str(e)}",
