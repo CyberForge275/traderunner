@@ -231,7 +231,7 @@ def register_run_backtest_callback(app):
         
         # Enable refresh interval to poll for completion
         # Clear run name input for next run
-        return progress_msg, "", False, initial_log, run_name  # Store run_name as job reference
+        return progress_msg, "", False, initial_log, job_id  # FIXED: was run_name, now job_id
     
     @app.callback(
         Output("backtests-pipeline-log", "children", allow_duplicate=True),
