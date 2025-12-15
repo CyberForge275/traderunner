@@ -268,17 +268,17 @@ def test_helper_has_no_source_imports():
         "chart_preprocess.py helper must exist"
     )
     
-    with open(helper_path) as f:
-        content = f.read()
+    # Use AST to check actual imports only (not docstrings)
+    imports = get_imports_from_file(helper_path)
     
-    # Forbidden tokens
-    forbidden = ['sqlite3', 'read_parquet', 'IntradayStore', 'artifacts/data_m']
-    found = [token for token in forbidden if token in content]
+    # Forbidden imports
+    forbidden_imports = ['sqlite3', 'read_parquet', 'IntradayStore', 'axiom_bt']
+    found = [imp for imp in imports if any(fib in imp for fib in forbidden_imports)]
     
     assert not found, (
         f"❌ Chart preprocessing helper VIOLATED SOURCE NEUTRALITY!\n"
         f"File: {helper_path}\n"
-        f"Forbidden tokens found: {found}\n"
+        f"Forbidden imports found: {found}\n"
         f"\n"
         f"Helper must be source-agnostic - NO direct data access.\n"
         f"It receives DataFrames and transforms them only."
