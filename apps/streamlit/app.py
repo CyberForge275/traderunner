@@ -443,7 +443,9 @@ DATA_DIRECTORIES = {
 }
 
 
-@st.cache_data(show_spinner=False)
+# MODIFIED: Removed @st.cache_data to allow immediate visibility of new runs
+# Previously: @st.cache_data(show_spinner=False) caused new runs to not appear
+# until page reload. Now reads filesystem on every call for real-time updates.
 def list_runs(base_dir: str) -> list[str]:
     base = Path(base_dir)
     runs = [d for d in base.glob("run_*") if d.is_dir()]
