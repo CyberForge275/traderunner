@@ -360,6 +360,13 @@ def create_pre_papertrade_layout():
                                     ),
                                 ],
                             ),
+                            
+                            # NEW: Run History Panel (InsideBar Pre-Paper only)
+                            html.Div(
+                                id="run-history-container",
+                                children=[],  # Will be populated by callback
+                                className="mt-3"
+                            ),
                         ],
                         md=8,
                     ),

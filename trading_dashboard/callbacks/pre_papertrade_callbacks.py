@@ -8,6 +8,12 @@ from dash import Input, Output, State, ctx
 from dash.exceptions import PreventUpdate
 
 
+def _build_run_history_panel(strategy_name):
+    """Helper to build run history panel."""
+    from trading_dashboard.utils.run_history_panel import build_run_history_panel
+    return build_run_history_panel(strategy_name)
+
+
 def register_pre_papertrade_callbacks(app):
     """Register callbacks for the Pre-PaperTrade Lab tab."""
 
@@ -89,6 +95,7 @@ def register_pre_papertrade_callbacks(app):
             Output("signals-buy", "children"),
             Output("signals-sell", "children"),
             Output("pre-papertrade-interval", "disabled"),
+            Output("run-history-container", "children"),  # NEW: Run history panel
         ],
         [
             Input("run-pre-papertrade-btn", "n_clicks"),
@@ -135,6 +142,7 @@ def register_pre_papertrade_callbacks(app):
                 "0",
                 "0",
                 True,  # Disable interval
+                [],  # Clear run history
             )
 
         # Run test
@@ -189,6 +197,7 @@ def register_pre_papertrade_callbacks(app):
                                 "0",
                                 "0",
                                 True,  # Disable interval
+                                [],  # Empty run history on error
                             )
                     
                     # NEW: Lifecycle Integration for InsideBar Intraday
@@ -225,6 +234,7 @@ def register_pre_papertrade_callbacks(app):
                                 "0",
                                 "0",
                                 True,  # Disable interval
+                                [],  # Empty run history on error
                             )
                     
                     if mode == "live":
@@ -308,6 +318,7 @@ def register_pre_papertrade_callbacks(app):
                             str(buy_count),
                             str(sell_count),
                             True,
+                            _build_run_history_panel(strategy_name),  # NEW: Add run history
                         )
                     else:
                         error_msg = result.get("error", "Unknown error")
@@ -319,6 +330,7 @@ def register_pre_papertrade_callbacks(app):
                             "0",
                             "0",
                             True,
+                            [],  # Empty run history on failure
                         )
 
             except Exception as e:
@@ -330,6 +342,7 @@ def register_pre_papertrade_callbacks(app):
                     "0",
                     "0",
                     True,
+                    [],  # Empty run history on exception
                 )
 
         # Auto-refresh (if enabled)
@@ -360,6 +373,7 @@ def register_pre_papertrade_callbacks(app):
                 str(buy_count),
                 str(sell_count),
                 False,  # Keep interval enabled
+                [],  # Empty run history for auto-refresh
             )
 
         raise PreventUpdate
