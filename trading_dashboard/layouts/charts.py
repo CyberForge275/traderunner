@@ -150,6 +150,28 @@ def create_charts_layout():
                         html.P("Select trading day", className="text-muted", style={"fontSize": "0.85rem", "marginTop": "5px"}),
                         
                         html.Hr(),
+                        
+                        # Data Freshness Telemetry (NEW)
+                        html.H5("📊 Data Freshness", style={"marginTop": "20px", "fontSize": "0.9rem"}),
+                        html.Div(id="data-freshness-indicator", children=[
+                            html.Div([
+                                html.Span("M1: ", style={"fontWeight": "bold", "fontSize": "0.75rem"}),
+                                html.Span("Checking...", id="m1-freshness-text", style={"fontSize": "0.75rem"}),
+                                html.Span(" ", id="m1-freshness-badge", style={"marginLeft": "5px"})
+                            ], style={"marginBottom": "8px"}),
+                            html.Div([
+                                html.Span("M5: ", style={"fontWeight": "bold", "fontSize": "0.75rem"}),
+                                html.Span("Checking...", id="m5-freshness-text", style={"fontSize": "0.75rem"}),
+                                html.Span(" ", id="m5-freshness-badge", style={"marginLeft": "5px"})
+                            ], style={"marginBottom": "8px"}),
+                        ]),
+                        html.P(
+                            "🟢 Fresh (<5 min)  🟡 Stale (>5 min)  🔴 Missing",
+                            className="text-muted",
+                            style={"fontSize": "0.7rem", "marginTop": "5px"}
+                        ),
+                        
+                        html.Hr(),
                         html.H5("📅 D1 Day Range", style={"marginTop": "20px", "fontSize": "0.9rem"}),
                         dcc.Dropdown(
                             id="d1-day-range",

@@ -31,6 +31,7 @@ from trading_dashboard.callbacks.period_buttons_callback import register_period_
 from trading_dashboard.callbacks.date_selection_callback import register_date_selection_callback
 from trading_dashboard.callbacks.symbol_selector_callback import register_symbol_selector_callbacks
 from trading_dashboard.callbacks.timestamp_prefix_callback import register_timestamp_prefix_callback
+from trading_dashboard.callbacks.freshness_callback import register_freshness_callback
 
 # Setup logging FIRST
 from trading_dashboard.logging_config import setup_logging
@@ -167,6 +168,7 @@ register_period_buttons_callback(app)
 register_date_selection_callback(app)
 register_symbol_selector_callbacks(app)
 register_timestamp_prefix_callback(app)  # Timestamp prefix display
+register_freshness_callback(app)  # Data freshness indicators
 
 # Initialize strategy configuration plugins
 # MUST be before if __name__ == "__main__" so gunicorn can import it!
