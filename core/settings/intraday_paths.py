@@ -1,21 +1,24 @@
 """Canonical intraday storage paths - single source of truth.
 
-This module defines the canonical storage locations for intraday data.
-All components (IntradayStore, CandleAggregator, Parquet writers) must
-use these paths to ensure consistency.
+This module defines the canonical storage locations for intraday data using
+settings from src.core.settings. All components (IntradayStore, ParquetWriter)
+MUST use these paths to ensure consistency.
+
+CRITICAL: No hardcoded paths! All paths derived from settings.
 """
 
 from pathlib import Path
 from typing import Dict
 
-# Canonical root
-INTRADAY_ROOT = Path("./artifacts")
+# Import canonical settings
+from src.settings import ARTIFACTS_ROOT, DATA_M1_DIR, DATA_M5_DIR, DATA_M15_DIR, DATA_D1_DIR, ensure_artifact_layout
 
-# Timeframe directories
-DATA_M1 = INTRADAY_ROOT / "data_m1"
-DATA_M5 = INTRADAY_ROOT / "data_m5"
-DATA_M15 = INTRADAY_ROOT / "data_m15"
-DATA_D1 = INTRADAY_ROOT / "data_d1"
+# Export for convenience (but derived from settings!)
+INTRADAY_ROOT = ARTIFACTS_ROOT
+DATA_M1 = DATA_M1_DIR
+DATA_M5 = DATA_M5_DIR
+DATA_M15 = DATA_M15_DIR
+DATA_D1 = DATA_D1_DIR
 
 # Timeframe mapping
 TIMEFRAME_PATHS: Dict[str, Path] = {
@@ -34,14 +37,14 @@ def get_intraday_parquet_path(symbol: str, timeframe: str) -> Path:
         timeframe: Timeframe string (M1, M5, M15, D1)
         
     Returns:
-        Path to parquet file (e.g., artifacts/data_m5/AAPL.parquet)
+        Absolute path to parquet file (e.g., /opt/trading/traderunner/artifacts/data_m5/AAPL.parquet)
         
     Raises:
         ValueError: If timeframe is not supported
         
     Example:
         >>> get_intraday_parquet_path("AAPL", "M5")
-        PosixPath('artifacts/data_m5/AAPL.parquet')
+        PosixPath('/opt/trading/traderunner/artifacts/data_m5/AAPL.parquet')
     """
     symbol = symbol.strip().upper()
     timeframe = timeframe.strip().upper()
@@ -54,12 +57,12 @@ def get_intraday_parquet_path(symbol: str, timeframe: str) -> Path:
     return base_dir / f"{symbol}.parquet"
 
 
-def ensure_intraday_layout() -> None:
-    """Create canonical intraday directory structure if it doesn't exist."""
-    INTRADAY_ROOT.mkdir(parents=True, exist_ok=True)
+def ensure_intraday_dirs_exist() -> None:
+    """Create canonical intraday directory structure if it doesn't exist.
     
-    for path in TIMEFRAME_PATHS.values():
-        path.mkdir(parents=True, exist_ok=True)
+    Uses ensure_artifact_layout from settings to create all directories.
+    """
+    ensure_artifact_layout()
 
 
 def get_all_symbols(timeframe: str) -> list[str]:

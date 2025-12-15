@@ -20,40 +20,41 @@ def get_connection(db_path: Path) -> Optional[sqlite3.Connection]:
 
 
 def get_watchlist_symbols() -> list[str]:
-    """Get symbols from active strategy deployments (marketdata-stream config)."""
+    """Get symbols for watchlist/charts from EODHD_SYMBOLS environment variable.
+    
+    Single Source of Truth: EODHD_SYMBOLS ENV variable (no hardcoded fallbacks).
+    This ensures dashboard stays in sync with marketdata-stream subscriptions.
+    
+    Returns:
+        List of uppercase symbol strings, or empty list if ENV not set.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
-        # Primary source: strategy_deployments.yml from marketdata-stream
-        deployment_config = MARKETDATA_DIR / "config" / "strategy_deployments.yml"
-        
-        if deployment_config.exists():
-            with open(deployment_config) as f:
-                config = yaml.safe_load(f)
-            
-            # Collect all symbols from all enabled deployments
-            all_symbols = set()
-            deployments = config.get('deployments', {})
-            
-            for deployment_id, deployment_config in deployments.items():
-                if deployment_config.get('enabled', False):
-                    symbols = deployment_config.get('symbols', [])
-                    all_symbols.update(symbols)
-            
-            if all_symbols:
-                return sorted(list(all_symbols))
-        
-        # Fallback 1: EODHD_SYMBOLS environment variable
+        # SINGLE SOURCE OF TRUTH: EODHD_SYMBOLS environment variable
         symbols_env = os.getenv("EODHD_SYMBOLS")
-        if symbols_env:
-            symbols = [s.strip() for s in symbols_env.split(",")]
-            if symbols:
-                return symbols
         
-        # Fallback 2: Default symbols
-        return ["APP", "TSLA", "PLTR", "HOOD"]
+        if symbols_env:
+            symbols = [s.strip().upper() for s in symbols_env.split(",") if s.strip()]
+            if symbols:
+                logger.info(f"Watchlist symbols (source=ENV EODHD_SYMBOLS): {', '.join(symbols)} ({len(symbols)} total)")
+                return symbols
+            else:
+                logger.warning("EODHD_SYMBOLS is set but empty after parsing")
+                return []
+        
+        # No ENV set - log warning and return empty
+        logger.warning(
+            "⚠️ EODHD_SYMBOLS environment variable not set! "
+            "Dashboard watchlist will be empty. "
+            "Set EODHD_SYMBOLS in systemd service or .env file."
+        )
+        return []
         
     except Exception as e:
-        print(f"Error loading watchlist from strategy deployments: {e}")
-        return ["APP", "TSLA", "PLTR", "HOOD"]
+        logger.error(f"Error loading watchlist symbols: {e}", exc_info=True)
+        return []
 
 
 def get_available_symbols() -> list[str]:
