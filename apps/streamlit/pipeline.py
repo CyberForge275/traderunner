@@ -461,9 +461,87 @@ def execute_pipeline(pipeline: PipelineConfig) -> str:
                     joined = "; ".join(entries)
                     messages.append(f"{symbol}: {joined}")
                 if messages:
-                    show_step_message("0) data coverage", "\n".join(messages), status="warning")
+                    show_step_message("0) data coverage", "\\n".join(messages), status="warning")
+            
+            # Run the data fetch command
             run_cli_step("0) ensure-intraday", fetch_args)
             st.cache_data.clear()
+            
+            # ENHANCED: Verify data coverage after fetch
+            try:
+                from axiom_bt.intraday import IntradayStore, Timeframe
+                
+                verify_store = IntradayStore()
+                coverage_ok = True
+                coverage_issues = []
+                
+                for symbol in fetch_targets:
+                    try:
+                        if verify_store.has_symbol(symbol, timeframe=Timeframe(pipeline.fetch.timeframe)):
+                            df = verify_store.load(symbol, timeframe=Timeframe(pipeline.fetch.timeframe))
+                            
+                            if df.empty:
+                                coverage_ok = False
+                                coverage_issues.append(f"{symbol}: Data file exists but is empty")
+                            elif pipeline.fetch.start and pipeline.fetch.end:
+                                # Check date coverage
+                                import pandas as pd
+                                req_start = pd.Timestamp(pipeline.fetch.start)
+                                req_end = pd.Timestamp(pipeline.fetch.end)
+                                actual_start = df.index[0]
+                                actual_end = df.index[-1]
+                                
+                                if actual_end < req_start or actual_start > req_end:
+                                    coverage_ok = False
+                                    coverage_issues.append(
+                                        f"{symbol}: No overlap with requested range "
+                                        f"(have {actual_start.date()} to {actual_end.date()}, "
+                                        f"need {req_start.date()} to {req_end.date()})"
+                                    )
+                                elif actual_end < req_end:
+                                    coverage_ok = False
+                                    coverage_issues.append(
+                                        f"{symbol}: Data ends {actual_end.date()}, "
+                                        f"requested until {req_end.date()} (gap: {(req_end - actual_end).days} days)"
+                                    )
+                        else:
+                            coverage_ok = False
+                            coverage_issues.append(f"{symbol}: No data file generated after fetch")
+                    except Exception as e:
+                        coverage_ok = False
+                        coverage_issues.append(f"{symbol}: Error verifying coverage - {str(e)}")
+                
+                if coverage_issues:
+                    _store_log({
+                        "kind": "data_coverage_verification",
+                        "status": "error" if not coverage_ok else "warning",
+                        "issues": coverage_issues,
+                        "details": "\\n".join(coverage_issues)
+                    })
+                    
+                    if not coverage_ok:
+                        # Log detailed coverage failure
+                        show_step_message(
+                            "Data Coverage Verification",
+                            "\\n".join(coverage_issues),
+                            status="error"
+                        )
+                else:
+                    _store_log({
+                        "kind": "step",
+                        "title": "Data Coverage Verification",
+                        "status": "success",
+                        "details": f"All {len(fetch_targets)} symbols have required data coverage"
+                    })
+                    
+            except Exception as verify_err:
+                # Don't fail pipeline on verification error, just log it
+                _store_log({
+                    "kind": "error",
+                    "title": "Coverage Verification Failed",
+                    "message": str(verify_err),
+                    "status": "warning"
+                })
         else:
             show_step_message("0) ensure-intraday", "Skipped (cached data)")
 

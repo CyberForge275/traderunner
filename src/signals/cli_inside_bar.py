@@ -177,16 +177,43 @@ def main(argv: List[str] | None = None) -> int:
         STRATEGY_VERSION_V2 = "unknown"
 
     rows: List[Dict[str, object]] = []
+    failed_symbols = []  # Track symbols with data issues
+    missing_symbols = []  # Track symbols with no data files
 
     for symbol in symbols:
         try:
             ohlcv = store.load(symbol, timeframe=Timeframe.M5, tz=args.tz)
         except FileNotFoundError:
             source = data_path / f"{symbol}.parquet"
-            print(f"[WARN] Missing parquet for {symbol}: {source}")
+            print(f"[ERROR] Missing data file for {symbol}: {source}")
+            print(f"        This symbol was requested but no parquet file exists.")
+            missing_symbols.append(symbol)
             continue
         except Exception as exc:  # pragma: no cover - defensive
-            print(f"[WARN] Failed to load {symbol}: {exc}")
+            print(f"[ERROR] Failed to load {symbol}: {type(exc).__name__}: {exc}")
+            failed_symbols.append(f"{symbol} ({type(exc).__name__})")
+            continue
+
+        # ENHANCED: Validate data quality before processing
+        if ohlcv.empty:
+            print(f"[ERROR] {symbol}: Loaded data is empty (0 rows)")
+            print(f"        This indicates the parquet file exists but contains no data.")
+            failed_symbols.append(f"{symbol} (empty data)")
+            continue
+        
+        # Check for NaN values in critical columns
+        nan_cols = []
+        for col in ['open', 'high', 'low', 'close']:
+            if col in ohlcv.columns and ohlcv[col].isna().any():
+                nan_count = ohlcv[col].isna().sum()
+                nan_cols.append(f"{col}({nan_count} NaN)")
+        
+        if nan_cols:
+            print(f"[ERROR] {symbol}: Data contains NaN values in OHLC columns")
+            print(f"        Affected columns: {', '.join(nan_cols)}")
+            print(f"        Total rows: {len(ohlcv)}, Date range: {ohlcv.index[0]} to {ohlcv.index[-1]}")
+            print(f"        This violates data quality SLA 'no_nan_ohlc'.")
+            failed_symbols.append(f"{symbol} (NaN in {', '.join(nan_cols)})")
             continue
 
         input_frame = ohlcv.reset_index().rename(columns={"timestamp": "timestamp"})
@@ -298,8 +325,42 @@ def main(argv: List[str] | None = None) -> int:
     current.parent.mkdir(parents=True, exist_ok=True)
     result.to_csv(current, index=False)
 
+    # ENHANCED: Report data issues and exit with appropriate codes
+    total_requested = len(symbols)
+    total_failed = len(failed_symbols) + len(missing_symbols)
+    total_processed = total_requested - total_failed
+    
     print(f"[OK] Signals → {output} (rows={len(result)})")
-    return 0
+    print(f"[INFO] Processed {total_processed}/{total_requested} symbols")
+    
+    if missing_symbols:
+        print(f"[ERROR] {len(missing_symbols)} symbol(s) had missing data files:")
+        for sym in missing_symbols[:5]:  # Show first 5
+            print(f"        - {sym}")
+        if len(missing_symbols) > 5:
+            print(f"        ... and {len(missing_symbols) - 5} more")
+    
+    if failed_symbols:
+        print(f"[ERROR] {len(failed_symbols)} symbol(s) had invalid data:")
+        for sym in failed_symbols[:5]:  # Show first 5
+            print(f"        - {sym}")
+        if len(failed_symbols) > 5:
+            print(f"        ... and {len(failed_symbols) - 5} more")
+    
+    # Exit codes:
+    # 0 = Success (no errors)
+    # 1 = All symbols missing/failed (complete failure)
+    # 2 = Some symbols failed but some succeeded (partial success)
+    if total_processed == 0:
+        print("[FATAL] No symbols could be processed. Check data availability.")
+        return 1  # Complete failure
+    elif total_failed > 0:
+        print(f"[WARN] Partial success: {total_failed} symbol(s) failed but {total_processed} succeeded.")
+        # Still return 0 for partial success to allow pipeline to continue
+        # Logging will show which symbols failed
+        return 0
+    else:
+        return 0  # Complete success
 
 
 if __name__ == "__main__":
