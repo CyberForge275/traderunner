@@ -283,3 +283,67 @@ def test_helper_has_no_source_imports():
         f"Helper must be source-agnostic - NO direct data access.\n"
         f"It receives DataFrames and transforms them only."
     )
+
+
+def test_live_callbacks_use_helper():
+    """Live callbacks MUST use preprocess_for_chart helper."""
+    file_path = REPO_ROOT / 'trading_dashboard/callbacks/charts_live_callbacks.py'
+    
+    assert file_path.exists(), "charts_live_callbacks.py must exist"
+    
+    with open(file_path) as f:
+        content = f.read()
+    
+    assert "preprocess_for_chart" in content, (
+        "❌ Live callbacks NOT using helper!\n"
+        f"File: {file_path}\n"
+        "MUST import and use preprocess_for_chart() for all transformations.\n"
+        "This enforces deterministic, testable processing."
+    )
+
+
+def test_backtesting_callbacks_use_helper():
+    """Backtesting callbacks MUST use preprocess_for_chart helper."""
+    file_path = REPO_ROOT / 'trading_dashboard/callbacks/charts_backtesting_callbacks.py'
+    
+    assert file_path.exists(), "charts_backtesting_callbacks.py must exist"
+    
+    with open(file_path) as f:
+        content = f.read()
+    
+    assert "preprocess_for_chart" in content, (
+        "❌ Backtesting callbacks NOT using helper!\n"
+        f"File: {file_path}\n"
+        "MUST import and use preprocess_for_chart() for all transformations.\n"
+        "This enforces deterministic, testable processing."
+    )
+
+
+def test_app_has_new_chart_tabs():
+    """App.py must have new segregated chart tabs wired."""
+    file_path = REPO_ROOT / 'trading_dashboard/app.py'
+    
+    assert file_path.exists(), "app.py must exist"
+    
+    with open(file_path) as f:
+        content = f.read()
+    
+    assert "charts-live" in content, (
+        "❌ App missing 'charts-live' tab!\n"
+        "Must have Charts - Live tab defined in app.py"
+    )
+    
+    assert "charts-backtesting" in content, (
+        "❌ App missing 'charts-backtesting' tab!\n"
+        "Must have Charts - Backtesting tab defined in app.py"
+    )
+    
+    assert "register_charts_live_callbacks" in content, (
+        "❌ App not registering Live callbacks!\n"
+        "Must call register_charts_live_callbacks(app)"
+    )
+    
+    assert "register_charts_backtesting_callbacks" in content, (
+        "❌ App not registering Backtesting callbacks!\n"
+        "Must call register_charts_backtesting_callbacks(app)"
+    )
