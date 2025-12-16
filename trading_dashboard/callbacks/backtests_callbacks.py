@@ -45,6 +45,10 @@ def register_backtests_callbacks(app):
         prevent_initial_call=True,
     )
     def update_backtests_detail(run_name, n_intervals):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🔍 update_backtests_detail CALLED: run_name={run_name}, n_intervals={n_intervals}")
+        
         from ..services.backtest_details_service import BacktestDetailsService
         from ..repositories.backtests import (
             get_backtest_log,
@@ -64,8 +68,12 @@ def register_backtests_callbacks(app):
         details = details_service.load_summary(run_name)
         steps = details_service.load_steps(run_name)
         
+        logger.info(f"📊 Loaded details: status={details.status}, source={details.source}, symbols={details.symbols}")
+        logger.info(f"📝 Loaded {len(steps)} steps")
+        
         # If we have new-pipeline artifacts, use them
         if details.source in ["manifest", "meta+result"]:
+            logger.info(f"✅ Using new-pipeline artifacts for {run_name}")
             # Create summary dict for create_backtest_detail
             summary = {
                 "run_name": run_name,
