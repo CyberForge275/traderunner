@@ -59,14 +59,16 @@ def minimal_backtest_with_gates(
     manager = ArtifactsManager(artifacts_root=artifacts_root)
     
     # CRITICAL: Create run directory FIRST (even before any checks)
+    # Returns RunContext which is SSOT for run_dir
     try:
         from backtest.services.step_tracker import StepTracker
         
-        manager.create_run_dir(run_id)
-        logger.info(f"[{run_id}] Run directory created")
+        # Create run dir and get RunContext
+        ctx = manager.create_run_dir(run_id)
+        logger.info(f"[{ctx.run_id}] Run directory created: {ctx.run_dir}")
         
-        # Initialize step tracker for UI visibility
-        tracker = StepTracker(manager.run_dir)
+        # Initialize step tracker using ctx.run_dir (SSOT)
+        tracker = StepTracker(ctx.run_dir)
         tracker._emit_event(1, "create_run_dir", "completed")
         
     except Exception as e:

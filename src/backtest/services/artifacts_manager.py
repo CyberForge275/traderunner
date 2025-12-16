@@ -48,27 +48,37 @@ class ArtifactsManager:
         self.artifacts_root = Path(artifacts_root)
         self.current_run_dir: Optional[Path] = None
         self.run_id: Optional[str] = None
+        self.backtests_dir = self.artifacts_root # Assuming artifacts_root is already the backtests root
     
-    def create_run_dir(self, run_id: str) -> Path:
+    def create_run_dir(self, run_id: str) -> "RunContext":
         """
-        Create run directory at the very start of execution.
-        
-        CRITICAL: Call this FIRST, before any execution logic.
+        Create the run directory and return RunContext.
         
         Args:
-            run_id: Unique run identifier
-        
+            run_id: Unique identifier for this run
+            
         Returns:
-            Path to run directory
+            RunContext with run_id, run_name, and absolute run_dir path
+            
+        Raises:
+            ValueError: If directory already exists
         """
-        self.run_id = run_id
-        self.current_run_dir = self.artifacts_root / run_id
+        from .run_context import RunContext
         
-        # Create directory
-        self.current_run_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Created run directory: {self.current_run_dir}")
+        run_dir = self.backtests_dir / run_id
         
-        return self.current_run_dir
+        if run_dir.exists():
+            raise ValueError(f"Run directory already exists: {run_dir}")
+        
+        run_dir.mkdir(parents=True)
+        logger.info(f"Created run directory: {run_dir.relative_to(self.artifacts_root)}")
+        
+        # Return RunContext as SSOT
+        return RunContext(
+            run_id=run_id,
+            run_name=run_id,  # In current impl, run_name == run_id
+            run_dir=run_dir.absolute()
+        )
     
     def write_run_meta(
         self,
