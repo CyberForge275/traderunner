@@ -233,8 +233,9 @@ def main(argv: List[str] | None = None) -> int:
             long_entry = None
             short_entry = None
             sl_long = None
+            sl_short = None  # FIX: Must initialize before conditional assignment
             tp_long = None
-            tp_short = None
+            tp_short = None  # FIX: Must initialize before conditional assignment
 
             if sig.signal_type == "LONG":
                 long_entry = sig.entry_price
