@@ -148,6 +148,30 @@ def create_charts_backtesting_layout():
                         
                         html.Hr(),
                         
+                        # Data Availability Box
+                        html.H6("📊 Data Availability", style={"fontSize": "0.9rem"}),
+                        html.Div(
+                            id="bt-availability-box",
+                            style={
+                                "fontSize": "0.72rem",
+                                "padding": "8px",
+                                "backgroundColor": "#1a1a1a",
+                                "borderRadius": "5px",
+                                "marginBottom": "8px",
+                                "minHeight": "80px"
+                            }
+                        ),
+                        dbc.Button(
+                            "🔄 Refresh",
+                            id="bt-availability-refresh",
+                            size="sm",
+                            color="secondary",
+                            outline=True,
+                            style={"width": "100%", "fontSize": "0.75rem"}
+                        ),
+                        
+                        html.Hr(),
+                        
                         # Info
                         html.Div([
                             html.H6("ℹ️ Backtesting Info", style={"fontSize": "0.85rem"}),
