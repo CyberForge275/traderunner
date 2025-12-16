@@ -102,14 +102,26 @@ class BacktestService:
             # Update progress
             self._update_job_progress(job_id, "Loading pipeline configuration...")
             
-            # Use the pipeline adapter
-            from .pipeline_adapter import create_adapter
+            # HOTFIX: Use new Phase 1-5 pipeline adapter (bypasses legacy Streamlit code)
+            # Feature flag: Set USE_NEW_PIPELINE=0 to revert to old adapter
+            use_new_pipeline = os.getenv("USE_NEW_PIPELINE", "1") == "1"
             
-            # Create adapter with progress callback
-            def update_progress(msg: str):
-                self._update_job_progress(job_id, msg)
-            
-            adapter = create_adapter(progress_callback=update_progress)
+            if use_new_pipeline:
+                from .new_pipeline_adapter import create_new_adapter
+                
+                # Create adapter with progress callback
+                def update_progress(msg: str):
+                    self._update_job_progress(job_id, msg)
+                
+                adapter = create_new_adapter(progress_callback=update_progress)
+            else:
+                # OLD path (deprecated)
+                from .pipeline_adapter import create_adapter
+                
+                def update_progress(msg: str):
+                    self._update_job_progress(job_id, msg)
+                
+                adapter = create_adapter(progress_callback=update_progress)
             
             # Execute backtest
             result = adapter.execute_backtest(
@@ -122,8 +134,43 @@ class BacktestService:
                 config_params=config_params
             )
             
-            # Check result
-            if result["status"] == "failed":
+            # Handle results from new pipeline adapter (Phase 1-5)
+            if result.get("status") == "failed_precondition":
+                # NOT an error - gates blocked execution (expected)
+                reason = result.get("reason", "unknown")
+                details = result.get("details", "")
+                
+                with self._lock:
+                    job_data = self.running_jobs.pop(job_id, {})
+                    self.completed_jobs[job_id] = {
+                        **job_data,
+                        "status": "failed_precondition",
+                        "reason": reason,
+                        "details": details,
+                        "ended_at": datetime.now().isoformat(),
+                        "progress": f"Gates blocked: {reason}",
+                    }
+                return
+            
+            elif result.get("status") == "error":
+                # Deterministic error with error_id
+                error_id = result.get("error_id", "UNKNOWN")
+                details = result.get("details", "")
+                
+                with self._lock:
+                    job_data = self.running_jobs.pop(job_id, {})
+                    self.completed_jobs[job_id] = {
+                        **job_data,
+                        "status": "error",
+                        "error_id": error_id,
+                        "details": details,
+                        "ended_at": datetime.now().isoformat(),
+                        "progress": f"Error (ID: {error_id})",
+                    }
+                return
+            
+            # Check OLD adapter result format (legacy)
+            if result.get("status") == "failed":
                 # If pipeline failed, try to extract more details from run_log.json
                 command_output = None
                 try:
