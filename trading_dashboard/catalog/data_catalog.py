@@ -1,42 +1,41 @@
 """
-Backtesting Data Catalog - Reports data availability and health.
+Backtesting Data Catalog
 
-CRITICAL ARCHITECTURE RULES:
-- Parquet-only: M1/M5/M15 files, D1 universe
-- No sqlite3, no live data sources
-- Performance: fast file checks, lazy dataframe loads
+Reports availability and validates data integrity across timeframes.
+Uses FAST pyarrow metadata reads (no full DataFrame loads).
 """
 
-from pathlib import Path
-from typing import Optional, Dict, List, Tuple
-from dataclasses import dataclass
-import pandas as pd
 import logging
+from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Optional, Dict, List, Tuple
 
-from axiom_bt.fs import DATA_M1, DATA_M5, DATA_M15
+import pandas as pd
+
 from trading_dashboard.repositories.daily_universe import DailyUniverseRepository
+from trading_dashboard.utils.parquet_meta_reader import read_parquet_metadata_fast
+from axiom_bt.intraday import IntradayStore
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class TimeframeInfo:
-    """Info about data availability for a timeframe."""
+    """Information about data availability for a timeframe."""
     exists: bool
     derivable: bool = False
     rows: int = 0
     first_date: Optional[pd.Timestamp] = None
     last_date: Optional[pd.Timestamp] = None
-    warnings: List[str] = None
-    
-    def __post_init__(self):
-        if self.warnings is None:
-            self.warnings = []
+    warnings: List[str] = field(default_factory=list)
 
 
 class BacktestingDataCatalog:
     """
-    Report data availability and health for backtesting.
+    Catalog of available backtesting data.
+    
+    PERFORMANCE: Uses PyArrow metadata reads (O(1), no DataFrame loads).
+    for backtesting.
     
     Checks:
     - File existence (M1/M5/M15 parquet, D1 universe)
@@ -88,60 +87,51 @@ class BacktestingDataCatalog:
         timeframe: str, 
         path_base: Path
     ) -> TimeframeInfo:
-        """Check intraday parquet file availability."""
+        """
+        Check intraday parquet file availability.
+        
+        PERFORMANCE: Uses PyArrow metadata reads (no DataFrame load).
+        """
         file_path = path_base / f"{symbol}.parquet"
         
-        if not file_path.exists():
+        # Fast metadata read (O(1), no DataFrame)
+        meta = read_parquet_metadata_fast(file_path)
+        
+        if not meta.exists:
             return TimeframeInfo(exists=False)
         
-        try:
-            # Read parquet to get stats
-            df = pd.read_parquet(file_path)
-            
-            if df.empty:
-                return TimeframeInfo(
-                    exists=True,
-                    rows=0,
-                    warnings=["File exists but contains no data"]
-                )
-            
-            # Extract info
-            if isinstance(df.index, pd.DatetimeIndex):
-                first_date = df.index.min()
-                last_date = df.index.max()
-            else:
-                # Has timestamp column
-                first_date = df['timestamp'].min() if 'timestamp' in df.columns else None
-                last_date = df['timestamp'].max() if 'timestamp' in df.columns else None
-            
-            warnings = []
-            
-            # Check for gaps (simple heuristic: expected days vs actual rows)
-            if first_date and last_date:
-                days_span = (last_date - first_date).days + 1
-                expected_bars_per_day = {
-                    'M1': 390,  # 6.5 hours * 60 min
-                    'M5': 78,   # 6.5 hours * 12 bars/hour
-                    'M15': 26   # 6.5 hours * 4 bars/hour
-                }
-                expected = days_span * expected_bars_per_day.get(timeframe, 1)
-                if len(df) < expected * 0.5:  # Less than 50% of expected
-                    warnings.append(f"Potential gaps: {len(df)} bars vs ~{expected} expected")
-            
+        if meta.rows == 0:
             return TimeframeInfo(
                 exists=True,
-                rows=len(df),
-                first_date=first_date,
-                last_date=last_date,
-                warnings=warnings
+                rows=0,
+                warnings=["File exists but contains no data"]
             )
-            
-        except Exception as e:
-            logger.error(f"Error checking {symbol} {timeframe}: {e}")
-            return TimeframeInfo(
-                exists=True,
-                warnings=[f"Error reading file: {str(e)[:50]}"]
-            )
+        
+        warnings = []
+        
+        # Check for gaps (simple heuristic: expected days vs actual rows)
+        if meta.first_ts and meta.last_ts:
+            days_span = (meta.last_ts - meta.first_ts).days + 1
+            expected_bars_per_day = {
+                'M1': 390,  # 6.5 hours * 60 min
+                'M5': 78,   # 6.5 hours * 12 bars/hour
+                'M15': 26   # 6.5 hours * 4 bars/hour
+            }
+            expected = days_span * expected_bars_per_day.get(timeframe, 1)
+            if meta.rows < expected * 0.5:  # Less than 50% of expected
+                warnings.append(f"Potential gaps: {meta.rows} bars vs ~{expected} expected")
+        
+        # Add performance indicator if stats were used
+        if not meta.used_stats:
+            warnings.append("Metadata read used fallback (stats unavailable)")
+        
+        return TimeframeInfo(
+            exists=True,
+            rows=meta.rows,
+            first_date=meta.first_ts,
+            last_date=meta.last_ts,
+            warnings=warnings
+        )
     
     def _check_h1(
         self, 
