@@ -243,16 +243,64 @@ def register_run_backtest_callback(app):
         """Fetch and display pipeline execution log with progress bar."""
         from pathlib import Path
         from dash import no_update
-        from ..utils.backtest_log_utils import (
-            get_pipeline_log_state,
-            format_step_icon,
-            format_step_color,
-        )
+        import json
         from ..config import BACKTESTS_DIR
         
         # No active job being tracked
         if not current_job_id:
             return no_update
+        
+        # HOTFIX: Check for NEW pipeline artifacts (run_result.json)
+        run_dir = Path(BACKTESTS_DIR) / current_job_id
+        run_result_file = run_dir / "run_result.json"
+        
+        if run_result_file.exists():
+            try:
+                with open(run_result_file) as f:
+                    result = json.load(f)
+                
+                status = result.get("status", "unknown")
+                reason = result.get("reason")
+                error_id = result.get("error_id")
+                details = result.get("details", {})
+                
+                if status == "success":
+                    return html.Div([
+                        html.H6("📋 Pipeline Execution", style={"marginTop": "20px", "marginBottom": "15px"}),
+                        html.Div("✅ Backtest completed successfully", 
+                                style={"color": "#28a745", "fontWeight": "600", "marginBottom": "12px"}),
+                        html.Div(f"Signals: {details.get('signals_count', 'N/A')}", 
+                                style={"fontSize": "0.9em", "color": "#666"}),
+                    ], style={"marginTop": "20px", "padding": "16px", "backgroundColor": "#fff", 
+                             "border": "1px solid #28a745", "borderRadius": "6px"})
+                
+                elif status == "failed_precondition":
+                    return html.Div([
+                        html.H6("📋 Pipeline Execution", style={"marginTop": "20px", "marginBottom": "15px"}),
+                        html.Div(f"⚠️ Gates blocked: {reason}", 
+                                style={"color": "#ffc107", "fontWeight": "600", "marginBottom": "12px"}),
+                    ], style={"marginTop": "20px", "padding": "16px", "backgroundColor": "#fff", 
+                             "border": "2px solid #ffc107", "borderRadius": "6px"})
+                
+                elif status == "error":
+                    return html.Div([
+                        html.H6("📋 Pipeline Execution", style={"marginTop": "20px", "marginBottom": "15px"}),
+                        html.Div(f"❌ Error (ID: {error_id})", 
+                                style={"color": "#dc3545", "fontWeight": "600", "marginBottom": "12px"}),
+                    ], style={"marginTop": "20px", "padding": "16px", "backgroundColor": "#fff", 
+                             "border": "2px solid #dc3545", "borderRadius": "6px"})
+            
+            except Exception:
+                pass  # Fall through to old logic
+        
+        # FALLBACK: Old pipeline log format
+        from ..utils.backtest_log_utils import (
+            get_pipeline_log_state,
+            format_step_icon,
+            format_step_color,
+        )
+        
+        log_state = get_pipeline_log_state(current_job_id, BACKTESTS_DIR)
         
         # Use utility to parse log
         log_state = get_pipeline_log_state(current_job_id, BACKTESTS_DIR)
