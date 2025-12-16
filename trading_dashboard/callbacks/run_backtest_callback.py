@@ -358,6 +358,80 @@ def register_run_backtest_callback(app):
             
             return html.Div(debug_info, style=debug_style)
         
+        # ===== NEW: Render pipeline steps from run_steps.jsonl =====
+        steps_file = run_dir / "run_steps.jsonl"
+        
+        if steps_file.exists():
+            try:
+                # Read all step events
+                step_events = []
+                with open(steps_file) as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            step_events.append(json.loads(line))
+                
+                if step_events:
+                    # Group events by step_index for display
+                    steps_by_index = {}
+                    for event in step_events:
+                        idx = event["step_index"]
+                        if idx not in steps_by_index:
+                            steps_by_index[idx] = []
+                        steps_by_index[idx].append(event)
+                    
+                    # Build step display elements
+                    step_elements = []
+                    for idx in sorted(steps_by_index.keys()):
+                        events = steps_by_index[idx]
+                        step_name = events[0]["step_name"]
+                        
+                        # Determine final status
+                        statuses = [e["status"] for e in events]
+                        if "failed" in statuses:
+                            final_status = "failed"
+                            icon = "❌"
+                            color = "#dc3545"
+                        elif "skipped" in statuses:
+                            final_status = "skipped"
+                            icon = "⏭️"
+                            color = "#6c757d"
+                        elif "completed" in statuses:
+                            final_status = "completed"
+                            icon = "✅"
+                            color = "#28a745"
+                        elif "started" in statuses:
+                            final_status = "running"
+                            icon = "⏳"
+                            color = "#ffc107"
+                        else:
+                            final_status = "unknown"
+                            icon = "❔"
+                            color = "#000"
+                        
+                        step_elements.append(
+                            html.Div([
+                                html.Span(icon, style={"marginRight": "8px", "fontSize": "1.1em"}),
+                                html.Span(
+                                    step_name.replace("_", " ").title(),
+                                    style={"fontWeight": "600" if final_status == "running" else "normal", "color": color}
+                                ),
+                            ], style={"padding": "6px 0", "display": "flex", "alignItems": "center"})
+                        )
+                    
+                    return html.Div([
+                        html.H6("📋 Pipeline Steps", style={"marginTop": "20px", "marginBottom": "12px", "color": "var(--bs-body-color, #333)"}),
+                        html.Div(step_elements, style={
+                            "backgroundColor": "var(--bs-card-bg, #fff)",
+                            "padding": "12px",
+                            "borderRadius": "6px",
+                            "border": "1px solid var(--bs-border-color, #dee2e6)"
+                        })
+                    ])
+            except Exception as e:
+                logger.error(f"Failed to render steps: {e}")
+                # Fall through to run_result.json check
+        
         # HOTFIX: Check for NEW pipeline artifacts (run_result.json)
         run_result_file = run_dir / "run_result.json"
         
