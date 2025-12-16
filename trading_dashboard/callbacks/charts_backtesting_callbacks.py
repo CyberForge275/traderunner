@@ -156,9 +156,14 @@ def register_charts_backtesting_callbacks(app):
                 return empty_fig
             
             # === BUILD CHART ===
+            # For D1 (EOD data), use 'all' session mode since daily bars don't have intraday timestamps
+            # For intraday (M1/M5/M15/H1), use 'rth' to filter regular trading hours
+            session_mode = "all" if timeframe_str == "D1" else "rth"
+            
             config = PriceChartConfig(
                 title=f"{symbol} {timeframe_str} - Backtesting",
                 show_volume=True,
+                session_mode=session_mode,  # Critical: D1 must use 'all' to avoid empty charts
             )
             
             fig = build_price_chart(df_processed, indicators=[], config=config)
