@@ -163,6 +163,7 @@ def create_charts_backtesting_layout():
                     ])
                 ])
             ], width=2),
+            ], width=3),
             
             # Chart Area
             dbc.Col([
@@ -172,11 +173,16 @@ def create_charts_backtesting_layout():
                     children=[
                         dcc.Graph(
                             id="bt-candlestick-chart",
-                            style={"height": "700px"}
+                            style={"height": "700px"},
+                            config={
+                                'scrollZoom': True,  # Enable mousewheel zoom
+                                'displaylogo': False,  # Remove Plotly logo
+                                'displayModeBar': True,  # Show mode bar with zoom tools
+                            }
                         )
                     ]
                 )
-            ], width=10),
+            ], width=9),
         ]),
     ], style={"padding": "20px"})
 

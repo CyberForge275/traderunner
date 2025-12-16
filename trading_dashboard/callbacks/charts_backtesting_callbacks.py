@@ -227,13 +227,25 @@ def register_charts_backtesting_callbacks(app):
             # For intraday (M1/M5/M15/H1), use 'rth' to filter regular trading hours
             session_mode = "all" if timeframe_str == "D1" else "rth"
             
+            # Calculate uirevision for persistent zoom
+            # Zoom resets only when these change: symbol, tf, effective_date, window, display_tz, sessions
+            session_hash = f"{session_toggles or []}"
+            uirevision = f"{symbol}|{timeframe_str}|{effective_date.date() if effective_date else 'none'}|{window if timeframe_str == 'D1' else 'na'}|{display_tz}|{session_hash}"
+            
             config = PriceChartConfig(
                 title=f"{symbol} {timeframe_str} - Backtesting",
                 show_volume=True,
                 session_mode=session_mode,  # Critical: D1 must use 'all' to avoid empty charts
+                show_rangeslider=(timeframe_str == "D1"),  # Rangeslider only for D1
             )
             
             fig = build_price_chart(df_processed, indicators=[], config=config)
+            
+            # Apply uirevision and dragmode to layout
+            fig.update_layout(
+                uirevision=uirevision,  # Persistent zoom state
+                dragmode='zoom',  # Default interaction mode
+            )
             
             return fig
             
