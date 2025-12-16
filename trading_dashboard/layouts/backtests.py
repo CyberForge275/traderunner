@@ -162,13 +162,15 @@ def create_backtest_detail(
     trades_df: pd.DataFrame | None = None,
     rk_df: pd.DataFrame | None = None,
 ):
-    if not run_name or log_df is None or log_df.empty:
+    # CRITICAL: Don't require log_df for new-pipeline runs (they don't have run_log.json)
+    # Show placeholder ONLY if run_name is missing AND summary is missing
+    if not run_name or (summary is None and (log_df is None or log_df.empty)):
         return html.Div(
             className="dashboard-card",
             children=[
                 html.H5("Backtest Details"),
                 html.P(
-                    "Select a backtest run from the table to see pipeline steps and metrics.",
+                    "Select a backtest run from the dropdown to see pipeline steps and metrics.",
                     className="text-muted",
                     style={"padding": "20px"},
                 ),
