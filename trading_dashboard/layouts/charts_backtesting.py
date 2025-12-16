@@ -162,26 +162,25 @@ def create_charts_backtesting_layout():
                         ], style={"marginTop": "15px"}),
                     ])
                 ])
-            ], width=2),
             ], width=3),
             
             # Chart Area
             dbc.Col([
-                dcc.Loading(
-                    id="bt-loading-chart",
-                    type="default",
-                    children=[
-                        dcc.Graph(
-                            id="bt-candlestick-chart",
-                            style={"height": "700px"},
-                            config={
-                                'scrollZoom': True,  # Enable mousewheel zoom
-                                'displaylogo': False,  # Remove Plotly logo
-                                'displayModeBar': True,  # Show mode bar with zoom tools
-                            }
-                        )
-                    ]
-                )
+                dbc.Card([
+                    dbc.CardBody(
+                        children=[
+                            dcc.Graph(
+                                id="bt-candlestick-chart",
+                                style={"height": "700px"},
+                                config={
+                                    'scrollZoom': True,  # Enable mousewheel zoom
+                                    'displaylogo': False,  # Remove Plotly logo
+                                    'displayModeBar': True,  # Show mode bar with zoom tools
+                                }
+                            )
+                        ]
+                    )
+                ])
             ], width=9),
         ]),
     ], style={"padding": "20px"})
