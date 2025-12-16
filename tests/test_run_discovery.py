@@ -103,16 +103,21 @@ class TestRunDiscovery:
         with open(run_dir / "run_meta.json", "w") as f:
             json.dump(run_meta, f)
         
-        # Write run_manifest.json with DIFFERENT data
+        # Write run_manifest.json with DIFFERENT data (actual manifest structure)
         run_manifest = {
             "identity": {
                 "run_id": "test_run",
-                "strategy_key": "inside_bar_v2",  # Different!
-                "symbols": ["MSFT"],  # Different!
+                "timestamp_utc": "2025-12-16T11:00:00+00:00"  # Different!
+            },
+            "strategy": {
+                "key": "inside_bar_v2"  # Different!
+            },
+            "data": {
+                "symbol": "MSFT",  # Different! (singular)
                 "requested_tf": "M15"  # Different!
             },
-            "execution": {
-                "started_at": "2025-12-16T11:00:00+00:00"  # Different!
+            "result": {
+                "run_status": "success"
             }
         }
         with open(run_dir / "run_manifest.json", "w") as f:
