@@ -52,10 +52,12 @@ class NewPipelineAdapter:
         Returns:
             Dict with keys:
             - status: "success" | "failed_precondition" | "error"
-            - run_name: Actual run directory name
+            - run_name: Actual run directory name (SSOT)
+            - run_dir: Absolute path to artifacts directory (for UI binding)
             - reason: FailureReason if FAILED_PRECONDITION
             - error_id: Error ID if ERROR
             - details: Additional context
+            - result: Full RunResult object
         """
         try:
             self.progress_callback("Initializing backtest...")
@@ -65,7 +67,8 @@ class NewPipelineAdapter:
                 return {
                     "status": "failed",
                     "error": "No symbols provided",
-                    "run_name": run_name
+                    "run_name": run_name,
+                    "run_dir": f"artifacts/backtests/{run_name}"
                 }
             
             symbol = symbols[0]  # minimal_pipeline takes single symbol
@@ -85,6 +88,9 @@ class NewPipelineAdapter:
             
             self.progress_callback(f"Running coverage & SLA gates for {symbol}...")
             
+            # Determine run_dir (SSOT)
+            run_dir = Path("artifacts/backtests") / run_name
+            
             # Call Phase 1-5 pipeline
             result = minimal_backtest_with_gates(
                 run_id=run_name,
@@ -96,12 +102,13 @@ class NewPipelineAdapter:
                 artifacts_root=Path("artifacts/backtests")
             )
             
-            # Map RunResult to legacy format for BacktestService
+            # Map RunResult to UI response format
             if result.status == RunStatus.SUCCESS:
                 self.progress_callback("Backtest completed successfully!")
                 return {
                     "status": "success",
                     "run_name": run_name,
+                    "run_dir": str(run_dir),  # SSOT for UI
                     "result": result
                 }
             
@@ -117,6 +124,7 @@ class NewPipelineAdapter:
                     "reason": reason_str,
                     "details": details_str,
                     "run_name": run_name,
+                    "run_dir": str(run_dir),  # SSOT for UI
                     "result": result
                 }
             

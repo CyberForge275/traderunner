@@ -213,6 +213,16 @@ def register_run_backtest_callback(app):
         # Format date range for display
         date_range_display = f"{start_date_str} to {end_date_str}" if start_date_str and end_date_str else "N/A"
         
+        # SSOT: Store run_dir immediately for UI binding
+        # Note: Adapter will return run_dir, but service wraps it
+        # For now, derive run_dir from run_name (service doesn't pass back adapter response yet)
+        active_run = {
+            "job_id": job_id,
+            "run_name": run_name,
+            "run_dir": f"artifacts/backtests/{run_name}",  # SSOT for all UI lookups
+            "started_at": datetime.now().isoformat()
+        }
+        
         # Show progress indicator
         progress_msg = html.Div(
             [
@@ -231,15 +241,16 @@ def register_run_backtest_callback(app):
         
         # Enable refresh interval to poll for completion
         # Clear run name input for next run
-        return progress_msg, "", False, initial_log, job_id  # FIXED: was run_name, now job_id
+        # Return active_run to store (SSOT)
+        return progress_msg, "", False, initial_log, active_run
     
     @app.callback(
         Output("backtests-pipeline-log", "children", allow_duplicate=True),
         Input("backtests-refresh-interval", "n_intervals"),
-        State("backtests-current-job-id", "data"),
+        State("backtests-current-job-id", "data"),  # This is actually active_run dict now
         prevent_initial_call=True
     )
-    def update_pipeline_log(n_intervals, current_job_id):
+    def update_pipeline_log(n_intervals, active_run):
         """Fetch and display pipeline execution log with progress bar."""
         from pathlib import Path
         from dash import no_update
@@ -247,51 +258,84 @@ def register_run_backtest_callback(app):
         from ..config import BACKTESTS_DIR
         
         # No active job being tracked
-        if not current_job_id:
+        if not active_run:
             return no_update
         
-        # HOTFIX: Get actual run_name from job (job_id has extra timestamp)
-        from ..services.backtest_service import get_backtest_service
-        service = get_backtest_service()
-        job_status = service.get_job_status(current_job_id)
+        # SSOT: Use run_dir from active_run store (not job_id!)
+        run_dir_str = active_run.get("run_dir") if isinstance(active_run, dict) else None
         
-        if not job_status or job_status.get("status") == "not_found":
-            return no_update
+        if not run_dir_str:
+            # Fallback for old format (just job_id string)
+            # Try to get from service
+            from ..services.backtest_service import get_backtest_service
+            service = get_backtest_service()
+            current_job_id = active_run if isinstance(active_run, str) else active_run.get("job_id")
+            job_status = service.get_job_status(current_job_id)
+            
+            if not job_status or job_status.get("status") == "not_found":
+                return no_update
+            
+            # Use run_name for directory
+            actual_run_name = job_status.get("run_name", current_job_id)
+            run_dir_str = f"{BACKTESTS_DIR}/{actual_run_name}"
         
-        # Use run_name for directory (not job_id which has double timestamp)
-        actual_run_name = job_status.get("run_name", current_job_id)
+        run_dir = Path(run_dir_str)
         
         # DEBUG MODE: Show directory resolution details
         import os
         debug_mode = os.getenv("DASH_BACKTEST_DEBUG") == "1"
         
         if debug_mode:
+            # High-contrast debug panel styling
+            debug_style = {
+                "marginTop": "20px",
+                "padding": "16px",
+                "backgroundColor": "var(--bs-card-bg, #2b2b2b)",
+                "border": "2px solid var(--bs-warning, #ffc107)",
+                "borderRadius": "6px",
+                "color": "var(--bs-body-color, #eaeaea)",
+            }
+            
+            label_style = {
+                "fontWeight": "600",
+                "color": "var(--bs-warning, #ffc107)"
+            }
+            
+            value_style = {
+                "fontFamily": "monospace",
+                "color": "var(--bs-body-color, #eaeaea)"
+            }
             # Show debug panel with directory resolution details
+            job_id = active_run.get("job_id") if isinstance(active_run, dict) else active_run
+            run_name = active_run.get("run_name") if isinstance(active_run, dict) else "unknown"
+            
             debug_info = [
-                html.H6("🐛 Debug Mode", style={"color": "#dc3545", "marginBottom": "10px"}),
+                html.H6("🐛 Debug Mode", style={**label_style, "marginBottom": "10px"}),
                 html.Div([
-                    html.Strong("Job ID: "), current_job_id, html.Br(),
-                    html.Strong("Run Name: "), actual_run_name, html.Br(),
-                    html.Strong("Expected Dir: "), str(Path(BACKTESTS_DIR) / actual_run_name), html.Br(),
+                    html.Span("Job ID: ", style=label_style), 
+                    html.Span(str(job_id), style=value_style), html.Br(),
+                    html.Span("Run Name: ", style=label_style),
+                    html.Span(run_name, style=value_style), html.Br(),
+                    html.Span("Run Dir: ", style=label_style),
+                    html.Span(str(run_dir), style=value_style), html.Br(),
                 ], style={"fontSize": "0.85em", "marginBottom": "10px"}),
             ]
             
             # Check directory existence
-            run_dir_path = Path(BACKTESTS_DIR) / actual_run_name
-            if run_dir_path.exists():
-                files_in_dir = list(run_dir_path.glob("*"))
+            if run_dir.exists():
+                files_in_dir = list(run_dir.glob("*"))
                 debug_info.append(
                     html.Div([
                         html.Span("✅ Directory exists", style={"color": "#28a745", "fontWeight": "600"}),
                         html.Br(),
                         html.Small(f"Files: {', '.join([f.name for f in files_in_dir[:10]])}")
-                    ], style={"marginTop": "8px"})
+                    ], style={"marginTop": "8px", "color": "var(--bs-body-color, #eaeaea)"})
                 )
             else:
                 # Search for candidate directories
                 backtests_path = Path(BACKTESTS_DIR)
-                prefix = actual_run_name[:15]  # First 15 chars (timestamp + start of name)
-                candidates = list(backtests_path.glob(f"{prefix}*"))
+                prefix = run_name[:15] if run_name else ""
+                candidates = list(backtests_path.glob(f"{prefix}*")) if prefix else []
                 
                 debug_info.append(
                     html.Div([
@@ -301,30 +345,20 @@ def register_run_backtest_callback(app):
                         html.Small(f"Searched for prefix: {prefix}*"),
                         html.Br(),
                         html.Small(f"Candidates found: {len(candidates)}"),
-                    ], style={"marginTop": "8px"})
+                    ], style={"marginTop": "8px", "color": "var(--bs-body-color, #eaeaea)"})
                 )
                 
                 if candidates:
                     debug_info.append(
                         html.Div([
-                            html.Strong("Candidate dirs:"),
-                            html.Ul([html.Li(str(c.name)) for c in candidates[:5]])
+                            html.Strong("Candidate dirs:", style=label_style),
+                            html.Ul([html.Li(str(c.name), style=value_style) for c in candidates[:5]])
                         ], style={"marginTop": "8px", "fontSize": "0.8em"})
                     )
             
-            return html.Div(
-                debug_info,
-                style={
-                    "marginTop": "20px",
-                    "padding": "16px",
-                    "backgroundColor": "#fff3cd",
-                    "border": "2px solid #ffc107",
-                    "borderRadius": "6px",
-                }
-            )
+            return html.Div(debug_info, style=debug_style)
         
         # HOTFIX: Check for NEW pipeline artifacts (run_result.json)
-        run_dir = Path(BACKTESTS_DIR) / actual_run_name
         run_result_file = run_dir / "run_result.json"
         
         if run_result_file.exists():
