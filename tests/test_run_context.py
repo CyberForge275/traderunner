@@ -119,8 +119,8 @@ class TestPipelineUsesRunContext:
         # Coverage gap = FAILED_PRECONDITION (not ERROR - this is expected behavior)
         assert result.status in [RunStatus.FAILED_PRECONDITION, RunStatus.ERROR]
         
-        # Run directory should exist
-        run_dir = tmp_path / "backtests" / "bootstrap_error_test"
+        # Run directory should exist (ArtifactsManager creates directly, not under backtests/)
+        run_dir = tmp_path / "bootstrap_error_test"
         assert run_dir.exists()
         
         # MUST have artifacts (not empty dir) - THIS IS THE KEY TEST
