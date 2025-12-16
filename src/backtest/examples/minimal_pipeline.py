@@ -100,6 +100,10 @@ def minimal_backtest_with_gates(
         # Write coverage check result (audit trail)
         manager.write_coverage_check_result(coverage_result)
         
+        # Update manifest with coverage result
+        if hasattr(manager, 'manifest_writer') and manager.manifest_writer:
+            manager.manifest_writer.update_coverage_gate(coverage_result)
+        
         # Check coverage status
         if coverage_result.status == CoverageStatus.GAP_DETECTED:
             logger.warning(f"[{run_id}] Coverage gap detected: {coverage_result.gap}")
