@@ -256,10 +256,70 @@ def register_run_backtest_callback(app):
         job_status = service.get_job_status(current_job_id)
         
         if not job_status or job_status.get("status") == "not_found":
-            return no_update
-        
         # Use run_name for directory (not job_id which has double timestamp)
         actual_run_name = job_status.get("run_name", current_job_id)
+        
+        # DEBUG MODE: Show directory resolution details
+        import os
+        debug_mode = os.getenv("DASH_BACKTEST_DEBUG") == "1"
+        
+        if debug_mode:
+            # Show debug panel with directory resolution details
+            debug_info = [
+                html.H6("🐛 Debug Mode", style={"color": "#dc3545", "marginBottom": "10px"}),
+                html.Div([
+                    html.Strong("Job ID: "), current_job_id, html.Br(),
+                    html.Strong("Run Name: "), actual_run_name, html.Br(),
+                    html.Strong("Expected Dir: "), str(Path(BACKTESTS_DIR) / actual_run_name), html.Br(),
+                ], style={"fontSize": "0.85em", "marginBottom": "10px"}),
+            ]
+            
+            # Check directory existence
+            run_dir_path = Path(BACKTESTS_DIR) / actual_run_name
+            if run_dir_path.exists():
+                files_in_dir = list(run_dir_path.glob("*"))
+                debug_info.append(
+                    html.Div([
+                        html.Span("✅ Directory exists", style={"color": "#28a745", "fontWeight": "600"}),
+                        html.Br(),
+                        html.Small(f"Files: {', '.join([f.name for f in files_in_dir[:10]])}")
+                    ], style={"marginTop": "8px"})
+                )
+            else:
+                # Search for candidate directories
+                backtests_path = Path(BACKTESTS_DIR)
+                prefix = actual_run_name[:15]  # First 15 chars (timestamp + start of name)
+                candidates = list(backtests_path.glob(f"{prefix}*"))
+                
+                debug_info.append(
+                    html.Div([
+                        html.Span("❌ Expected directory NOT FOUND", 
+                                 style={"color": "#dc3545", "fontWeight": "600"}),
+                        html.Br(),
+                        html.Small(f"Searched for prefix: {prefix}*"),
+                        html.Br(),
+                        html.Small(f"Candidates found: {len(candidates)}"),
+                    ], style={"marginTop": "8px"})
+                )
+                
+                if candidates:
+                    debug_info.append(
+                        html.Div([
+                            html.Strong("Candidate dirs:"),
+                            html.Ul([html.Li(str(c.name)) for c in candidates[:5]])
+                        ], style={"marginTop": "8px", "fontSize": "0.8em"})
+                    )
+            
+            return html.Div(
+                debug_info,
+                style={
+                    "marginTop": "20px",
+                    "padding": "16px",
+                    "backgroundColor": "#fff3cd",
+                    "border": "2px solid #ffc107",
+                    "borderRadius": "6px",
+                }
+            )
         
         # HOTFIX: Check for NEW pipeline artifacts (run_result.json)
         run_dir = Path(BACKTESTS_DIR) / actual_run_name
