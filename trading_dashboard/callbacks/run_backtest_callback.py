@@ -256,6 +256,8 @@ def register_run_backtest_callback(app):
         job_status = service.get_job_status(current_job_id)
         
         if not job_status or job_status.get("status") == "not_found":
+            return no_update
+        
         # Use run_name for directory (not job_id which has double timestamp)
         actual_run_name = job_status.get("run_name", current_job_id)
         
