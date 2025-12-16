@@ -47,12 +47,11 @@ def _safe_parse_dt(value: Any) -> Optional[datetime]:
         return None
 
 
-def _iter_run_logs() -> List[BacktestRun]:
-    """Iterate over all UI-triggered backtest runs.
+def _iter_run_logs_legacy() -> List[BacktestRun]:
+    """
+    LEGACY: Iterate over runs using run_log.json (old pipeline).
 
-    UI runs live directly under BACKTESTS_DIR with names like
-    ui_m5_APP_240d_10k and contain a run_log.json. The actual
-    axiom_bt runner artifacts live in sibling run_* directories.
+    Only used if USE_LEGACY_DISCOVERY=1 is set.
     """
 
     runs: List[BacktestRun] = []
@@ -92,6 +91,45 @@ def _iter_run_logs() -> List[BacktestRun]:
                 timeframe=timeframe,
                 symbols=list(symbols),
                 status=status,
+            )
+        )
+
+    return runs
+
+
+def _iter_run_logs() -> List[BacktestRun]:
+    """
+    Iterate over all backtest runs using RunDiscoveryService.
+
+    New-pipeline runs (run_meta.json/run_manifest.json) now visible.
+    Falls back to legacy discovery if USE_LEGACY_DISCOVERY=1.
+    """
+
+    # Legacy fallback for emergency rollback
+    use_legacy = os.getenv("USE_LEGACY_DISCOVERY", "0") == "1"
+    if use_legacy:
+        logger = logging.getLogger(__name__)
+        logger.warning("⚠️ Using LEGACY run discovery (USE_LEGACY_DISCOVERY=1)")
+        return _iter_run_logs_legacy()
+
+    # Use new RunDiscoveryService (manifest-based discovery)
+    from trading_dashboard.services.run_discovery_service import RunDiscoveryService
+
+    service = RunDiscoveryService()
+    summaries = service.discover()
+
+    # Convert BacktestRunSummary to BacktestRun for compatibility
+    runs: List[BacktestRun] = []
+    for summary in summaries:
+        runs.append(
+            BacktestRun(
+                run_name=summary.run_id,
+                created_at=summary.started_at,
+                finished_at=summary.finished_at,
+                strategy=summary.strategy_key,
+                timeframe=summary.requested_tf,
+                symbols=summary.symbols,
+                status=summary.status.lower()
             )
         )
 
