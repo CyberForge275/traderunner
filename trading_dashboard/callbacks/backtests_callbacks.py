@@ -42,9 +42,10 @@ def register_backtests_callbacks(app):
         Output("backtests-detail", "children"),
         Input("backtests-run-dropdown", "value"),
         Input("backtests-refresh-interval", "n_intervals"),
-        prevent_initial_call=True,  # Changed to True for proper dropdown behavior
+        prevent_initial_call=True,
     )
     def update_backtests_detail(run_name, n_intervals):
+        from ..services.backtest_details_service import BacktestDetailsService
         from ..repositories.backtests import (
             get_backtest_log,
             get_backtest_metrics,
@@ -58,6 +59,47 @@ def register_backtests_callbacks(app):
         if not run_name:
             return create_backtest_detail(None, None, None)
 
+        # Try new-pipeline artifacts first
+        details_service = BacktestDetailsService()
+        details = details_service.load_summary(run_name)
+        steps = details_service.load_steps(run_name)
+        
+        # If we have new-pipeline artifacts, use them
+        if details.source in ["manifest", "meta+result"]:
+            # Create summary dict for create_backtest_detail
+            summary = {
+                "run_name": run_name,
+                "status": details.status.lower(),
+                "strategy": details.strategy_key,
+                "timeframe": details.requested_tf,
+                "symbols": details.symbols,
+                "started_at": details.started_at,
+                "finished_at": details.finished_at,
+                "failure_reason": details.failure_reason,
+                "steps": steps,  # Pass steps to detail view
+            }
+            
+            # Still try to load legacy artifacts if they exist
+            # (equity, orders, etc. - still valuable even for new runs)
+            log_df = get_backtest_log(run_name)  # May be empty
+            metrics = get_backtest_metrics(run_name)
+            equity_df = get_backtest_equity(run_name)
+            orders = get_backtest_orders(run_name)
+            rk_df = get_rudometkin_candidates(run_name)
+            
+            return create_backtest_detail(
+                run_name,
+                log_df,
+                metrics,
+                summary=summary,
+                equity_df=equity_df,
+                orders_df=orders.get("orders"),
+                fills_df=orders.get("fills"),
+                trades_df=orders.get("trades"),
+                rk_df=rk_df,
+            )
+        
+        # Fall back to pure legacy if no new artifacts
         log_df = get_backtest_log(run_name)
         metrics = get_backtest_metrics(run_name)
         summary = get_backtest_summary(run_name)
