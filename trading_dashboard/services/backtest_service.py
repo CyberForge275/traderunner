@@ -102,11 +102,21 @@ class BacktestService:
             # Update progress
             self._update_job_progress(job_id, "Loading pipeline configuration...")
             
-            # HOTFIX: Use new Phase 1-5 pipeline adapter (bypasses legacy Streamlit code)
-            # Feature flag: Set USE_NEW_PIPELINE=0 to revert to old adapter
-            use_new_pipeline = os.getenv("USE_NEW_PIPELINE", "1") == "1"
+            # CRITICAL: Use Phase 1-5 pipeline by DEFAULT (legacy only if explicitly enabled)
+            # To use old pipeline: Set USE_LEGACY_PIPELINE=1 (NOT RECOMMENDED)
+            use_legacy =os.getenv("USE_LEGACY_PIPELINE", "0") == "1"
             
-            if use_new_pipeline:
+            if use_legacy:
+                # OLD path (DEPRECATED - only for emergency rollback)
+                from .pipeline_adapter import create_adapter
+                
+                def update_progress(msg: str):
+                    self._update_job_progress(job_id, msg)
+                
+                adapter = create_adapter(progress_callback=update_progress)
+                print("⚠️  WARNING: Using LEGACY pipeline adapter (signals.cli_inside_bar subprocess)")
+            else:
+                # NEW path (DEFAULT) - Phase 1-5 robust pipeline
                 from .new_pipeline_adapter import create_new_adapter
                 
                 # Create adapter with progress callback
@@ -114,14 +124,7 @@ class BacktestService:
                     self._update_job_progress(job_id, msg)
                 
                 adapter = create_new_adapter(progress_callback=update_progress)
-            else:
-                # OLD path (deprecated)
-                from .pipeline_adapter import create_adapter
-                
-                def update_progress(msg: str):
-                    self._update_job_progress(job_id, msg)
-                
-                adapter = create_adapter(progress_callback=update_progress)
+
             
             # Execute backtest
             result = adapter.execute_backtest(
