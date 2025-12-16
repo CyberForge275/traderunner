@@ -31,6 +31,11 @@ from trading_dashboard.utils.chart_logging import (
     log_chart_meta,
     log_chart_error,
 )
+from trading_dashboard.utils.date_filtering import (
+    calculate_effective_date,
+    apply_d1_window,
+    apply_intraday_exact_day,
+)
 from visualization.plotly import build_price_chart, PriceChartConfig
 
 logger = logging.getLogger(__name__)
@@ -51,17 +56,19 @@ def register_charts_backtesting_callbacks(app):
             Input("bt-tf-m15", "n_clicks"),
             Input("bt-tf-h1", "n_clicks"),
             Input("bt-tf-d1", "n_clicks"),
+            Input("bt-date-picker", "date"),
+            Input("bt-window-selector", "value"),  # NEW: Window for D1
             Input("bt-tz-ny-btn", "n_clicks"),
             Input("bt-tz-berlin-btn", "n_clicks"),
             Input("bt-refresh-btn", "n_clicks"),
-            Input("bt-date-picker", "date"),
             Input("bt-session-toggles", "value"),
         ],
         prevent_initial_call=False
     )
     def update_backtesting_chart(
         symbol, m1_clicks, m5_clicks, m15_clicks, h1_clicks, d1_clicks,
-        ny_clicks, berlin_clicks, refresh_clicks, selected_date, session_toggles
+        selected_date, window,  # NEW: window parameter
+        ny_clicks, berlin_clicks, refresh_clicks, session_toggles
     ):
         """
         Update backtesting chart with data from Parquet.
@@ -129,16 +136,48 @@ def register_charts_backtesting_callbacks(app):
                 
                 return empty_fig
             
-            # === USE HELPER FOR ALL TRANSFORMATIONS ===
+            # === APPLY DATE FILTERING (P0.2) ===
             # Convert selected_date string to date object if provided
-            ref_date = None
+            requested_date = None
             if selected_date:
-                ref_date = pd.to_datetime(selected_date).date()
+                requested_date = pd.to_datetime(selected_date).date()
             
+            # Calculate effective date (with clamping/rollback)
+            effective_date, date_reason = calculate_effective_date(requested_date, df)
+            
+            # Apply timeframe-specific filtering
+            date_filter_mode = "NONE"
+            if timeframe_str == "D1":
+                # D1: Window-based filtering
+                df = apply_d1_window(df, effective_date, window=window or "12M")
+                date_filter_mode = f"D1_WINDOW_{window or '12M'}"
+            else:
+                # Intraday (M1/M5/M15/H1): Exact-day filtering
+                if requested_date:
+                    df = apply_intraday_exact_day(df, effective_date, market_tz="America/New_York")
+                    date_filter_mode = "INTRADAY_EXACT_DAY"
+                else:
+                    # No date filter - show recent data (last N days)
+                    date_filter_mode = "INTRADAY_RECENT"
+            
+            # Check if filtering removed all data
+            if df.empty:
+                empty_fig = go.Figure()
+                empty_fig.add_annotation(
+                    text=f"📭 No data for {symbol} {timeframe_str} on {effective_date.date()}<br>" +
+                         f"<sub>Date filter removed all rows | Available range: {rows_before} rows total</sub>",
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5, showarrow=False,
+                    font=dict(size=16)
+                )
+                return empty_fig
+            
+            # === USE HELPER FOR ALL TRANSFORMATIONS ===
+            # Note: ref_date=None here because we already applied date filtering above
             df_processed, meta = preprocess_for_chart(
                 df=df,
                 source="BACKTEST_PARQUET",
-                ref_date=ref_date,  # Will filter if < today
+                ref_date=None,  # Already filtered above
                 display_tz=display_tz,
                 market_tz="America/New_York"
             )
@@ -154,18 +193,18 @@ def register_charts_backtesting_callbacks(app):
                 source="BACKTEST_PARQUET",
                 symbol=symbol,
                 timeframe=timeframe_str,
-                requested_date=selected_date,
-                effective_date=selected_date,  # Will enhance in P0.2
-                window_mode=None,  # Will add in P0.2
+                requested_date=str(requested_date) if requested_date else None,
+                effective_date=str(effective_date.date()) if effective_date else None,
+                window_mode=window if timeframe_str == "D1" else None,
                 rows_before=rows_before,
-                rows_after=meta['rows_after'],
-                dropped_rows=meta.get('dropped_rows', 0),
-                date_filter_mode="NONE" if not selected_date else "BASIC",  # Will enhance in P0.2
-                min_ts=meta.get('first_ts'),
-                max_ts=meta.get('last_ts'),
-                market_tz=meta['market_tz'],
-                display_tz=meta['display_tz'],
-                session_flags={"pre": False, "after": False},  # Will read from toggles in P0.2
+                rows_after=len(df),  # After date filtering
+                dropped_rows=rows_before - len(df),
+                date_filter_mode=date_filter_mode,
+                min_ts=df.index.min() if len(df) > 0 else None,
+                max_ts=df.index.max() if len(df) > 0 else None,
+                market_tz="America/New_York",
+                display_tz=display_tz,
+                session_flags={"pre": "pre" in (session_toggles or []), "after": "after" in (session_toggles or [])},
                 data_path=data_path,
             )
             

@@ -98,10 +98,35 @@ def create_charts_backtesting_layout():
                             date=date.today(),
                             display_format='YYYY-MM-DD',
                             style={"width": "100%"},
-                            className="mb-3"
+                            className="mb-2"
                         ),
                         html.P(
                             "Select date for historical analysis",
+                            className="text-muted",
+                            style={"fontSize": "0.7rem"}
+                        ),
+                        
+                        # Window Dropdown (for D1 only)
+                        html.H6("Window (D1 only)", className="mt-2"),
+                        dcc.Dropdown(
+                            id="bt-window-selector",
+                            options=[
+                                {"label": "1 Month (21 days)", "value": "1M"},
+                                {"label": "3 Months (63 days)", "value": "3M"},
+                                {"label": "6 Months (126 days)", "value": "6M"},
+                                {"label": "12 Months (252 days)", "value": "12M"},
+                                {"label": "All History", "value": "All"},
+                            ],
+                            value="12M",  # Default to 12 months
+                            clearable=False,
+                            style={
+                                "backgroundColor": "#2b2b2b",
+                                "color": "#ffffff",
+                            },
+                            className="custom-dropdown mb-2"
+                        ),
+                        html.P(
+                            "Time window to display (ignored for intraday)",
                             className="text-muted",
                             style={"fontSize": "0.7rem"}
                         ),
