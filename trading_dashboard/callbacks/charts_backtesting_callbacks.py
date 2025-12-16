@@ -356,12 +356,12 @@ def register_charts_backtesting_callbacks(app):
         """
         Update data availability display for selected symbol.
         
-        Shows availability, date ranges, and row counts for D1/M1/M5/M15/H1.
-        Uses cache with 60s TTL for performance.
+        Thin callback - delegates to service layer.
         """
-        from trading_dashboard.utils.availability_cache import get_cached, set_cached
-        from trading_dashboard.utils.availability_checker import get_availability
-        from datetime import datetime
+        from trading_dashboard.services.data_availability_service import (
+            get_availability,
+            format_availability_for_ui
+        )
         
         if not symbol:
             return html.Div(
@@ -375,64 +375,13 @@ def register_charts_backtesting_callbacks(app):
         force_refresh = (ctx.triggered and 
                         ctx.triggered[0]['prop_id'] == 'bt-availability-refresh.n_clicks')
         
-        # Check cache
-        cached = get_cached(symbol) if not force_refresh else None
-        
-        if cached is None:
-            # Refresh from catalog
-            try:
-                availability = get_availability(symbol)
-                set_cached(symbol, availability)
-            except Exception as e:
-                logger.error(f"Error getting availability for {symbol}: {e}", exc_info=True)
-                return html.Div(
-                    f"Error: {str(e)[:40]}",
-                    style={"color": "red", "fontSize": "0.7rem"}
-                )
-        else:
-            availability = cached
-        
-        # Build display
-        children = []
-        
-        for tf in ['D1', 'M1', 'M5', 'M15', 'H1']:
-            info = availability.get(tf, {})
-            
-            if info.get('available'):
-                # Available or derivable
-                icon = "🔄" if info.get('derivable') else "✅"
-                
-                # Format date range  
-                if info.get('first_date') and info.get('last_date'):
-                    date_range = f"{info['first_date']} → {info['last_date']}"
-                else:
-                    date_range = "unknown"
-                
-                # Format row count
-                rows = info.get('rows', 0)
-                if rows > 0:
-                    unit = "days" if tf == "D1" else "bars"
-                    rows_str = f"({rows:,} {unit})"
-                else:
-                    rows_str = ""
-                
-                # Combine
-                text = f"{tf}: {icon} {date_range} {rows_str}"
-                
-                children.append(html.Div(text, style={"marginBottom": "3px", "lineHeight": "1.2"}))
-            else:
-                # Not available
-                children.append(html.Div(
-                    f"{tf}: ❌ Not available",
-                    className="text-muted",
-                    style={"marginBottom": "3px", "lineHeight": "1.2"}
-                ))
-        
-        # Add timestamp
-        children.append(html.Div(
-            f"Updated: {datetime.now().strftime('%H:%M:%S')}",
-            className="text-muted",
-            style={"marginTop": "8px", "fontSize": "0.6rem", "textAlign": "center"}
-        ))
-        
-        return children
+        # Delegate to service layer
+        try:
+            result = get_availability(symbol, force_refresh=force_refresh)
+            return format_availability_for_ui(result)
+        except Exception as e:
+            logger.error(f"Error getting availability for {symbol}: {e}", exc_info=True)
+            return html.Div(
+                f"Error: {str(e)[:40]}",
+                style={"color": "red", "fontSize": "0.7rem"}
+            )
