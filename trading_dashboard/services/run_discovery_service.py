@@ -156,13 +156,15 @@ class RunDiscoveryService:
             with open(manifest_file) as f:
                 manifest = json.load(f)
             
-            # Extract identity from manifest
+            # Extract from manifest (actual structure, not expected structure)
             identity = manifest.get("identity", {})
             execution = manifest.get("execution", {})
-            outcome = manifest.get("outcome", {})
+            outcome = manifest.get("result", {})  # "result" not "outcome"
+            strategy_section = manifest.get("strategy", {})
+            data_section = manifest.get("data", {})
             
             # Parse started_at
-            started_at_str = execution.get("started_at")
+            started_at_str = execution.get("started_at") or identity.get("timestamp_utc")
             if started_at_str:
                 started_at = datetime.fromisoformat(started_at_str)
             else:
@@ -170,13 +172,21 @@ class RunDiscoveryService:
                 from datetime import timezone
                 started_at = datetime.fromtimestamp(run_dir.stat().st_mtime, tz=timezone.utc)
             
-            # Parse finished_at
-            finished_at_str = execution.get("finished_at")
-            finished_at = datetime.fromisoformat(finished_at_str) if finished_at_str else None
+            # Parse finished_at (might not exist in manifest)
+            finished_at = None
             
-            # Get status and failure info from outcome
-            status = outcome.get("status", "unknown").upper()
+            # Get status from result section
+            status = outcome.get("run_status", "unknown").upper()
             failure_reason = outcome.get("failure_reason")
+            
+            # Get strategy key from strategy section
+            strategy_key = strategy_section.get("key", "unknown")
+            
+            # Get symbols and TF from data section
+            # Note: manifest has "symbol" (singular) not "symbols" (plural)
+            symbol = data_section.get("symbol")
+            symbols = [symbol] if symbol else []
+            requested_tf = data_section.get("requested_tf", "unknown")
             
             # Load steps if available
             has_steps, steps_count = self._load_steps_info(steps_file)
@@ -186,9 +196,9 @@ class RunDiscoveryService:
             return BacktestRunSummary(
                 run_id=run_id,
                 run_dir=run_dir.absolute(),
-                strategy_key=identity.get("strategy_key", "unknown"),
-                symbols=identity.get("symbols", []),
-                requested_tf=identity.get("requested_tf", "unknown"),
+                strategy_key=strategy_key,
+                symbols=symbols,
+                requested_tf=requested_tf,
                 started_at=started_at,
                 finished_at=finished_at,
                 status=status,
