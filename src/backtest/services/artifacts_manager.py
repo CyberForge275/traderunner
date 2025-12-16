@@ -36,19 +36,21 @@ class ArtifactsManager:
     even if run fails or crashes.
     """
     
-    def __init__(self, artifacts_root: Path = None):
-        """
-        Args:
-            artifacts_root: Root artifacts directory (default: artifacts/backtests/)
-        """
+    def __init__(self, artifacts_root: Optional[Path] = None):
+        """Initialize the artifacts manager."""
         if artifacts_root is None:
-            # Default: artifacts/backtests/ relative to project root
-            artifacts_root = Path("artifacts/backtests")
+            from src.core.settings import get_settings
+            artifacts_root = get_settings().artifacts_root / "backtests"
         
         self.artifacts_root = Path(artifacts_root)
+        self.backtests_dir = self.artifacts_root
+        
+        # Internal state (after create_run_dir)
+        self.ctx: Optional["RunContext"] = None
+        
+        # Legacy attributes for backward compatibility
         self.current_run_dir: Optional[Path] = None
         self.run_id: Optional[str] = None
-        self.backtests_dir = self.artifacts_root # Assuming artifacts_root is already the backtests root
     
     def create_run_dir(self, run_id: str) -> "RunContext":
         """
@@ -73,12 +75,19 @@ class ArtifactsManager:
         run_dir.mkdir(parents=True)
         logger.info(f"Created run directory: {run_dir.relative_to(self.artifacts_root)}")
         
-        # Return RunContext as SSOT
-        return RunContext(
+        # Create and store RunContext as SSOT
+        ctx = RunContext(
             run_id=run_id,
             run_name=run_id,  # In current impl, run_name == run_id
             run_dir=run_dir.absolute()
         )
+        
+        # Store internally for backward compatibility with existing methods
+        self.ctx = ctx
+        self.current_run_dir = ctx.run_dir
+        self.run_id = ctx.run_id
+        
+        return ctx
     
     def write_run_meta(
         self,
