@@ -170,7 +170,6 @@ def register_charts_live_callbacks(app):
             # === BUILD CHART ===
             config = PriceChartConfig(
                 title=f"{symbol} {timeframe} - Live",
-                timezone=display_tz,
                 show_volume=True,
             )
             

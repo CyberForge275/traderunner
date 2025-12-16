@@ -21,7 +21,9 @@ import pandas as pd
 import logging
 from datetime import date
 
-from axiom_bt.intraday import IntradayStore, Timeframe
+from axiom_bt.intraday import IntradayStore
+from trading_dashboard.resolvers.timeframe_resolver import BacktestingTimeframeResolver
+from trading_dashboard.callbacks._backtesting_helpers import _get_source_name
 from trading_dashboard.utils.chart_preprocess import preprocess_for_chart
 from visualization.plotly import build_price_chart, PriceChartConfig
 
@@ -31,8 +33,8 @@ logger = logging.getLogger(__name__)
 def register_charts_backtesting_callbacks(app):
     """Register all callbacks for Backtesting Charts tab."""
     
-    # Initialize store
-    intraday_store = IntradayStore()
+    # Initialize resolver (replaces IntradayStore)
+    resolver = BacktestingTimeframeResolver()
     
     @app.callback(
         Output("bt-candlestick-chart", "figure"),
@@ -102,16 +104,16 @@ def register_charts_backtesting_callbacks(app):
         )
         
         try:
-            # === LOAD DATA FROM PARQUET ===
-            timeframe = Timeframe(timeframe_str)
-            df = intraday_store.load(symbol, timeframe=timeframe)
+            # === LOAD DATA VIA RESOLVER ===
+            # Resolver routes: M1/M5/M15→IntradayStore, D1→Universe, H1→Resample
+            df = resolver.load(symbol, timeframe=timeframe_str, tz="America/New_York")
             
             if df.empty:
-                # === EMPTY STATE WITH EXPLANATION ===
+                # === EMPTY STATE WITH CLEAR MESSAGE ===
                 empty_fig = go.Figure()
                 empty_fig.add_annotation(
-                    text=f"📭 No backtest data for {symbol} {timeframe_str}<br>" +
-                         f"<sub>source: BACKTEST_PARQUET | rows=0</sub>",
+                    text=f"📭 No {timeframe_str} data for {symbol}<br>" +
+                         f"<sub>source: {_get_source_name(timeframe_str)} | rows=0</sub>",
                     xref="paper", yref="paper",
                     x=0.5, y=0.5, showarrow=False,
                     font=dict(size=16)
@@ -156,7 +158,6 @@ def register_charts_backtesting_callbacks(app):
             # === BUILD CHART ===
             config = PriceChartConfig(
                 title=f"{symbol} {timeframe_str} - Backtesting",
-                timezone=display_tz,
                 show_volume=True,
             )
             

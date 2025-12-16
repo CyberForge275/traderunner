@@ -23,8 +23,8 @@ def create_charts_live_layout():
     symbols = [s.strip().upper() for s in symbols_env.split(',') if s.strip()]
     
     if not symbols:
-        # FAIL FAST - no hardcoded defaults
-        symbols = ['ERROR']  # Will show error in dropdown
+        # Fallback for local development
+        symbols = ['AAL', 'AAPL', 'TSLA']
     
     return html.Div([
         # Header

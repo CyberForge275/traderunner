@@ -8,7 +8,7 @@ from typing import Dict, Iterable, List, Optional
 
 import pandas as pd
 
-from axiom_bt.fs import DATA_M1, DATA_M5, DATA_M15, ensure_layout
+from axiom_bt.fs import DATA_M1, DATA_M5, DATA_M15, DATA_D1, ensure_layout
 from axiom_bt.data.eodhd_fetch import fetch_intraday_1m_to_parquet, resample_m1
 
 
