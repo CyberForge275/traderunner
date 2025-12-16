@@ -79,10 +79,15 @@ class ArtifactsManager:
         requested_end: str,
         lookback_days: int,
         commit_hash: Optional[str] = None,
-        market_tz: str = "America/New_York"
+        market_tz: str = "America/New_York",
+        # Manifest-specific params
+        impl_version: str = "1.0.0",
+        profile_version: str = "default"
     ):
         """
         Write run metadata at START (before execution).
+        
+        Also initializes manifest writer if manifest writing is enabled.
         
         Args:
             strategy: Strategy key (e.g., "inside_bar")
@@ -93,6 +98,8 @@ class ArtifactsManager:
             lookback_days: Lookback in days
             commit_hash: Git commit hash (optional)
             market_tz: Market timezone
+            impl_version: Strategy implementation version
+            profile_version: Strategy profile version
         """
         if not self.current_run_dir:
             raise RuntimeError("create_run_dir() must be called first")
@@ -102,7 +109,8 @@ class ArtifactsManager:
             "started_at": datetime.now(timezone.utc).isoformat(),
             "strategy": {
                 "key": strategy,
-                # Version info can be added later
+                "impl_version": impl_version,
+                "profile_version": profile_version
             },
             "params": params,
             "data": {
@@ -120,13 +128,39 @@ class ArtifactsManager:
             json.dump(run_meta, f, indent=2)
         
         logger.info(f"Wrote run_meta.json: {meta_path}")
+        
+        # Initialize manifest writer
+        try:
+            from backtest.services.manifest_writer import ManifestWriter
+            
+            self.manifest_writer = ManifestWriter(self.current_run_dir)
+            
+            # Write initial manifest
+            self.manifest_writer.write_initial_manifest(
+                run_id=self.run_id,
+                strategy_key=strategy,
+                impl_version=impl_version,
+                profile_version=profile_version,
+                params=params,
+                symbol=symbols[0] if symbols else "UNKNOWN",  # TODO: handle multi-symbol
+                requested_tf=timeframe,
+                base_tf=timeframe,  # For now, same as requested
+                lookback_days=lookback_days,
+                requested_end=requested_end
+            )
+        except Exception as e:
+            logger.warning(f"Failed to initialize manifest writer: {e}")
+            self.manifest_writer = None
     
-    def write_run_result(self, run_result: RunResult):
+    def write_run_result(self, run_result: RunResult, artifacts_produced: Optional[list] = None):
         """
         Write run result at END (always called, even on failure).
         
+        Also finalizes manifest if manifest writer is initialized.
+        
         Args:
             run_result: RunResult DTO
+            artifacts_produced: List of artifact filenames produced (optional)
         """
         if not self.current_run_dir:
             raise RuntimeError("create_run_dir() must be called first")
@@ -145,6 +179,14 @@ class ArtifactsManager:
             json.dump(result_data, f, indent=2)
         
         logger.info(f"Wrote run_result.json: {result_path} (status={run_result.status.value})")
+        
+        # Finalize manifest
+        if hasattr(self, 'manifest_writer') and self.manifest_writer is not None:
+            try:
+                self.manifest_writer.finalize_manifest(run_result, artifacts_produced)
+            except Exception as e:
+                logger.error(f"Manifest finalization failed: {e}")
+                # Do not raise - must not crash run_result writing
     
     def write_error_stacktrace(self, exception: Exception, error_id: str):
         """
