@@ -60,8 +60,15 @@ def minimal_backtest_with_gates(
     
     # CRITICAL: Create run directory FIRST (even before any checks)
     try:
+        from backtest.services.step_tracker import StepTracker
+        
         manager.create_run_dir(run_id)
         logger.info(f"[{run_id}] Run directory created")
+        
+        # Initialize step tracker for UI visibility
+        tracker = StepTracker(manager.run_dir)
+        tracker._emit_event(1, "create_run_dir", "completed")
+        
     except Exception as e:
         # Very rare - only if filesystem issues
         logger.error(f"[{run_id}] Failed to create run dir: {e}")
@@ -74,28 +81,32 @@ def minimal_backtest_with_gates(
     
     try:
         # Write run_meta.json at START (before execution)
-        manager.write_run_meta(
-            strategy="inside_bar",  # Example
-            symbols=[symbol],
-            timeframe=timeframe,
-            params=strategy_params,
-            requested_end=requested_end,
-            lookback_days=lookback_days,
-            commit_hash="abc123"  # Would be from git
-        )
-        logger.info(f"[{run_id}] run_meta.json written")
+        with tracker.step("write_run_meta"):
+            manager.write_run_meta(
+                strategy="inside_bar",  # Example
+                symbols=[symbol],
+                timeframe=timeframe,
+                params=strategy_params,
+                requested_end=requested_end,
+                lookback_days=lookback_days,
+                commit_hash="abc123"  # Would be from git
+            )
+            logger.info(f"[{run_id}] run_meta.json written")
         
         # ===== PHASE 1: COVERAGE GATE =====
-        logger.info(f"[{run_id}] Running coverage gate...")
-        requested_end_ts = pd.Timestamp(requested_end, tz="America/New_York")
-        
-        coverage_result = check_coverage(
-            symbol=symbol,
-            timeframe=timeframe,
-            requested_end=requested_end_ts,
-            lookback_days=lookback_days,
-            auto_fetch=False  # Fail-fast by default
-        )
+        with tracker.step("coverage_gate") as step:
+            logger.info(f"[{run_id}] Running coverage gate...")
+            requested_end_ts = pd.Timestamp(requested_end, tz="America/New_York")
+            
+            coverage_result = check_coverage(
+                symbol=symbol,
+                timeframe=timeframe,
+                requested_end=requested_end_ts,
+                lookback_days=lookback_days,
+                auto_fetch=False  # Fail-fast by default
+            )
+            
+            step.add_detail("status", coverage_result.status.value if hasattr(coverage_result.status, 'value') else str(coverage_result.status))
         
         # Write coverage check result (audit trail)
         manager.write_coverage_check_result(coverage_result)
@@ -108,6 +119,10 @@ def minimal_backtest_with_gates(
         if coverage_result.status == CoverageStatus.GAP_DETECTED:
             logger.warning(f"[{run_id}] Coverage gap detected: {coverage_result.gap}")
             
+            # Skip remaining steps - gates failed
+            tracker.skip_step("sla_gate", "coverage_gate_failed")
+            tracker.skip_step("strategy_execute", "precondition_failed")
+            
             # Return FAILED_PRECONDITION (not ERROR)
             run_result = RunResult(
                 run_id=run_id,
@@ -117,12 +132,17 @@ def minimal_backtest_with_gates(
             )
             
             # Write run_result.json
-            manager.write_run_result(run_result)
+            with tracker.step("write_run_result"):
+                manager.write_run_result(run_result)
             
             return run_result
         
         elif coverage_result.status == CoverageStatus.FETCH_FAILED:
             logger.error(f"[{run_id}] Data fetch failed: {coverage_result.error_message}")
+            
+            # Skip remaining steps
+            tracker.skip_step("sla_gate", "coverage_gate_failed")
+            tracker.skip_step("strategy_execute", "precondition_failed")
             
             # Also FAILED_PRECONDITION (data unavailable)
             run_result = RunResult(
@@ -132,7 +152,9 @@ def minimal_backtest_with_gates(
                 details=coverage_result.to_dict()
             )
             
-            manager.write_run_result(run_result)
+            with tracker.step("write_run_result"):
+                manager.write_run_result(run_result)
+            
             return run_result
         
         # Coverage SUFFICIENT → continue
@@ -144,26 +166,30 @@ def minimal_backtest_with_gates(
         # if not sla_result.passed: return FAILED_PRECONDITION(DATA_SLA_FAILED)
         
         # ===== PHASE 3: STRATEGY EXECUTION =====
-        logger.info(f"[{run_id}] Executing strategy...")
+        with tracker.step("strategy_execute") as step:
+            logger.info(f"[{run_id}] Executing strategy...")
+            
+            # TODO: Actual strategy execution
+            # signals = run_strategy(...)
+            # For now, return placeholder
+            signals_count = 42  # Placeholder
+            
+            step.add_detail("signals_count", signals_count)
+            logger.info(f"[{run_id}] Strategy execution completed")
         
-        # TODO: Actual strategy execution
-        # signals = run_strategy(...)
-        
-        # Simulate success
-        logger.info(f"[{run_id}] Strategy execution complete")
-        
-        # SUCCESS
+        # ===== WRITE FINAL RESULT =====
         run_result = RunResult(
             run_id=run_id,
             status=RunStatus.SUCCESS,
             details={
-                "signals_count": 42,  # Example
+                "signals_count": signals_count,
                 "coverage": coverage_result.to_dict()
             }
         )
         
-        manager.write_run_result(run_result)
-        logger.info(f"[{run_id}] Backtest complete: SUCCESS")
+        with tracker.step("write_run_result"):
+            manager.write_run_result(run_result)
+            logger.info(f"[{run_id}] run_result.json written (SUCCESS)")
         
         return run_result
     
