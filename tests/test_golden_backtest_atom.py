@@ -19,6 +19,7 @@ Golden Config:
 
 import pytest
 import json
+import os
 from pathlib import Path
 
 from backtest.examples.minimal_pipeline import minimal_backtest_with_gates
@@ -71,7 +72,16 @@ class TestGoldenBacktestAtom:
         
         # CRITICAL: Golden Atom MUST succeed (when data available)
         if result.status == RunStatus.FAILED_PRECONDITION and result.reason == FailureReason.DATA_COVERAGE_GAP:
-            # Data not available - skip test
+            # Check promotion mode
+            if os.getenv("REQUIRE_GOLDEN_DATA") == "1":
+                # PROMOTION MODE: Fail explicitly (blocks promotion)
+                pytest.fail(
+                    "Golden data missing (promotion blocked). "
+                    f"Expected APP M5 data for range: {result.details.get('gap', 'unknown gap')}. "
+                    "Set REQUIRE_GOLDEN_DATA=1 to enforce this in CI/CD."
+                )
+            
+            # DEV MODE: Skip (allows development without full dataset)
             pytest.skip(f"APP M5 data not available: {result.details.get('gap', 'unknown gap')}")
         
         assert result.status == RunStatus.SUCCESS, \
@@ -133,9 +143,16 @@ class TestGoldenBacktestAtom:
             artifacts_root=tmp_path
         )
         
-        # Skip if data not available
+        # Skip if data not available (with promotion policy)
+        import os
         if result.status == RunStatus.FAILED_PRECONDITION and result.reason == FailureReason.DATA_COVERAGE_GAP:
+            if os.getenv("REQUIRE_GOLDEN_DATA") == "1":
+                pytest.fail(
+                    "Golden data missing (promotion blocked). "
+                    f"Required for reproducibility test: {result.details.get('gap')}"
+                )
             pytest.skip(f"APP M5 data not available: {result.details.get('gap', 'unknown gap')}")
+
         
         run_dir = tmp_path / "golden_reproducible"
         manifest_path = run_dir / "run_manifest.json"
