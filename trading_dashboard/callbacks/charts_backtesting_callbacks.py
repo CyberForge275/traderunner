@@ -342,6 +342,10 @@ def register_charts_backtesting_callbacks(app):
             return True, False, False, True  # NY default
         
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+        
+        if button_id == 'bt-tz-ny-btn':
+            return True, False, False, True
+        else:
             return False, True, True, False
     
     
