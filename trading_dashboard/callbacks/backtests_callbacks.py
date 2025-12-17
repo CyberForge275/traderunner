@@ -72,14 +72,51 @@ def register_backtests_callbacks(app):
         run_dir_exists = run_dir.exists()
         logger.info(f"🔍 [backtests_detail] run_dir={run_dir}, exists={run_dir_exists}")
 
+        # Helper: Normalize steps to dicts (Dash UI boundary - only JSON-serializable types)
+        def _step_to_dict(s):
+            """Convert RunStep (dataclass/pydantic) to plain dict for Dash serialization."""
+            from dataclasses import asdict, is_dataclass
+            
+            if isinstance(s, dict):
+                return s
+            if is_dataclass(s):
+                # Dataclass: convert datetime objects to ISO strings
+                d = asdict(s)
+                # Convert datetime to string for JSON compatibility
+                if 'timestamp' in d and d['timestamp'] is not None:
+                    d['timestamp'] = d['timestamp'].isoformat() if hasattr(d['timestamp'], 'isoformat') else str(d['timestamp'])
+                # Rename duration_seconds to duration_s for consistency with layout
+                if 'duration_seconds' in d:
+                    d['duration_s'] = d.pop('duration_seconds')
+                return d
+            if hasattr(s, "model_dump"):  # pydantic v2
+                return s.model_dump()
+            if hasattr(s, "dict"):  # pydantic v1
+                return s.dict()
+            # Fallback: manual extraction
+            return {
+                "step_index": getattr(s, "step_index", None),
+                "step_name": getattr(s, "step_name", ""),
+                "status": getattr(s, "status", ""),
+                "timestamp": getattr(s, "timestamp", None),
+                "details": getattr(s, "details", None),
+                "duration_s": getattr(s, "duration_seconds", getattr(s, "duration_s", None)),
+            }
+
         # Try new-pipeline artifacts first
         details_service = BacktestDetailsService()
         details = details_service.load_summary(run_name)
-        steps = details_service.load_steps(run_name)
+        steps_raw = details_service.load_steps(run_name)
+        
+        # Normalize steps to dicts (CRITICAL: Dash requires JSON-serializable data)
+        steps = [_step_to_dict(s) for s in (steps_raw or [])]
         
         # Log what we found
         logger.info(f"📊 [backtests_detail] Loaded details: status={details.status}, source={details.source}, symbols={details.symbols}")
         logger.info(f"📝 [backtests_detail] Loaded {len(steps)} steps from run_steps.jsonl")
+        if steps_raw:
+            logger.info(f"🧪 [backtests_detail] step_type_raw={type(steps_raw[0]).__name__}, step_type_normalized={type(steps[0]).__name__}")
+
         
         # Discover available files
         found_files = []
