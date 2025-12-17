@@ -341,12 +341,17 @@ def create_backtest_detail(
         # Convert steps (list of dicts from run_steps.jsonl) to DataFrame format
         steps_data = []
         for step in summary["steps"]:
+            # Defensive: handle None duration
+            duration = step.get("duration_s", 0.0)
+            if duration is None:
+                duration = 0.0
+            
             steps_data.append({
                 "title": step.get("step_name", ""),
                 "kind": "step",
                 "status": step.get("status", ""),
-                "duration": round(step.get("duration_s", 0.0), 2),
-                "details": step.get("message", "") or "",
+                "duration": round(duration, 2),
+                "details": step.get("message", "") or step.get("details", ""),
             })
         display_log_df = pd.DataFrame(steps_data)
     
