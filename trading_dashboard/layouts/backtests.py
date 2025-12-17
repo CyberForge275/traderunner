@@ -345,12 +345,24 @@ def create_backtest_detail(
             dur = step.get("duration_s", None)
             duration_display = "—" if dur is None else round(float(dur), 2)
             
+            # CRITICAL: Ensure details is always a string (not dict/object)
+            # React error #31: Objects are not valid as React child
+            details = step.get("message", "") or step.get("details", "")
+            if isinstance(details, dict):
+                # If details is a dict (e.g., error details), stringify it
+                import json
+                details = json.dumps(details)
+            elif details is None:
+                details = ""
+            else:
+                details = str(details)
+            
             steps_data.append({
-                "title": step.get("step_name", ""),
+                "title": str(step.get("step_name", "")),
                 "kind": "step",
-                "status": step.get("status", ""),
+                "status": str(step.get("status", "")),
                 "duration": duration_display,
-                "details": step.get("message", "") or step.get("details", ""),
+                "details": details,
             })
         display_log_df = pd.DataFrame(steps_data)
     
