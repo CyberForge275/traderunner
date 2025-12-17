@@ -42,12 +42,15 @@ def register_backtests_callbacks(app):
         Output("backtests-detail", "children"),
         Input("backtests-run-dropdown", "value"),
         Input("backtests-refresh-interval", "n_intervals"),
-        prevent_initial_call=True,
+        # prevent_initial_call removed - allow initial render when dropdown has default value
     )
     def update_backtests_detail(run_name, n_intervals):
         import logging
+        from pathlib import Path
         logger = logging.getLogger(__name__)
-        logger.info(f"🔍 update_backtests_detail CALLED: run_name={run_name}, n_intervals={n_intervals}")
+        
+        # Comprehensive logging for evidence/debugging
+        logger.info(f"🔍 [backtests_detail] CALLBACK TRIGGERED: run_name={run_name}, n_intervals={n_intervals}")
         
         from ..services.backtest_details_service import BacktestDetailsService
         from ..repositories.backtests import (
@@ -61,19 +64,32 @@ def register_backtests_callbacks(app):
         from ..layouts.backtests import create_backtest_detail
 
         if not run_name:
+            logger.info(f"🔍 [backtests_detail] No run_name provided, returning placeholder")
             return create_backtest_detail(None, None, None)
+
+        # Resolve run_dir and check existence
+        run_dir = Path("artifacts/backtests") / run_name
+        run_dir_exists = run_dir.exists()
+        logger.info(f"🔍 [backtests_detail] run_dir={run_dir}, exists={run_dir_exists}")
 
         # Try new-pipeline artifacts first
         details_service = BacktestDetailsService()
         details = details_service.load_summary(run_name)
         steps = details_service.load_steps(run_name)
         
-        logger.info(f"📊 Loaded details: status={details.status}, source={details.source}, symbols={details.symbols}")
-        logger.info(f"📝 Loaded {len(steps)} steps")
+        # Log what we found
+        logger.info(f"📊 [backtests_detail] Loaded details: status={details.status}, source={details.source}, symbols={details.symbols}")
+        logger.info(f"📝 [backtests_detail] Loaded {len(steps)} steps from run_steps.jsonl")
+        
+        # Discover available files
+        found_files = []
+        if run_dir_exists:
+            found_files = [f.name for f in run_dir.iterdir() if f.is_file()]
+            logger.info(f"📂 [backtests_detail] Found files in run_dir: {', '.join(found_files[:10])}{'...' if len(found_files) > 10 else ''}")
         
         # If we have new-pipeline artifacts, use them
         if details.source in ["manifest", "meta+result"]:
-            logger.info(f"✅ Using new-pipeline artifacts for {run_name}")
+            logger.info(f"✅ [backtests_detail] Using new-pipeline artifacts for {run_name}")
             # Create summary dict for create_backtest_detail
             summary = {
                 "run_name": run_name,
@@ -95,6 +111,11 @@ def register_backtests_callbacks(app):
             orders = get_backtest_orders(run_name)
             rk_df = get_rudometkin_candidates(run_name)
             
+            # Log artifact counts for evidence
+            equity_rows = len(equity_df) if equity_df is not None and not equity_df.empty else 0
+            orders_count = len(orders.get("orders", [])) if orders.get("orders") is not None else 0
+            logger.info(f"📈 [backtests_detail] Charts/Artifacts: equity_rows={equity_rows}, orders_count={orders_count}, steps_count={len(steps)}")
+            
             return create_backtest_detail(
                 run_name,
                 log_df,
@@ -108,6 +129,7 @@ def register_backtests_callbacks(app):
             )
         
         # Fall back to pure legacy if no new artifacts
+        logger.info(f"⚠️ [backtests_detail] Falling back to legacy artifacts for {run_name}")
         log_df = get_backtest_log(run_name)
         metrics = get_backtest_metrics(run_name)
         summary = get_backtest_summary(run_name)

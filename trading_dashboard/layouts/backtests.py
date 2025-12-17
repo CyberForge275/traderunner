@@ -276,6 +276,27 @@ def create_backtest_detail(
         if charts_row_children
         else html.Div()
     )
+    
+    # Diagnostic: if no charts, explain why (avoid silent empty state)
+    if not charts_row_children and run_name:
+        charts_row = html.Div(
+            className="dashboard-card",
+            children=[
+                html.H5("Charts Not Available"),
+                html.P(
+                    f"No equity_curve.csv found for run: {run_name}",
+                    className="text-muted",
+                ),
+                html.P(
+                    "This run may be signals-only (no backtesting simulation). "
+                    "Check run_manifest.json or run_meta.json for artifact_index.",
+                    className="text-muted",
+                    style={"fontSize": "0.85em"},
+                ),
+            ],
+            style={"marginBottom": "20px"},
+        )
+
 
     # Full metrics table (all metrics.json keys)
     metrics_table = html.Div()
@@ -313,6 +334,23 @@ def create_backtest_detail(
         )
 
     # Run log & performance (per-step durations + raw log)
+    # CRITICAL: Use steps from summary if available (new-pipeline), fallback to log_df (legacy)
+    display_log_df = log_df
+    
+    if summary and "steps" in summary and summary["steps"]:
+        # Convert steps (list of dicts from run_steps.jsonl) to DataFrame format
+        steps_data = []
+        for step in summary["steps"]:
+            steps_data.append({
+                "title": step.get("step_name", ""),
+                "kind": "step",
+                "status": step.get("status", ""),
+                "duration": round(step.get("duration_s", 0.0), 2),
+                "details": step.get("message", "") or "",
+            })
+        display_log_df = pd.DataFrame(steps_data)
+    
+    # Render log table from resolved log data (steps or legacy log_df)
     log_table = dash_table.DataTable(
         id="backtests-log-table",
         columns=[
@@ -322,7 +360,7 @@ def create_backtest_detail(
             {"name": "Duration (s)", "id": "duration"},
             {"name": "Details", "id": "details"},
         ],
-        data=log_df.to_dict("records"),
+        data=display_log_df.to_dict("records"),
         page_size=20,
         style_table={"overflowX": "auto"},
         style_header={
@@ -342,11 +380,12 @@ def create_backtest_detail(
         },
     )
 
+    # Per-step duration summary (also uses display_log_df)
     step_summary = html.Div()
-    if "duration" in log_df.columns and "title" in log_df.columns:
+    if "duration" in display_log_df.columns and "title" in display_log_df.columns:
         try:
             summary_df = (
-                log_df.groupby("title")["duration"]
+                display_log_df.groupby("title")["duration"]
                 .sum()
                 .reset_index()
                 .sort_values("duration", ascending=False)
