@@ -64,26 +64,32 @@ class SessionFilter:
             result.append(f"{start_str}-{end_str}")
         return result
     
-    def is_in_session(self, timestamp: pd.Timestamp, tz: str = "UTC") -> bool:
+    def is_in_session(self, timestamp: pd.Timestamp, tz: str = "Europe/Berlin") -> bool:
         """Check if timestamp falls within any session window (timezone-aware).
         
         Args:
             timestamp: Timestamp to check
-            tz: Target timezone for session check (e.g., "Europe/Berlin")
+            tz: Target timezone for session check (default: Europe/Berlin)
             
         Returns:
             True if timestamp is within any session window,
-            True if no windows defined (no filtering),
             False otherwise
+            
+        Raises:
+            ValueError: If timestamp has no timezone info and config doesn't allow naive
         """
         if not self.windows:
-            return True  # No filter = all times valid
+            return False  # No windows = reject all (ALWAYS ON enforcement)
+        
+        # Handle naive timestamps
+        if timestamp.tz is None:
+            raise ValueError(
+                f"Naive timestamp not allowed: {timestamp}. "
+                "All timestamps must have timezone info for session filtering."
+            )
         
         # Convert to target timezone
-        if timestamp.tz is None:
-            ts_tz = timestamp.tz_localize("UTC").tz_convert(tz)
-        else:
-            ts_tz = timestamp.tz_convert(tz)
+        ts_tz = timestamp.tz_convert(tz)
         
         t = ts_tz.time()
         for start, end in self.windows:
@@ -91,7 +97,7 @@ class SessionFilter:
                 return True
         return False
     
-    def get_session_index(self, timestamp: pd.Timestamp, tz: str = "UTC") -> Optional[int]:
+    def get_session_index(self, timestamp: pd.Timestamp, tz: str = "Europe/Berlin") -> Optional[int]:
         """Return session index (0, 1, ...) or None if outside all sessions.
         
         Args:
@@ -116,7 +122,7 @@ class SessionFilter:
                 return idx
         return None
     
-    def get_session_end(self, timestamp: pd.Timestamp, tz: str = "UTC") -> Optional[pd.Timestamp]:
+    def get_session_end(self, timestamp: pd.Timestamp, tz: str = "Europe/Berlin") -> Optional[pd.Timestamp]:
         """Return session end timestamp or None if outside sessions.
         
         Args:
@@ -142,7 +148,7 @@ class SessionFilter:
                 return ts_tz.replace(hour=end.hour, minute=end.minute, second=0, microsecond=0)
         return None
     
-    def get_session_start(self, timestamp: pd.Timestamp, tz: str = "UTC") -> Optional[pd.Timestamp]:
+    def get_session_start(self, timestamp: pd.Timestamp, tz: str = "Europe/Berlin") -> Optional[pd.Timestamp]:
         """Return session start timestamp or None if outside sessions.
         
         Args:
@@ -195,7 +201,7 @@ class InsideBarConfig:
     tick_size: float = 0.01
     
     # === Order Validity (Critical for Replay Fills) ===
-    order_validity_policy: str = "session_end"  # or "fixed_minutes" | "instant"
+    order_validity_policy: str = "session_end"  # or "fixed_minutes" | "one_bar"
     order_validity_minutes: int = 60  # Only for fixed_minutes policy
     valid_from_policy: str = "signal_ts"  # or "next_bar"
     
@@ -217,20 +223,50 @@ class InsideBarConfig:
     
     def validate(self) -> None:
         """Validate configuration parameters."""
+        # Core parameters
         assert self.atr_period > 0, "ATR period must be positive"
         assert self.risk_reward_ratio > 0, "Risk/reward ratio must be positive"
         assert self.min_mother_bar_size >= 0, "Min mother size must be non-negative"
         assert self.inside_bar_mode in ["inclusive", "strict"], \
             f"Invalid mode: {self.inside_bar_mode}"
+        
+        # Session enforcement (ALWAYS ON)
+        assert len(self.session_windows) > 0, \
+            "session_windows cannot be empty - sessions are ALWAYS ON"
+        
+        # Validate session window format
+        for window in self.session_windows:
+            try:
+                start_str, end_str = window.strip().split("-")
+                h1, m1 = map(int, start_str.split(":"))
+                h2, m2 = map(int, end_str.split(":"))
+                assert 0 <= h1 < 24 and 0 <= m1 < 60, f"Invalid start time in: {window}"
+                assert 0 <= h2 < 24 and 0 <= m2 < 60, f"Invalid end time in: {window}"
+                start_time = h1 * 60 + m1
+                end_time = h2 * 60 + m2
+                assert start_time < end_time, f"Start must be before end in: {window}"
+            except Exception as e:
+                raise ValueError(f"Invalid session window '{window}': {e}")
+        
+        # Entry and exit
         assert self.entry_level_mode in ["mother_bar", "inside_bar"], \
             f"Invalid entry_level_mode: {self.entry_level_mode}"
-        assert self.order_validity_policy in ["session_end", "fixed_minutes", "instant"], \
-            f"Invalid order_validity_policy: {self.order_validity_policy}"
-        assert self.valid_from_policy in ["signal_ts", "next_bar"], \
-            f"Invalid valid_from_policy: {self.valid_from_policy}"
         assert self.max_trades_per_session > 0, "Max trades per session must be positive"
         assert self.stop_distance_cap_ticks > 0, "SL cap ticks must be positive"
         assert self.tick_size > 0, "Tick size must be positive"
+        
+        # Order validity
+        assert self.order_validity_policy in ["session_end", "fixed_minutes", "one_bar"], \
+            f"Invalid order_validity_policy: {self.order_validity_policy} " \
+            "('instant' removed - use 'one_bar' for single-bar validity)"
+        assert self.valid_from_policy in ["signal_ts", "next_bar"], \
+            f"Invalid valid_from_policy: {self.valid_from_policy}"
+        if self.order_validity_policy == "fixed_minutes":
+            assert self.order_validity_minutes > 0, "order_validity_minutes must be positive"
+        
+        # Trailing stop
+        assert self.trailing_apply_mode in ["next_bar"], \
+            f"Invalid trailing_apply_mode: {self.trailing_apply_mode} (only 'next_bar' supported)"
         assert 0.0 <= self.trailing_trigger_tp_pct <= 1.0, "Trailing trigger must be in [0, 1]"
         assert 0.0 <= self.trailing_risk_remaining_pct <= 1.0, "Trailing risk pct must be in [0, 1]"
     
@@ -239,11 +275,11 @@ class InsideBarConfig:
         self.validate()
 
 
-def load_config(config_path: Path):
+def load_config(config_path: Path) -> dict:
     """
     Load configuration from YAML file.
     
-    NOTE: Returns dict instead of InsideBarConfig to avoid circular import.
+    NOTE: Returns dict, not InsideBarConfig, to avoid circular imports.
     Use InsideBarConfig(**load_config(path)) to create config object.
     
     Args:
@@ -266,10 +302,7 @@ def load_config(config_path: Path):
         raise ValueError(f"Empty config file: {config_path}")
     
     params = data.get('parameters', {})
-    
-    # Create and validate config
-    config = InsideBarConfig(**params)
-    return config
+    return params
 
 
 def get_default_config_path() -> Path:
