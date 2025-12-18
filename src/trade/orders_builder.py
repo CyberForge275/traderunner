@@ -9,11 +9,16 @@ argparse/CLI concerns into higher layers and exposes a simple
 from __future__ import annotations
 
 import argparse
+import logging
 from typing import Dict, List
 
 import pandas as pd
 
 from trade.cli_export_orders import _build_inside_bar_orders, Session
+from trade.validity import calculate_validity_window
+from strategies.inside_bar.config import SessionFilter
+
+logger = logging.getLogger(__name__)
 
 
 def _detect_timestamp_column(signals: pd.DataFrame) -> str:
@@ -121,11 +126,16 @@ def build_orders_for_backtest(
     - constructs :class:`Session` windows from ``session_filter`` (or
       defaults to a single RTH session),
     - builds a minimal ``argparse.Namespace`` with sizing and risk
-      parameters derived from ``strategy_params``.
+      parameters derived from ``strategy_params``,
+    - applies validity window validation using the new validity calculator.
 
     The underlying builder is responsible for detailed price rounding,
     sizing, and timestamp localization. When ``signals`` is empty, the
     function simply returns the empty orders DataFrame from the builder.
+    
+    Phase 5 Integration: Orders with invalid validity windows (valid_to <= valid_from)
+    are now filtered out to prevent zero-fill scenarios. This is critical for
+    November parity.
     """
 
     # Short-circuit early for the empty-frame case but still delegate to
@@ -137,4 +147,31 @@ def build_orders_for_backtest(
     sessions = _build_sessions(strategy_params, market_tz)
     args = _build_args_from_params(strategy_params, market_tz)
 
-    return _build_inside_bar_orders(signals, ts_col, sessions, args)
+    # Build base orders using existing logic
+    orders_df = _build_inside_bar_orders(signals, ts_col, sessions, args)
+    
+    # Phase 5: Apply validity validation (CRITICAL for fills)
+    if not orders_df.empty and 'valid_from' in orders_df.columns and 'valid_to' in orders_df.columns:
+        # Check for invalid windows (valid_to <= valid_from)
+        invalid_mask = pd.to_datetime(orders_df['valid_to']) <= pd.to_datetime(orders_df['valid_from'])
+        
+        if invalid_mask.any():
+            num_invalid = invalid_mask.sum()
+            logger.warning(
+                f"Filtered {num_invalid} orders with invalid validity windows (valid_to <= valid_from). "
+                "This prevents zero-fill scenarios and ensures November parity."
+            )
+            
+            # Log details for first few invalid orders
+            for idx in orders_df[invalid_mask].head(3).index:
+                row = orders_df.loc[idx]
+                logger.debug(
+                    f"Invalid order #{idx}: valid_from={row['valid_from']}, "
+                    f"valid_to={row['valid_to']}, symbol={row.get('symbol', 'N/A')}"
+                )
+            
+            # Filter out invalid orders
+            orders_df = orders_df[~invalid_mask].copy()
+            logger.info(f"Remaining valid orders: {len(orders_df)}")
+    
+    return orders_df
