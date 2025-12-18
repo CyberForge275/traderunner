@@ -132,7 +132,7 @@ def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--rrr", type=float, default=1.0)
     parser.add_argument("--allow-touch-breakout", action="store_true", help="Allow breakouts on wick touch (disables close confirmation)")
     parser.add_argument("--session-filter", type=int, nargs=2, metavar=("START", "END"), help="Optional inclusive hour range for session filter")
-    parser.add_argument("--strategy", choices=["inside_bar", "inside_bar_v2"], default="inside_bar")
+    parser.add_argument("--strategy", choices=["inside_bar"], default="inside_bar")
     parser.add_argument("--max-master-atr-mult", type=float, default=None, help="Suppress signals if master range exceeds this multiple of ATR (v2)")
     parser.add_argument("--min-master-body-ratio", type=float, default=0.5, help="Minimum master candle body ratio (v2)")
     parser.add_argument("--execution-lag", type=int, default=0, help="Execution lag in bars before arming breakout orders (v2)")
@@ -163,18 +163,12 @@ def main(argv: List[str] | None = None) -> int:
         registry.auto_discover("strategies")
     strategy = factory.create_strategy(args.strategy, config)
 
-    # Import per-strategy version metadata so inside_bar and inside_bar_v2
-    # can evolve independently.
+    # Import strategy version metadata
     from decimal import Decimal
     try:
         from strategies.inside_bar.core import STRATEGY_VERSION as IB_VERSION
     except Exception:  # pragma: no cover - defensive fallback
         IB_VERSION = "unknown"
-
-    try:
-        from strategies.inside_bar_v2.strategy import STRATEGY_VERSION_V2
-    except Exception:  # pragma: no cover - defensive fallback
-        STRATEGY_VERSION_V2 = "unknown"
 
     rows: List[Dict[str, object]] = []
     failed_symbols = []  # Track symbols with data issues
@@ -246,11 +240,8 @@ def main(argv: List[str] | None = None) -> int:
                 sl_short = sig.stop_loss
                 tp_short = sig.take_profit
 
-            # Select correct version per strategy
-            if args.strategy == "inside_bar_v2":
-                strategy_version = STRATEGY_VERSION_V2
-            else:
-                strategy_version = IB_VERSION
+            # Use InsideBar SSOT version
+            strategy_version = IB_VERSION
 
             # Validate and normalize via SignalOutputSpec (ensures canonical schema)
             spec = SignalOutputSpec(

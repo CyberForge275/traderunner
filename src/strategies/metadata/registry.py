@@ -25,7 +25,7 @@ class StrategyRegistry:
     Usage:
         registry = StrategyRegistry()
         registry.register(metadata)
-        strategy = registry.get("inside_bar_v2")
+        strategy = registry.get("inside_bar")
     """
     
     _instance: Optional[StrategyRegistry] = None

@@ -99,7 +99,7 @@ class TestStrategyMetadata:
     def valid_metadata(self):
         """Create valid metadata for testing."""
         return StrategyMetadata(
-            strategy_id="inside_bar_v2",
+            strategy_id="inside_bar",
             canonical_name="inside_bar",
             display_name="Inside Bar Breakout",
             version="2.0.0",
@@ -121,7 +121,7 @@ class TestStrategyMetadata:
     
     def test_valid_metadata_creation(self, valid_metadata):
         """Valid metadata should be created successfully."""
-        assert valid_metadata.strategy_id == "inside_bar_v2"
+        assert valid_metadata.strategy_id == "inside_bar"
         assert valid_metadata.version == "2.0.0"
     
     def test_invalid_strategy_id_fails(self):
@@ -205,7 +205,7 @@ class TestStrategyMetadata:
     def test_repr_format(self, valid_metadata):
         """__repr__() should be informative."""
         repr_str = repr(valid_metadata)
-        assert "inside_bar_v2" in repr_str
+        assert "inside_bar" in repr_str
         assert "2.0.0" in repr_str
         assert "Inside Bar Breakout" in repr_str
 

@@ -17,7 +17,7 @@ Usage:
     registry = StrategyRegistry()
     
     # Lookup strategy
-    strategy = registry.get("inside_bar_v2")
+    strategy = registry.get("inside_bar")
     
     # List all strategies
     all_strategies = registry.list_all()

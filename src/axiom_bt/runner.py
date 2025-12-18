@@ -67,8 +67,7 @@ def main() -> int:
     # validation and manifest clarity rather than as a hard routing
     # mechanism.
     supported_modes = {
-        "insidebar_intraday",
-        "insidebar_intraday_v2",
+        "insidebar_intraday",  # InsideBar SSOT
         "rudometkin_moc_mode",
     }
     if mode not in supported_modes:

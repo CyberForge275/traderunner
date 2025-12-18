@@ -26,7 +26,7 @@ from strategies.metadata import StrategyMetadata, StrategyCapabilities, DataRequ
 
 # Create metadata
 metadata = StrategyMetadata(
-    strategy_id="inside_bar_v2",
+    strategy_id="inside_bar",
     canonical_name="inside_bar",
     display_name="Inside Bar Breakout",
     version="2.0.0",
@@ -69,7 +69,7 @@ if metadata.is_compatible_with_environment(DeploymentEnvironment.LIVE_TRADING):
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `strategy_id` | str | ✅ | Unique ID (e.g., `"inside_bar_v2"`) |
+| `strategy_id` | str | ✅ | Unique ID (e.g., `"inside_bar"`) |
 | `canonical_name` | str | ✅ | Base name (e.g., `"inside_bar"`) |
 | `display_name` | str | ✅ | Human name (e.g., `"Inside Bar Breakout"`) |
 | `version` | str | ✅ | Semver (e.g., `"2.0.0"`) |

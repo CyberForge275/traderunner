@@ -104,7 +104,7 @@ deployment_notes="Original implementation, stable and tested",
 # InsideBar v2 (Unified Implementation)
 INSIDE_BAR_V2_PROFILE = StrategyMetadata(
     # Identity
-    strategy_id="insidebar_intraday_v2",
+    strategy_id="inside_bar",  # Unified SSOT - v2 deprecated
     canonical_name="inside_bar",
     display_name="Inside Bar Intraday v2",
     version="2.0.0",
