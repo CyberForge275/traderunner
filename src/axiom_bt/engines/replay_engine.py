@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional, Tuple
+from typing import Any, Dict, Literal, Optional, Tuple, Union
 
 import pandas as pd
 
@@ -145,6 +145,7 @@ def simulate_insidebar_from_orders(
     costs: Costs,
     initial_cash: float = DEFAULT_INITIAL_CASH,
     data_path_m1: Optional[Path] = None,
+    requested_end: Optional[Union[str, pd.Timestamp]] = None,
 ) -> Dict[str, Any]:
     import logging
     logger = logging.getLogger(__name__)
@@ -229,6 +230,7 @@ def simulate_insidebar_from_orders(
     equity_points = []
     filled_indices: list[int] = []
     fill_ts_map: dict[int, pd.Timestamp] = {}
+    last_data_ts: Optional[pd.Timestamp] = None
 
     for symbol, group in ib_orders.groupby("symbol"):
         file_path, _ = _resolve_symbol_path(symbol, m1_dir, data_path)
@@ -238,6 +240,10 @@ def simulate_insidebar_from_orders(
         ohlcv = _ensure_dtindex_and_ohlcv(ohlcv, tz)
         # ensure chronological order when switching between sources
         ohlcv = ohlcv.sort_index()
+        if not ohlcv.empty:
+            ts_max = ohlcv.index.max()
+            if last_data_ts is None or ts_max > last_data_ts:
+                last_data_ts = ts_max
         group = group.sort_values("valid_from")
 
         for oco_group, oco_orders in group.groupby("oco_group"):
@@ -322,7 +328,66 @@ def simulate_insidebar_from_orders(
 
     filled_df = pd.DataFrame(filled)
     trades_df = pd.DataFrame(trades)
-    equity_df = pd.DataFrame(equity_points).sort_values("ts")
+
+    if equity_points:
+        equity_df = pd.DataFrame(equity_points).sort_values("ts")
+    else:
+        # No equity points were generated (e.g. all orders expired
+        # without entry). Synthesize a flat equity curve at a
+        # deterministic timestamp so downstream code can always rely on
+        # a non-empty equity frame.
+        fallback_ts: Optional[pd.Timestamp] = None
+        rule = None
+
+        # Priority 1: explicit requested_end from the caller.
+        if requested_end is not None:
+            try:
+                ts = pd.Timestamp(requested_end)
+                if ts.tzinfo is None:
+                    ts = ts.tz_localize(tz)
+                else:
+                    ts = ts.tz_convert(tz)
+                fallback_ts = ts
+                rule = "prio_requested_end"
+            except Exception:
+                fallback_ts = None
+
+        # Priority 2: derive from orders timestamps.
+        if fallback_ts is None and not orders.empty:
+            for col, label in (("valid_to", "prio_orders_valid_to"), ("valid_from", "prio_orders_valid_from")):
+                if col in orders.columns:
+                    series = pd.to_datetime(orders[col], errors="coerce", utc=True).dropna()
+                    if not series.empty:
+                        candidate = series.max().tz_convert(tz)
+                        fallback_ts = candidate
+                        rule = label
+                        break
+
+        # Priority 3: latest available market data timestamp.
+        if fallback_ts is None and last_data_ts is not None:
+            fallback_ts = last_data_ts
+            rule = "prio_data_index"
+
+        # Priority 4: deterministic epoch fallback.
+        if fallback_ts is None:
+            ts_epoch = pd.Timestamp("1970-01-01T00:00:00Z")
+            fallback_ts = ts_epoch.tz_convert(tz)
+            rule = "prio_epoch_fallback"
+
+        logger.info(
+            "simulate_insidebar_from_orders: synthesized flat equity (rule=%s, ts=%s)",
+            rule,
+            fallback_ts.isoformat() if isinstance(fallback_ts, pd.Timestamp) else None,
+        )
+
+        equity_df = pd.DataFrame(
+            [
+                {
+                    "ts": fallback_ts.isoformat(),
+                    "equity": float(initial_cash),
+                }
+            ]
+        )
     total_pnl = float(trades_df["pnl"].sum()) if not trades_df.empty else 0.0
     num_trades = int(len(trades_df))
     win_rate = float((trades_df["pnl"] > 0).mean()) if num_trades > 0 else 0.0

@@ -67,7 +67,8 @@ In: `artifacts/backtests/<run_dir>/`
 Optional:
 - `error_stacktrace.txt` (only on ERROR)
 - `coverage_check.json` / `sla_results.json` (if present in design)
-- `pipeline.log` or `pipeline_steps.jsonl` (preferred for UI steps)
+- `pipeline.log` (optional)
+- `run_steps.jsonl` (preferred for UI steps)
 
 ### 2.3 Status Model (only these outcomes)
 - `SUCCESS`
@@ -111,6 +112,58 @@ NO generic “Pipeline Exception” as a primary outcome in UI.
 ### 3.6 Polling is read-only
 - Polling callbacks may update only view components (panels), never inputs or the SSOT store.
 
+### 3.7 Callback determinism (no “magic” initial state)
+- If a page/tab sets a default dropdown value, the details callback MUST render without user interaction.
+- `prevent_initial_call=True` is forbidden for any callback that renders the primary details pane.
+  - Exception: only if a separate “bootstrap” callback triggers the first render explicitly.
+
+### 3.8 Inputs vs State (polling must not behave like a second user)
+- Polling (`dcc.Interval`) should be **State** unless you explicitly want it to trigger recomputation.
+- If polling is an **Input**, the callback MUST:
+  - use `dash.callback_context.triggered_id` (or `dash.ctx.triggered_id`) to branch, and
+  - avoid re-reading heavy artifacts unless the run is still in a non-terminal state.
+- Terminal states: `SUCCESS`, `FAILED_PRECONDITION`, `ERROR` → stop expensive work (no repeated file reads).
+
+### 3.9 Single writer rule (Outputs & stores)
+- Each Output (including `dcc.Store`) must have exactly one callback writing it.
+- No “helper” callbacks that silently overwrite the store or clear selection values.
+- If a second update path is needed, refactor into one callback with multiple Inputs and explicit branching.
+
+### 3.10 Callback-level tracing (TRACE-FIRST for UI)
+Every callback that touches backtest state must log:
+- `callback_name`, `run_id`, `run_dir`, `triggered_id`, `n_intervals` (if present)
+- `exists()` checks for required artifacts:
+  - `run_meta.json`, `run_result.json`, `run_manifest.json`, `run_steps.jsonl`
+- Count + size of artifacts index (if present)
+- Outcome: `rendered`, `no_update`, or `diagnostic_state`
+
+### 3.11 Never silently drop data (empty UI must be explained)
+- If steps/logs/metrics/charts are missing, the UI must render a diagnostic card:
+  - which file is missing
+  - where it was expected
+  - whether the run is “signals-only” (no equity curve expected)
+- Empty tables without explanation are forbidden.
+
+### 3.12 Steps rendering contract (new pipeline)
+- If `run_steps.jsonl` exists, the UI MUST display steps from it.
+- If durations are not present, UI may:
+  - display `—` for duration, or
+  - compute duration by pairing `started`/`completed` timestamps per step.
+- Legacy `run_log.json` may be supported only as a fallback and must be labeled “legacy”.
+
+### 3.13 Error handling contract
+- Callbacks must catch exceptions and:
+  - log a full stacktrace server-side, and
+  - render a user-visible error card containing:
+    - error_id (if available)
+    - run_id
+    - the failing file/path
+- Do NOT swallow exceptions and return placeholders.
+
+### 3.14 Dash component IDs are immutable and unique
+- Component `id`s are part of the public UI contract.
+- Do not change IDs casually; if changed, update all callbacks + tests in the same PR.
+- IDs must be globally unique within the app (no duplicates).
 ---
 
 ## 4) Debugging & Observability Rules
@@ -156,6 +209,14 @@ NO generic “Pipeline Exception” as a primary outcome in UI.
 - Single file:
   `PYTHONPATH=src:. pytest -q tests/test_<name>.py -q`
 
+### marketdata-stream
+- Tests (preferred, if src layout exists):
+  `PYTHONPATH=src:. pytest -q`
+
+### automatictrader-api
+- Tests (preferred, if src layout exists):
+  `PYTHONPATH=src:. pytest -q`
+
 ### INT service checks (if deployed with systemd)
 - Logs:
   `sudo journalctl -u trading-dashboard-v2 -n 200 --no-pager`
@@ -197,8 +258,8 @@ Before changing code, the agent MUST prove which code path is active.
 Run (from repo root):
 - `git status --porcelain`
 - `git rev-parse --short HEAD`
-- `git grep -n "signals\.cli_inside_bar\|Pipeline Exception\|run_log\.json\|current_signals" -S . || true`
-- `git grep -n "run_result\.json\|run_manifest\.json\|bt-active-run\|run_dir" -S . || true`
+- `git grep -n -E "signals\.cli_inside_bar|Pipeline Exception|run_log\.json|current_signals" -- . || true`
+- `git grep -n -E "run_result\.json|run_manifest\.json|bt-active-run|run_dir" -- . || true`
 
 PR must include a short “Integration Path Evidence” section:
 - which callback/file triggers the run
@@ -259,3 +320,75 @@ If any of the following is true, STOP and report instead of changing code:
 - Bug cannot be reproduced and no deterministic instrumentation exists
 - Proposed change is large refactor without regression test
 - Multiple competing SSOTs exist (must consolidate first)
+
+## 11) UI Contract Addendum — Dash Callbacks (Regression Guardrails)
+
+> Goal: Prevent “works after click”, empty panes, missing charts, and silent failures.
+
+### 11.1 Deterministic Initial Render (No “click to load”)
+- When the user opens the Backtests tab, the Details/Result pane MUST render deterministically:
+  - If a latest run exists, it MUST be auto-selected and rendered.
+  - No UI state may require a manual dropdown click to trigger rendering.
+- Allowed triggers for initial render:
+  - `dcc.Location(pathname)` OR active tab Input.
+- Avoid `prevent_initial_call=True` on critical “render details” callbacks unless a documented alternative trigger exists.
+
+### 11.2 Single SSOT for Selection (run_dir)
+- The selected run MUST be represented by exactly one SSOT store:
+  - `dcc.Store(id="bt-active-run")` containing at least `{run_dir, run_id, started_at_utc}`.
+- All detail panels MUST read from `run_dir` only.
+- Never use `job_id` or `run_name` for filesystem lookup.
+
+### 11.3 Callback Input/State Rules
+- If a value changes what is rendered, it MUST be an `Input`, not only `State`.
+- `State` is allowed only for non-triggering auxiliary values.
+- Every callback MUST handle `None` safely:
+  - Return a visible “Select a run” message, not empty tables.
+
+### 11.4 Artifact Reading Contract (UI)
+- UI details MUST be sourced from artifact files inside `run_dir` only:
+  - Meta: `run_manifest.json` (preferred) else `run_meta.json`
+  - Status: `run_result.json` only
+  - Steps: `run_steps.jsonl` (preferred) (or documented alternative)
+  - Charts/Metrics: only if the underlying artifact files exist
+- If a required artifact is missing:
+  - UI MUST show a clear diagnostic (“missing <file> in <run_dir>”) and MUST NOT silently show zeros.
+
+### 11.5 Steps/Logs Rendering (TRACE-FIRST)
+- The “Steps / Performance” panel MUST render something if `run_steps.jsonl` exists:
+  - At minimum: step_name + status + timestamp
+  - Prefer: compute duration from `started`/`completed` pairs
+- “Raw logs” MUST be run-scoped:
+  - No global “current_*” shared files.
+
+### 11.6 Charts Panel Rules
+- Charts MUST be derived from artifacts (equity_curve, trades, orders, metrics).
+- If the current pipeline is “signals-only” and does not produce trading artifacts:
+  - The UI MUST explicitly label it (“Signals run”) and hide/disable trading charts OR show a clear “not available” message.
+- Never render a “success” run with empty charts without explanation.
+
+### 11.7 No Duplicate Component IDs / Accessibility
+- UI MUST NOT create duplicate HTML `id` attributes (browser console warnings are treated as defects).
+- Every form control should have a stable id/name and a label association where feasible.
+- Duplicate ids are a STOP issue for UI changes.
+
+### 11.8 Fail Fast, Visible, and Logged (UI)
+- Callback exceptions MUST NOT fail silently.
+- On error:
+  - Log server-side with `{run_dir, callback_name, exception}`
+  - Render a visible error panel with a short error_id and where to find logs.
+
+### 11.9 Debug Mode (UI)
+- If `DASH_UI_DEBUG=1`:
+  - Show a “Discovery/Details Debug” panel:
+    - selected run_dir
+    - files found/missing
+    - parse errors
+    - rows returned for steps/logs/tables
+- Debug mode must be readable (high contrast) and must not change behavior.
+
+### 11.10 UI Regression Tests (Minimum Set)
+- Add/maintain tests that guarantee:
+  - Latest run is rendered on initial page/tab load (no click required)
+  - A run with `run_meta.json` + `run_result.json` + `run_steps.jsonl` renders non-empty steps
+  - Missing chart artifacts produce a visible “missing artifacts” message (not silent zeros)

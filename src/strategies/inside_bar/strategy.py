@@ -8,7 +8,7 @@ IMPORTANT: This is just an I/O adapter. ALL strategy logic is in core.py
 """
 from __future__ import annotations
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Callable
 import pandas as pd
 
 from ..base import BaseStrategy, Signal
@@ -95,7 +95,8 @@ class InsideBarStrategy(BaseStrategy):
         self,
         data: pd.DataFrame,
         symbol: str,
-        config: Dict[str, Any]
+        config: Dict[str, Any],
+        tracer: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> List[Signal]:
         """
         Generate Inside Bar signals for backtesting.
@@ -134,7 +135,7 @@ class InsideBarStrategy(BaseStrategy):
         
         # Delegate to core
         core = InsideBarCore(strategy_config)
-        raw_signals = core.process_data(df, symbol)
+        raw_signals = core.process_data(df, symbol, tracer=tracer)
         
         # Convert RawSignals to Backtest Signals
         signals = []

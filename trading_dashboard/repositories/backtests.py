@@ -273,26 +273,35 @@ def get_backtest_log(run_name: str) -> pd.DataFrame:
 def get_backtest_metrics(run_name: str) -> Dict[str, Any]:
     """Return metrics.json contents for a run if available.
 
-    The axiom_bt runner writes artifacts under run_* directories with
-    names like: run_<ts>_<run_name>
+    The axiom_bt runner writes artifacts under either:
+
+    - NEW: BACKTESTS_DIR / <run_id>
+    - LEGACY: run_* directories with names like run_<ts>_<run_name>
     """
 
-    root = BACKTESTS_DIR
-    if not root.exists():
+    runner_dir = _find_runner_dir(run_name)
+    if runner_dir is None:
         return {}
 
-    candidate: Optional[Path] = None
-    for entry in root.iterdir():
-        if not entry.is_dir() or not entry.name.startswith("run_"):
-            continue
-        if entry.name.endswith(run_name):
-            candidate = entry
-            break
+    # Prefer artifacts_index.json when present
+    index_path = runner_dir / "artifacts_index.json"
+    metrics_path: Optional[Path] = None
 
-    if candidate is None:
-        return {}
+    if index_path.exists():
+        try:
+            with open(index_path, "r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+            for entry in payload.get("artifacts", []):
+                if entry.get("kind") == "metrics" and entry.get("relpath"):
+                    metrics_path = runner_dir / entry["relpath"]
+                    break
+        except (OSError, json.JSONDecodeError):
+            metrics_path = None
 
-    metrics_path = candidate / "metrics.json"
+    # Fallback to legacy metrics.json path
+    if metrics_path is None:
+        metrics_path = runner_dir / "metrics.json"
+
     if not metrics_path.exists():
         return {}
 
@@ -306,13 +315,22 @@ def get_backtest_metrics(run_name: str) -> Dict[str, Any]:
 def _find_runner_dir(run_name: str) -> Optional[Path]:
     """Locate the axiom_bt runner directory for a given UI run name.
 
-    Runner directories have the pattern ``run_*_<run_name>``.
+    Supports both new and legacy layouts:
+
+    - NEW: BACKTESTS_DIR / <run_id> (run_id == run_name)
+    - LEGACY: ``run_*_<run_name>`` directories created by the old runner
     """
 
     root = BACKTESTS_DIR
     if not root.exists():
         return None
 
+    # New layout: direct directory match (run_id == run_name)
+    direct = root / run_name
+    if direct.exists() and direct.is_dir():
+        return direct
+
+    # Legacy layout: run_*_<run_name>
     for entry in root.iterdir():
         if not entry.is_dir() or not entry.name.startswith("run_"):
             continue
@@ -373,12 +391,31 @@ def get_backtest_equity(run_name: str) -> pd.DataFrame:
     if runner_dir is None:
         return pd.DataFrame()
 
-    path = runner_dir / "equity_curve.csv"
-    if not path.exists():
+    # Prefer artifacts_index.json when present for deterministic discovery
+    index_path = runner_dir / "artifacts_index.json"
+    equity_path: Optional[Path] = None
+
+    if index_path.exists():
+        try:
+            with open(index_path, "r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+            artifacts = payload.get("artifacts") or []
+            for entry in artifacts:
+                if entry.get("kind") == "equity_curve" and entry.get("relpath"):
+                    equity_path = runner_dir / entry["relpath"]
+                    break
+        except (OSError, json.JSONDecodeError):
+            equity_path = None
+
+    # Legacy fallback: direct equity_curve.csv lookup
+    if equity_path is None:
+        equity_path = runner_dir / "equity_curve.csv"
+
+    if not equity_path.exists():
         return pd.DataFrame()
 
     try:
-        df = pd.read_csv(path)
+        df = pd.read_csv(equity_path)
     except (pd.errors.EmptyDataError, pd.errors.ParserError, OSError):
         return pd.DataFrame()
 
@@ -392,19 +429,36 @@ def get_backtest_orders(run_name: str) -> Dict[str, pd.DataFrame]:
     if runner_dir is None:
         return {"orders": pd.DataFrame(), "fills": pd.DataFrame(), "trades": pd.DataFrame()}
 
-    def _read_csv(name: str) -> pd.DataFrame:
-        p = runner_dir / name
-        if not p.exists():
+    index_path = runner_dir / "artifacts_index.json"
+    kind_to_path: Dict[str, Path] = {}
+
+    if index_path.exists():
+        try:
+            with open(index_path, "r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+            for entry in payload.get("artifacts", []):
+                kind = entry.get("kind")
+                relpath = entry.get("relpath")
+                if kind and relpath:
+                    kind_to_path[kind] = runner_dir / relpath
+        except (OSError, json.JSONDecodeError):
+            kind_to_path = {}
+
+    def _read_csv(kind: str, legacy_name: str) -> pd.DataFrame:
+        path = kind_to_path.get(kind) if kind_to_path else None
+        if path is None:
+            path = runner_dir / legacy_name
+        if not path.exists():
             return pd.DataFrame()
         try:
-            return pd.read_csv(p)
+            return pd.read_csv(path)
         except (pd.errors.EmptyDataError, pd.errors.ParserError, OSError):
             return pd.DataFrame()
 
     return {
-        "orders": _read_csv("orders.csv"),
-        "fills": _read_csv("filled_orders.csv"),
-        "trades": _read_csv("trades.csv"),
+        "orders": _read_csv("orders", "orders.csv"),
+        "fills": _read_csv("filled_orders", "filled_orders.csv"),
+        "trades": _read_csv("trades", "trades.csv"),
     }
 
 

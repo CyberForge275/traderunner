@@ -24,8 +24,9 @@ class TestArtifactsManager:
         manager = ArtifactsManager(artifacts_root=artifacts_root)
         
         run_id = "test_run_123"
-        run_dir = manager.create_run_dir(run_id)
-        
+        ctx = manager.create_run_dir(run_id)
+        run_dir = ctx.run_dir
+
         assert run_dir.exists()
         assert run_dir.is_dir()
         assert run_dir.name == run_id

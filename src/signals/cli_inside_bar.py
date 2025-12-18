@@ -319,12 +319,33 @@ def main(argv: List[str] | None = None) -> int:
 
     SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+
+    # Full output (includes strategy + strategy_version for downstream
+    # metadata-aware consumers and validation tests).
     output = Path(args.output) if args.output else SIGNALS_DIR / f"signals_ib_{timestamp}.csv"
     result.to_csv(output, index=False)
 
+    # Current snapshot used by legacy pipelines expects the original
+    # column contract without strategy metadata. Trim to the legacy
+    # schema to keep existing tests and consumers stable.
+    snapshot_cols = [
+        "ts",
+        "session_id",
+        "ib",
+        "ib_qual",
+        "long_entry",
+        "short_entry",
+        "sl_long",
+        "sl_short",
+        "tp_long",
+        "tp_short",
+        "Symbol",
+    ]
+    snapshot_df = result[snapshot_cols] if not result.empty else result[snapshot_cols]
+
     current = Path(args.current_snapshot)
     current.parent.mkdir(parents=True, exist_ok=True)
-    result.to_csv(current, index=False)
+    snapshot_df.to_csv(current, index=False)
 
     # ENHANCED: Report data issues and exit with appropriate codes
     total_requested = len(symbols)

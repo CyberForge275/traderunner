@@ -1,12 +1,11 @@
-"""
-Strategy Helper Utilities - UPDATED to use Central Registry
-============================================================
+"""Strategy helper utilities backed by the central StrategyRegistry.
 
-Helper functions for accessing strategy metadata.
-Now uses src.strategies.metadata.StrategyRegistry as Single Source of Truth.
+These helpers expose a thin façade over :class:`StrategyRegistry` so that
+UI layers and architecture tests can reason about available strategies
+without depending on registry internals.
 """
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from src.strategies.metadata import StrategyRegistry, StrategyMetadata
 from src.strategies.profiles import (
     INSIDE_BAR_V1_PROFILE,
@@ -91,6 +90,17 @@ def get_backtest_capable_strategies() -> Dict[str, StrategyMetadata]:
         lambda cap: cap.supports_backtest
     )
     return {meta.strategy_id: meta for meta in backtest_strategies}
+
+
+def get_available_strategies() -> List[str]:
+    """Return strategy IDs available for generic Backtests UI.
+
+    Currently this is defined as all strategies that declare
+    ``supports_backtest`` in their capability set. The list is
+    returned sorted to provide deterministic ordering for tests.
+    """
+
+    return sorted(get_backtest_capable_strategies().keys())
 
 
 def get_pre_papertrade_capable_strategies() -> Dict[str, StrategyMetadata]:

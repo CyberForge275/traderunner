@@ -794,7 +794,7 @@ def create_backtests_layout():
                     html.Label("Anchor Date", style={"fontSize": "0.9em", "marginTop": "5px"}),
                     dcc.DatePickerSingle(
                         id="anchor-date",
-                        date=datetime.utcnow().date(),
+                        date=(datetime.utcnow() - timedelta(days=1)).date(),  # Yesterday to avoid coverage gap
                         display_format="YYYY-MM-DD",
                         style={"width": "100%", "marginBottom": "8px"},
                     ),
@@ -832,7 +832,7 @@ def create_backtests_layout():
                     html.Label("End Date", style={"fontSize": "0.9em", "marginTop": "5px"}),
                     dcc.DatePickerSingle(
                         id="explicit-end-date",
-                        date=datetime.utcnow().date(),
+                        date=(datetime.utcnow() - timedelta(days=1)).date(),  # Yesterday to avoid coverage gap
                         display_format="YYYY-MM-DD",
                         style={"width": "100%", "marginBottom": "8px"},
                     ),

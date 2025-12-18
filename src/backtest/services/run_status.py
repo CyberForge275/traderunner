@@ -18,16 +18,18 @@ class RunStatus(Enum):
     """Backtest run terminal status."""
     SUCCESS = "success"
     FAILED_PRECONDITION = "failed_precondition"
+    FAILED_POSTCONDITION = "failed_postcondition"  # NEW: Postcondition gate failed
     ERROR = "error"
 
 
 class FailureReason(Enum):
-    """Specific failure reasons for FAILED_PRECONDITION status."""
+    """Specific failure reasons for FAILED_PRECONDITION/POSTCONDITION status."""
     DATA_COVERAGE_GAP = "data_coverage_gap"
     DATA_SLA_FAILED = "data_sla_failed"
     SCHEMA_MISSING = "schema_missing"
     EMPTY_DAY = "empty_day"
     TZ_ERROR = "tz_error"
+    EQUITY_POSTCONDITION_FAILED = "equity_postcondition_failed"  # NEW: Equity missing after full backtest
 
 
 @dataclass

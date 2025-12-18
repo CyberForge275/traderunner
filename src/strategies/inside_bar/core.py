@@ -12,7 +12,7 @@ Version: 2.0.0
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Callable
 from datetime import datetime
 from pathlib import Path
 import hashlib
@@ -284,7 +284,8 @@ class InsideBarCore:
     def generate_signals(
         self,
         df: pd.DataFrame,
-        symbol: str
+        symbol: str,
+        tracer: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> List[RawSignal]:
         """
         Generate trading signals from inside bar patterns.
@@ -304,11 +305,23 @@ class InsideBarCore:
         Returns:
             List of RawSignal objects (one per breakout)
         """
-        signals = []
-        
+        signals: List[RawSignal] = []
+
+        def emit(event: Dict[str, Any]) -> None:
+            if tracer is not None:
+                tracer(event)
+
         # Check if we have any inside bars
-        inside_mask = df['is_inside_bar'].fillna(False)
+        inside_mask = df["is_inside_bar"].fillna(False)
         if not inside_mask.any():
+            # Still emit a high-level event so the trace can explain an
+            # empty-signal run without re-running detection logic.
+            emit(
+                {
+                    "event": "no_inside_bars",
+                    "rows": int(len(df)),
+                }
+            )
             return signals
         
         # Track which patterns have already generated signals
@@ -318,108 +331,192 @@ class InsideBarCore:
         # Iterate through each candle (potential breakout)
         for idx in range(1, len(df)):
             current = df.iloc[idx]
-            
+
+            base_event: Optional[Dict[str, Any]] = None
+            if tracer is not None:
+                ts_val = current.get("timestamp")
+                try:
+                    ts_iso = pd.to_datetime(ts_val).isoformat() if ts_val is not None else None
+                except Exception:
+                    ts_iso = str(ts_val) if ts_val is not None else None
+
+                base_event = {
+                    "row_index": int(idx),
+                    "timestamp": ts_iso,
+                    "open": float(current["open"]) if "open" in df.columns and pd.notna(current.get("open")) else None,
+                    "high": float(current["high"]) if "high" in df.columns and pd.notna(current.get("high")) else None,
+                    "low": float(current["low"]) if "low" in df.columns and pd.notna(current.get("low")) else None,
+                    "close": float(current["close"]) if "close" in df.columns and pd.notna(current.get("close")) else None,
+                    "volume": float(current["volume"]) if "volume" in df.columns and pd.notna(current.get("volume")) else None,
+                    "is_inside_bar": bool(current.get("is_inside_bar", False)),
+                }
+
+            def emit_with(reason: Optional[str] = None, **extra: Any) -> None:
+                if base_event is None:
+                    return
+                event = dict(base_event)
+                event.update(extra)
+                event.setdefault("signal_emitted", False)
+                event.setdefault("signal_side", None)
+                event.setdefault("breakout_from_pattern_index", None)
+                event["reject_reason"] = reason
+                emit(event)
+
             # Find the most recent inside bar BEFORE current candle
             recent_inside_bars = df.iloc[:idx][inside_mask[:idx]]
-            
+
             if recent_inside_bars.empty:
+                emit_with("no_recent_inside_bar", has_recent_inside_bar=False)
                 continue
-            
+
             # Get the last (most recent) inside bar
             last_inside = recent_inside_bars.iloc[-1]
             last_inside_idx = recent_inside_bars.index[-1]
-            
+
             # Skip if we already signaled this pattern
             if last_inside_idx in signaled_patterns:
+                emit_with("pattern_already_signaled", has_recent_inside_bar=True, pattern_index=int(last_inside_idx))
                 continue
-            
+
             # Get mother bar breakout levels
-            mother_high = last_inside['mother_bar_high']
-            mother_low = last_inside['mother_bar_low']
-            
+            mother_high = last_inside["mother_bar_high"]
+            mother_low = last_inside["mother_bar_low"]
+
             if pd.isna(mother_high) or pd.isna(mother_low):
+                emit_with("invalid_mother_levels", has_recent_inside_bar=True, pattern_index=int(last_inside_idx))
                 continue
-            
+
             # Determine breakout price to compare
             if self.config.breakout_confirmation:
                 # Conservative: Use close price (confirmed breakout)
-                compare_high = current['close']
-                compare_low = current['close']
+                compare_high = current["close"]
+                compare_low = current["close"]
             else:
                 # Aggressive: Use high/low (intrabar breakout)
-                compare_high = current['high']
-                compare_low = current['low']
-            
+                compare_high = current["high"]
+                compare_low = current["low"]
+
+            long_breakout = bool(compare_high > mother_high)
+            short_breakout = bool(compare_low < mother_low)
+
+            event_side: Optional[str] = None
+            risk: Optional[float] = None
+
             # Check for LONG breakout (price breaks above mother high)
-            if compare_high > mother_high:
+            if long_breakout:
                 entry = float(mother_high)
                 sl = float(mother_low)
                 risk = entry - sl
-                
+
                 if risk <= 0:
+                    emit_with(
+                        "non_positive_risk",
+                        has_recent_inside_bar=True,
+                        pattern_index=int(last_inside_idx),
+                        mother_bar_high=float(mother_high),
+                        mother_bar_low=float(mother_low),
+                        atr=float(current["atr"]) if pd.notna(current.get("atr")) else None,
+                        compare_high=float(compare_high),
+                        compare_low=float(compare_low),
+                        long_breakout=long_breakout,
+                        short_breakout=short_breakout,
+                    )
                     continue
-                
+
                 tp = entry + (risk * self.config.risk_reward_ratio)
-                
+
                 signal = RawSignal(
-                    timestamp=current['timestamp'],
-                    side='BUY',
+                    timestamp=current["timestamp"],
+                    side="BUY",
                     entry_price=entry,
                     stop_loss=sl,
                     take_profit=tp,
                     metadata={
-                        'pattern': 'inside_bar_breakout',
-                        'mother_high': float(mother_high),
-                        'mother_low': float(mother_low),
-                        'atr': float(current['atr']) if pd.notna(current['atr']) else 0.0,
-                        'risk': risk,
-                        'reward': risk * self.config.risk_reward_ratio,
-                        'symbol': symbol
-                    }
+                        "pattern": "inside_bar_breakout",
+                        "mother_high": float(mother_high),
+                        "mother_low": float(mother_low),
+                        "atr": float(current["atr"]) if pd.notna(current.get("atr")) else 0.0,
+                        "risk": risk,
+                        "reward": risk * self.config.risk_reward_ratio,
+                        "symbol": symbol,
+                    },
                 )
                 signals.append(signal)
-                
+
                 # Mark this pattern as signaled
                 signaled_patterns.add(last_inside_idx)
-            
+                event_side = "BUY"
+
             # Check for SHORT breakout (price breaks below mother low)
-            elif compare_low < mother_low:
+            elif short_breakout:
                 entry = float(mother_low)
                 sl = float(mother_high)
                 risk = sl - entry
-                
+
                 if risk <= 0:
+                    emit_with(
+                        "non_positive_risk",
+                        has_recent_inside_bar=True,
+                        pattern_index=int(last_inside_idx),
+                        mother_bar_high=float(mother_high),
+                        mother_bar_low=float(mother_low),
+                        atr=float(current["atr"]) if pd.notna(current.get("atr")) else None,
+                        compare_high=float(compare_high),
+                        compare_low=float(compare_low),
+                        long_breakout=long_breakout,
+                        short_breakout=short_breakout,
+                    )
                     continue
-                
+
                 tp = entry - (risk * self.config.risk_reward_ratio)
-                
+
                 signal = RawSignal(
-                    timestamp=current['timestamp'],
-                    side='SELL',
+                    timestamp=current["timestamp"],
+                    side="SELL",
                     entry_price=entry,
                     stop_loss=sl,
                     take_profit=tp,
                     metadata={
-                        'pattern': 'inside_bar_breakout',
-                        'mother_high': float(mother_high),
-                        'mother_low': float(mother_low),
-                        'atr': float(current['atr']) if pd.notna(current['atr']) else 0.0,
-                        'risk': risk,
-                        'reward': risk * self.config.risk_reward_ratio,
-                        'symbol': symbol
-                    }
+                        "pattern": "inside_bar_breakout",
+                        "mother_high": float(mother_high),
+                        "mother_low": float(mother_low),
+                        "atr": float(current["atr"]) if pd.notna(current.get("atr")) else 0.0,
+                        "risk": risk,
+                        "reward": risk * self.config.risk_reward_ratio,
+                        "symbol": symbol,
+                    },
                 )
                 signals.append(signal)
-                
+
                 # Mark this pattern as signaled
                 signaled_patterns.add(last_inside_idx)
-        
+                event_side = "SELL"
+
+            # Emit final per-candle event summarising breakout evaluation
+            if base_event is not None:
+                emit_with(
+                    None if event_side is not None else "no_breakout",
+                    has_recent_inside_bar=True,
+                    pattern_index=int(last_inside_idx),
+                    mother_bar_high=float(mother_high),
+                    mother_bar_low=float(mother_low),
+                    atr=float(current["atr"]) if pd.notna(current.get("atr")) else None,
+                    compare_high=float(compare_high),
+                    compare_low=float(compare_low),
+                    long_breakout=long_breakout,
+                    short_breakout=short_breakout,
+                    signal_emitted=event_side is not None,
+                    signal_side=event_side,
+                    breakout_from_pattern_index=int(last_inside_idx) if event_side is not None else None,
+                )
+
         return signals
     
     def process_data(
         self,
         df: pd.DataFrame,
-        symbol: str
+        symbol: str,
+        tracer: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> List[RawSignal]:
         """
         Complete pipeline: Input data → Signals.
@@ -457,7 +554,7 @@ class InsideBarCore:
         # Pipeline: Calculate ATR, detect patterns, generate signals
         df = self.calculate_atr(df)
         df = self.detect_inside_bars(df)
-        signals = self.generate_signals(df, symbol)
+        signals = self.generate_signals(df, symbol, tracer=tracer)
         
         # Apply session filtering if configured
         if self.config.session_filter is not None:

@@ -11,6 +11,134 @@ import pandas as pd
 from axiom_bt.fs import DATA_M1, DATA_M5, DATA_M15, DATA_D1, ensure_layout
 from axiom_bt.data.eodhd_fetch import fetch_intraday_1m_to_parquet, resample_m1
 
+import logging
+logger = logging.getLogger(__name__)
+
+
+def get_eodhd_token_with_guard() -> str:
+    """Get EODHD API token with strict validation.
+    
+    Raises:
+        ValueError: If token is missing or set to 'demo'
+    """
+    import os
+    token = os.getenv("EODHD_API_TOKEN")
+    
+    if not token:
+        raise ValueError(
+            "EODHD_API_TOKEN not found in environment. "
+            "Configure token in /opt/trading/marketdata-stream/.env"
+        )
+    
+    if token.lower() == "demo":
+        raise ValueError(
+            "EODHD_API_TOKEN is set to 'demo'. "
+            "This is forbidden. Use your actual API token."
+        )
+    
+    return token
+
+
+def check_local_m1_coverage(
+    symbol: str,
+    start: str,
+    end: str,
+    tz: str = "America/New_York"
+) -> dict:
+    """Check how many days of M1 data are available locally.
+    
+    Args:
+        symbol: Stock symbol (e.g., "AAPL")
+        start: Start date ISO format (e.g., "2024-09-28")
+        end: End date ISO format (e.g., "2024-12-17")
+        tz: Timezone for date calculations
+    
+    Returns:
+        Dict with keys:
+            - available_days: int
+            - requested_days: int
+            - has_gap: bool
+            - earliest_data: str (ISO) if data exists
+            - latest_data: str (ISO) if data exists
+            - gap_start: str (ISO) if has_gap
+            - gap_end: str (ISO) if has_gap
+    """
+    from datetime import datetime
+    
+    m1_path = DATA_M1 / f"{symbol}.parquet"
+    
+    requested_start = datetime.fromisoformat(start).date()
+    requested_end = datetime.fromisoformat(end).date()
+    requested_days = (requested_end - requested_start).days + 1
+    
+    if not m1_path.exists():
+        # No data at all
+        return {
+            "available_days": 0,
+            "requested_days": requested_days,
+            "has_gap": True,
+            "gap_start": start,
+            "gap_end": end
+        }
+    
+    # Load existing M1 data
+    try:
+        df = pd.read_parquet(m1_path)
+        
+        # Get index with timezone
+        if "timestamp" in df.columns:
+            df_index = pd.to_datetime(df["timestamp"], errors="coerce", utc=True).dt.tz_convert(tz)
+        elif isinstance(df.index, pd.DatetimeIndex):
+            if df.index.tz is None:
+                df_index = pd.to_datetime(df.index, errors="coerce", utc=True).dt.tz_convert(tz)
+            else:
+                df_index = df.index.tz_convert(tz)
+        else:
+            # Can't determine index, assume gap
+            return {
+                "available_days": 0,
+                "requested_days": requested_days,
+                "has_gap": True,
+                "gap_start": start,
+                "gap_end": end
+            }
+        
+        # Get date range of existing data
+        earliest = df_index.min().date()
+        latest = df_index.max().date()
+        
+        # Calculate coverage
+        available_days = (latest - earliest).days + 1
+        
+        # Check if gap exists (need more data than available, or dates don't cover requested range)
+        has_gap = (earliest > requested_start) or (latest < requested_end) or (available_days < requested_days * 0.8)
+        
+        result = {
+            "available_days": available_days,
+            "requested_days": requested_days,
+            "has_gap": has_gap,
+            "earliest_data": earliest.isoformat(),
+            "latest_data": latest.isoformat(),
+        }
+        
+        if has_gap:
+            # Gap exists - need to fetch more data
+            result["gap_start"] = requested_start.isoformat()
+            result["gap_end"] = requested_end.isoformat()
+        
+        return result
+    
+    except Exception as e:
+        logger.warning(f"Could not read {m1_path} for coverage check: {e}")
+        # On error, assume gap to be safe
+        return {
+            "available_days": 0,
+            "requested_days": requested_days,
+            "has_gap": True,
+            "gap_start": start,
+            "gap_end": end
+        }
+
 
 class Timeframe(str, Enum):
     """Supported intraday timeframes for the central store."""
@@ -61,10 +189,20 @@ class IntradayStore:
         *,
         force: bool = False,
         use_sample: bool = False,
+        auto_fill_gaps: bool = True,
     ) -> Dict[str, List[str]]:
         """Ensure required intraday data exists on disk.
+        
+        NEW: Now checks local coverage and auto-fills gaps from EODHD if enabled.
 
-        Returns a mapping of symbol -> list of actions taken.
+        Args:
+            spec: IntradaySpec with symbols, date range, timeframe
+            force: Force rebuild even if cache exists
+            use_sample: Use sample data (testing only)
+            auto_fill_gaps: If True, automatically fetch missing data from EODHD
+            
+        Returns:
+            Dict mapping symbol -> list of actions taken
         """
 
         symbols = sorted({s.strip().upper() for s in spec.symbols if s.strip()})
@@ -80,13 +218,47 @@ class IntradayStore:
         for symbol in symbols:
             sym_actions: List[str] = []
             m1_path = DATA_M1 / f"{symbol}.parquet"
-
-            if force or not m1_path.exists():
+            
+            # NEW: Check coverage before deciding to fetch
+            if not force and auto_fill_gaps:
+                coverage = check_local_m1_coverage(
+                    symbol=symbol,
+                    start=start_str,
+                    end=end_str,
+                    tz=tz
+                )
+                
+                if coverage["has_gap"]:
+                    # Gap detected - need to fetch
+                    logger.info(
+                        f"[{symbol}] Gap detected: have {coverage['available_days']} days, "
+                        f"need {coverage['requested_days']} days. Fetching from EODHD..."
+                    )
+                    
+                    fetch_intraday_1m_to_parquet(
+                        symbol=symbol,
+                        exchange="US",
+                        start_date=coverage["gap_start"],
+                        end_date=coverage["gap_end"],
+                        out_dir=DATA_M1,
+                        tz=tz,
+                        use_sample=use_sample,
+                    )
+                    sym_actions.append(f"gap_fill_m1_{coverage['requested_days']}_days")
+                else:
+                    #Sufficient coverage
+                    logger.info(
+                        f"[{symbol}] Sufficient M1 coverage: {coverage['available_days']} days"
+                    )
+                    sym_actions.append("use_cached_m1")
+            
+            elif force or not m1_path.exists():
+                # Original behavior: force rebuild or doesn't exist
                 fetch_intraday_1m_to_parquet(
                     symbol=symbol,
                     exchange="US",
-                    start=start_str,
-                    end=end_str,
+                    start_date=start_str,
+                    end_date=end_str,
                     out_dir=DATA_M1,
                     tz=tz,
                     use_sample=use_sample,
@@ -95,6 +267,7 @@ class IntradayStore:
             else:
                 sym_actions.append("use_cached_m1")
 
+            # Resample to M5, M15 (existing logic)
             resample_m1(m1_path, DATA_M5, interval="5min", tz=tz)
             sym_actions.append("resample_m5")
 
@@ -103,6 +276,51 @@ class IntradayStore:
                 sym_actions.append("resample_m15")
 
             actions[symbol] = sym_actions
+
+        # Evidence logging after all symbols processed
+        if actions:
+            logger.info(f"[ensure] Summary for {len(symbols)} symbol(s):")
+            for sym, acts in actions.items():
+                logger.info(f"  {sym}: {' → '.join(acts)}")
+                
+                # Log data quality for symbols that were fetched/filled
+                if any("fetch" in act or "gap_fill" in act for act in acts):
+                    m1_file = DATA_M1 / f"{sym}.parquet"
+                    if m1_file.exists():
+                        try:
+                            df_check = pd.read_parquet(m1_file)
+                            
+                            # Get index
+                            if "timestamp" in df_check.columns:
+                                idx = pd.to_datetime(df_check["timestamp"], utc=True).dt.tz_convert(tz)
+                            else:
+                                idx = df_check.index
+                                if idx.tz is None:
+                                    idx = pd.to_datetime(idx, utc=True).dt.tz_convert(tz)
+                                else:
+                                    idx = idx.tz_convert(tz)
+                            
+                            # Quality checks
+                            ohlc_cols = [c for c in ["open", "high", "low", "close", "Open", "High", "Low", "Close"] if c in df_check.columns]
+                            if ohlc_cols:
+                                nan_count = df_check[ohlc_cols].isna().all(axis=1).sum()
+                                nan_pct = (nan_count / len(df_check)) * 100 if len(df_check) > 0 else 0
+                            else:
+                                nan_pct = 0
+                            
+                            is_monotonic = idx.is_monotonic_increasing
+                            is_unique = not idx.duplicated().any()
+                            
+                            logger.info(
+                                f"  {sym} M1: {len(df_check)} rows, "
+                                f"NaN={nan_pct:.1f}%, "
+                                f"range={idx.min().date()} to {idx.max().date()}, "
+                                f"tz={idx.tz}, "
+                                f"monotonic={'✓' if is_monotonic else '✗'}, "
+                                f"unique={'✓' if is_unique else '✗'}"
+                            )
+                        except Exception as e:
+                            logger.warning(f"  {sym}: Could not verify M1 quality: {e}")
 
         return actions
 
@@ -169,6 +387,7 @@ def _normalize_ohlcv_frame(frame: pd.DataFrame, target_tz: str) -> pd.DataFrame:
     """
 
     df = frame.copy()
+    original_columns = list(df.columns)
 
     if "timestamp" in df.columns:
         ts = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
@@ -187,12 +406,43 @@ def _normalize_ohlcv_frame(frame: pd.DataFrame, target_tz: str) -> pd.DataFrame:
     df.index = df.index.tz_convert(target_tz)
     df.index.name = "timestamp"
 
-    col_map = {c.lower(): c for c in df.columns}
+    # Handle duplicate columns (Capitalized + lowercase) by merging:
+    # Use Capitalized where available, fall back to lowercase where Capitalized is NaN
     required_raw = ["open", "high", "low", "close", "volume"]
-    missing = [name for name in required_raw if name not in col_map]
-    if missing:
-        raise ValueError(f"Intraday parquet missing required columns: {missing}")
 
-    ordered = df[[col_map[name] for name in required_raw]].copy()
+    result_cols: Dict[str, pd.Series] = {}
+    column_mapping: Dict[str, str] = {}
+    for name in required_raw:
+        cap_name = name.capitalize()
+        low_name = name.lower()
+
+        has_cap = cap_name in df.columns
+        has_low = low_name in df.columns
+
+        if has_cap and has_low:
+            series = df[cap_name].fillna(df[low_name])
+            source_name = cap_name
+        elif has_cap:
+            series = df[cap_name]
+            source_name = cap_name
+        elif has_low:
+            series = df[low_name]
+            source_name = low_name
+        else:
+            raise ValueError(
+                f"Intraday parquet missing required column: {name} (neither {cap_name} nor {low_name} found)"
+            )
+
+        result_cols[name] = series
+        column_mapping[name] = source_name
+
+    ordered = pd.DataFrame(result_cols, index=df.index)
     ordered.columns = required_raw
+
+    # Attach metadata so downstream debug tooling can report how the
+    # canonical OHLCV view was derived from the raw source.
+    ordered.attrs["ohlcv_raw_columns"] = original_columns
+    ordered.attrs["ohlcv_canonical_columns"] = required_raw
+    ordered.attrs["ohlcv_column_mapping"] = column_mapping
+
     return ordered

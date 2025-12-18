@@ -96,9 +96,25 @@ class PaperTradingAdapter:
             
             resp.raise_for_status()
             result = resp.json()
-            log.info("Intent created: id=%s symbol=%s side=%s qty=%s",
-                     result.get("id"), intent["symbol"], intent["side"], intent["quantity"])
-            return {"status": "created", **result}
+            log.info(
+                "Intent created: id=%s symbol=%s side=%s qty=%s",
+                result.get("id"),
+                intent["symbol"],
+                intent["side"],
+                intent["quantity"],
+            )
+
+            # Preserve a stable high-level status flag for callers while
+            # still exposing the API's own status field separately.
+            payload = {
+                "status": "created",
+                "intent_status": result.get("status"),
+            }
+            for key, value in result.items():
+                if key == "status":
+                    continue
+                payload[key] = value
+            return payload
         
         except requests.RequestException as e:
             log.error("Failed to send intent for %s: %s", intent["symbol"], e)
