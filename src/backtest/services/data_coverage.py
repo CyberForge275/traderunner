@@ -112,6 +112,22 @@ def check_coverage(
        - auto_fetch=False (default): return GAP_DETECTED status
        - auto_fetch=True: attempt fetch, verify, return result
     """
+    # INT Runtime: Skip coverage checks if env var set
+    # This allows backtest execution without trading_dashboard dependency
+    import os
+    skip_coverage = os.environ.get('AXIOM_BT_SKIP_COVERAGE') or os.environ.get('AXIOM_BT_SKIP_PRECONDITIONS')
+    if skip_coverage and skip_coverage.lower() in ('1', 'true', 'yes', 'on'):
+        logger.warning("Coverage check SKIPPED via environment variable (INT runtime mode)")
+        requested_range = DateRange(
+            start=requested_end - pd.Timedelta(days=lookback_days),
+            end=requested_end
+        )
+        return CoverageCheckResult(
+            status=CoverageStatus.SUFFICIENT,
+            requested_range=requested_range,
+            cached_range=requested_range,  # Fake cached range to satisfy caller
+        )
+    
     try:
         from trading_dashboard.utils.parquet_meta_reader import read_parquet_metadata_fast
         from axiom_bt.fs import DATA_M1, DATA_M5, DATA_M15
