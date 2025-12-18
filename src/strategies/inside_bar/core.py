@@ -19,8 +19,8 @@ import hashlib
 import pandas as pd
 import numpy as np
 
-# Import SessionFilter from config module
-from .config import SessionFilter
+# Import config classes from config module
+from .config import SessionFilter, InsideBarConfig
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -53,40 +53,6 @@ STRATEGY_VERSION = __version__
 STRATEGY_NAME = __strategy_name__
 CORE_CHECKSUM = _get_core_checksum()
 
-
-@dataclass
-class InsideBarConfig:
-    """
-    Validated configuration for InsideBar strategy.
-    
-    This config is used by BOTH backtest and live trading.
-    """
-    # Core parameters (affect signal generation)
-    atr_period: int = 14
-    risk_reward_ratio: float = 2.0
-    min_mother_bar_size: float = 0.5
-    breakout_confirmation: bool = True
-    inside_bar_mode: str = "inclusive"  # or "strict"
-    
-    # Session filtering (None = no filtering, applies to all time periods)
-    session_filter: Optional[SessionFilter] = None
-    
-    # Live-specific parameters (ignored in backtest)
-    lookback_candles: int = 50
-    max_pattern_age_candles: int = 12
-    max_deviation_atr: float = 3.0
-    
-    def validate(self) -> None:
-        """Validate configuration parameters."""
-        assert self.atr_period > 0, "ATR period must be positive"
-        assert self.risk_reward_ratio > 0, "Risk/reward ratio must be positive"
-        assert self.min_mother_bar_size >= 0, "Min mother size must be non-negative"
-        assert self.inside_bar_mode in ["inclusive", "strict"], \
-            f"Invalid mode: {self.inside_bar_mode}"
-    
-    def __post_init__(self):
-        """Auto-validate after initialization."""
-        self.validate()
 
 
 @dataclass
@@ -288,22 +254,20 @@ class InsideBarCore:
         tracer: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> List[RawSignal]:
         """
-        Generate trading signals from inside bar patterns.
+        Generate trading signals with First-IB-per-session semantics.
         
-        Signal Generation Logic:
-        1. Find inside bars in the data
-        2. For each subsequent candle, check for breakout
-        3. Breakout = price moves beyond mother bar high (LONG) or low (SHORT)
-        4. Generate ONE signal per pattern (first breakout only)
+        SPEC: Only the FIRST inside bar per session is traded.
+        This is implemented via a session state machine.
         
         Args:
             df: DataFrame with inside bar detection results
                 Must have: timestamp, close, high, low, is_inside_bar,
                           mother_bar_high, mother_bar_low, atr
-            symbol: Trading symbol (e.g., 'APP')
+            symbol: Trading symbol (e.g., 'TSLA')
+            tracer: Optional callback for debugging/audit trail
             
         Returns:
-            List of RawSignal objects (one per breakout)
+            List of RawSignal objects
         """
         signals: List[RawSignal] = []
 
@@ -311,204 +275,294 @@ class InsideBarCore:
             if tracer is not None:
                 tracer(event)
 
+        # Get session configuration
+        session_filter = self.config.session_filter
+        if session_filter is None:
+            # No session filtering - process all bars
+            session_filter = SessionFilter(windows=[])
+        
+        session_tz = getattr(self.config, 'session_timezone', 'Europe/Berlin')
+        
+        # Session state machine: {session_key: state_dict}
+        session_states: Dict[tuple, Dict[str, Any]] = {}
+        
+        # Additional hard limit counter (belt-and-suspenders with state machine)
+        signals_per_session: Dict[tuple, int] = {}
+        max_trades = getattr(self.config, 'max_trades_per_session', 1)
+        
+        # Entry level mode
+        entry_mode = getattr(self.config, 'entry_level_mode', 'mother_bar')
+        
+        # SL cap parameters
+        sl_cap_ticks = getattr(self.config, 'stop_distance_cap_ticks', 40)
+        tick_size = getattr(self.config, 'tick_size', 0.01)
+        max_risk = sl_cap_ticks * tick_size
+        
         # Check if we have any inside bars
         inside_mask = df["is_inside_bar"].fillna(False)
         if not inside_mask.any():
-            # Still emit a high-level event so the trace can explain an
-            # empty-signal run without re-running detection logic.
-            emit(
-                {
-                    "event": "no_inside_bars",
-                    "rows": int(len(df)),
-                }
-            )
+            emit({"event": "no_inside_bars", "rows": int(len(df))})
             return signals
         
-        # Track which patterns have already generated signals
-        # to avoid duplicates
-        signaled_patterns = set()
-        
-        # Iterate through each candle (potential breakout)
+        # Iterate bars starting from index 1 (need previous bar)
         for idx in range(1, len(df)):
             current = df.iloc[idx]
-
-            base_event: Optional[Dict[str, Any]] = None
-            if tracer is not None:
-                ts_val = current.get("timestamp")
-                try:
-                    ts_iso = pd.to_datetime(ts_val).isoformat() if ts_val is not None else None
-                except Exception:
-                    ts_iso = str(ts_val) if ts_val is not None else None
-
-                base_event = {
-                    "row_index": int(idx),
-                    "timestamp": ts_iso,
-                    "open": float(current["open"]) if "open" in df.columns and pd.notna(current.get("open")) else None,
-                    "high": float(current["high"]) if "high" in df.columns and pd.notna(current.get("high")) else None,
-                    "low": float(current["low"]) if "low" in df.columns and pd.notna(current.get("low")) else None,
-                    "close": float(current["close"]) if "close" in df.columns and pd.notna(current.get("close")) else None,
-                    "volume": float(current["volume"]) if "volume" in df.columns and pd.notna(current.get("volume")) else None,
-                    "is_inside_bar": bool(current.get("is_inside_bar", False)),
+            prev = df.iloc[idx - 1]
+            
+            # === TIMESTAMP VALIDATION ===
+            ts = pd.to_datetime(current['timestamp'])
+            prev_ts = pd.to_datetime(prev['timestamp'])
+            
+            if ts.tz is None or prev_ts.tz is None:
+                emit({
+                    'event': 'signal_rejected',
+                    'reason': 'naive_timestamp',
+                    'idx': int(idx),
+                    'ts': str(ts) if ts.tz is None else None,
+                    'prev_ts': str(prev_ts) if prev_ts.tz is None else None
+                })
+                continue
+            
+            # === SESSION GATE ===
+            # Both current and prev must be in sessions (but can be different sessions)
+            try:
+                session_idx = session_filter.get_session_index(ts, session_tz)
+                prev_session_idx = session_filter.get_session_index(prev_ts, session_tz)
+            except ValueError as e:
+                # SessionFilter raises ValueError for naive timestamps
+                emit({
+                    'event': 'signal_rejected',
+                    'reason': 'session_filter_error',
+                    'idx': int(idx),
+                    'error': str(e)
+                })
+                continue
+            
+            if session_idx is None:
+                # Current bar outside session - skip
+                continue
+            
+            # Build session key
+            ts_session = ts.tz_convert(session_tz)
+            session_key = (ts_session.date(), session_idx)
+            
+            # Initialize session state if new
+            if session_key not in session_states:
+                session_states[session_key] = {
+                    'armed': False,
+                    'done': False,
+                    'ib_idx': None,
+                    'levels': {}
                 }
-
-            def emit_with(reason: Optional[str] = None, **extra: Any) -> None:
-                if base_event is None:
-                    return
-                event = dict(base_event)
-                event.update(extra)
-                event.setdefault("signal_emitted", False)
-                event.setdefault("signal_side", None)
-                event.setdefault("breakout_from_pattern_index", None)
-                event["reject_reason"] = reason
-                emit(event)
-
-            # Find the most recent inside bar BEFORE current candle
-            recent_inside_bars = df.iloc[:idx][inside_mask[:idx]]
-
-            if recent_inside_bars.empty:
-                emit_with("no_recent_inside_bar", has_recent_inside_bar=False)
+            
+            state = session_states[session_key]
+            
+            # === STATE: DONE (already traded this session) ===
+            if state['done']:
                 continue
-
-            # Get the last (most recent) inside bar
-            last_inside = recent_inside_bars.iloc[-1]
-            last_inside_idx = recent_inside_bars.index[-1]
-
-            # Skip if we already signaled this pattern
-            if last_inside_idx in signaled_patterns:
-                emit_with("pattern_already_signaled", has_recent_inside_bar=True, pattern_index=int(last_inside_idx))
-                continue
-
-            # Get mother bar breakout levels
-            mother_high = last_inside["mother_bar_high"]
-            mother_low = last_inside["mother_bar_low"]
-
-            if pd.isna(mother_high) or pd.isna(mother_low):
-                emit_with("invalid_mother_levels", has_recent_inside_bar=True, pattern_index=int(last_inside_idx))
-                continue
-
-            # Determine breakout price to compare
-            if self.config.breakout_confirmation:
-                # Conservative: Use close price (confirmed breakout)
-                compare_high = current["close"]
-                compare_low = current["close"]
-            else:
-                # Aggressive: Use high/low (intrabar breakout)
-                compare_high = current["high"]
-                compare_low = current["low"]
-
-            long_breakout = bool(compare_high > mother_high)
-            short_breakout = bool(compare_low < mother_low)
-
-            event_side: Optional[str] = None
-            risk: Optional[float] = None
-
-            # Check for LONG breakout (price breaks above mother high)
-            if long_breakout:
-                entry = float(mother_high)
-                sl = float(mother_low)
-                risk = entry - sl
-
-                if risk <= 0:
-                    emit_with(
-                        "non_positive_risk",
-                        has_recent_inside_bar=True,
-                        pattern_index=int(last_inside_idx),
-                        mother_bar_high=float(mother_high),
-                        mother_bar_low=float(mother_low),
-                        atr=float(current["atr"]) if pd.notna(current.get("atr")) else None,
-                        compare_high=float(compare_high),
-                        compare_low=float(compare_low),
-                        long_breakout=long_breakout,
-                        short_breakout=short_breakout,
-                    )
+            
+            # === STATE: SEARCH FOR FIRST IB ===
+            if not state['armed']:
+                # Check if current bar is inside bar AND mother bar is in SAME session
+                if prev_session_idx != session_idx:
+                    # Mother bar outside current session - cannot use
+                    emit({
+                        'event': 'ib_rejected',
+                        'reason': 'mother_bar_outside_session',
+                        'idx': int(idx),
+                        'current_session': session_idx,
+                        'prev_session': prev_session_idx,
+                        'session_key': str(session_key)
+                    })
                     continue
-
-                tp = entry + (risk * self.config.risk_reward_ratio)
-
-                signal = RawSignal(
-                    timestamp=current["timestamp"],
-                    side="BUY",
-                    entry_price=entry,
-                    stop_loss=sl,
-                    take_profit=tp,
-                    metadata={
-                        "pattern": "inside_bar_breakout",
-                        "mother_high": float(mother_high),
-                        "mother_low": float(mother_low),
-                        "atr": float(current["atr"]) if pd.notna(current.get("atr")) else 0.0,
-                        "risk": risk,
-                        "reward": risk * self.config.risk_reward_ratio,
-                        "symbol": symbol,
-                    },
+                
+                # Check IB condition (inclusive mode)
+                is_inside = (
+                    current['high'] <= prev['high'] and 
+                    current['low'] >= prev['low']
                 )
-                signals.append(signal)
-
-                # Mark this pattern as signaled
-                signaled_patterns.add(last_inside_idx)
-                event_side = "BUY"
-
-            # Check for SHORT breakout (price breaks below mother low)
-            elif short_breakout:
-                entry = float(mother_low)
-                sl = float(mother_high)
-                risk = sl - entry
-
-                if risk <= 0:
-                    emit_with(
-                        "non_positive_risk",
-                        has_recent_inside_bar=True,
-                        pattern_index=int(last_inside_idx),
-                        mother_bar_high=float(mother_high),
-                        mother_bar_low=float(mother_low),
-                        atr=float(current["atr"]) if pd.notna(current.get("atr")) else None,
-                        compare_high=float(compare_high),
-                        compare_low=float(compare_low),
-                        long_breakout=long_breakout,
-                        short_breakout=short_breakout,
-                    )
+                
+                if is_inside:
+                    # Check min mother bar size
+                    mother_range = prev['high'] - prev['low']
+                    atr_val = current['atr'] if 'atr' in current and pd.notna(current['atr']) else 0.0
+                    min_size = self.config.min_mother_bar_size * atr_val
+                    
+                    if mother_range < min_size:
+                        emit({
+                            'event': 'ib_rejected',
+                            'reason': 'mother_bar_too_small',
+                            'idx': int(idx),
+                            'mother_range': float(mother_range),
+                            'min_size': float(min_size),
+                            'atr': float(atr_val)
+                        })
+                        continue
+                    
+                    # FIRST IB FOUND - ARM SESSION
+                    state['armed'] = True
+                    state['ib_idx'] = idx
+                    state['levels'] = {
+                        'mother_high': float(prev['high']),
+                        'mother_low': float(prev['low']),
+                        'ib_high': float(current['high']),
+                        'ib_low': float(current['low']),
+                        'atr': float(atr_val)
+                    }
+                    
+                    emit({
+                        'event': 'ib_armed',
+                        'session_key': str(session_key),
+                        'ib_idx': int(idx),
+                        'ib_ts': ts.isoformat(),
+                        'levels': state['levels']
+                    })
                     continue
-
-                tp = entry - (risk * self.config.risk_reward_ratio)
-
-                signal = RawSignal(
-                    timestamp=current["timestamp"],
-                    side="SELL",
-                    entry_price=entry,
-                    stop_loss=sl,
-                    take_profit=tp,
-                    metadata={
-                        "pattern": "inside_bar_breakout",
-                        "mother_high": float(mother_high),
-                        "mother_low": float(mother_low),
-                        "atr": float(current["atr"]) if pd.notna(current.get("atr")) else 0.0,
-                        "risk": risk,
-                        "reward": risk * self.config.risk_reward_ratio,
-                        "symbol": symbol,
-                    },
-                )
-                signals.append(signal)
-
-                # Mark this pattern as signaled
-                signaled_patterns.add(last_inside_idx)
-                event_side = "SELL"
-
-            # Emit final per-candle event summarising breakout evaluation
-            if base_event is not None:
-                emit_with(
-                    None if event_side is not None else "no_breakout",
-                    has_recent_inside_bar=True,
-                    pattern_index=int(last_inside_idx),
-                    mother_bar_high=float(mother_high),
-                    mother_bar_low=float(mother_low),
-                    atr=float(current["atr"]) if pd.notna(current.get("atr")) else None,
-                    compare_high=float(compare_high),
-                    compare_low=float(compare_low),
-                    long_breakout=long_breakout,
-                    short_breakout=short_breakout,
-                    signal_emitted=event_side is not None,
-                    signal_side=event_side,
-                    breakout_from_pattern_index=int(last_inside_idx) if event_side is not None else None,
-                )
+            
+            # === STATE: ARMED (watch for breakout of THE FIRST IB) ===
+            if state['armed'] and not state['done']:
+                levels = state['levels']
+                
+                # Determine entry levels based on entry_level_mode
+                if entry_mode == "mother_bar":
+                    entry_long = levels['mother_high']
+                    entry_short = levels['mother_low']
+                else:  # inside_bar
+                    entry_long = levels['ib_high']
+                    entry_short = levels['ib_low']
+                
+                # === MAX TRADES CHECK (hard limit) ===
+                if signals_per_session.get(session_key, 0) >= max_trades:
+                    emit({
+                        'event': 'signal_rejected',
+                        'reason': 'max_trades_reached',
+                        'session_key': str(session_key),
+                        'count': signals_per_session[session_key]
+                    })
+                    state['done'] = True  # Mark session done
+                    continue
+                
+                # Check LONG breakout
+                if current['close'] > entry_long:
+                    # Calculate SL with cap
+                    sl = levels['mother_low']
+                    initial_risk = entry_long - sl
+                    
+                    if initial_risk <= 0:
+                        emit({
+                            'event': 'signal_rejected',
+                            'reason': 'non_positive_risk',
+                            'idx': int(idx),
+                            'entry': entry_long,
+                            'sl': sl
+                        })
+                        continue
+                    
+                    # === SL CAP ===
+                    effective_risk = initial_risk
+                    stop_cap_applied = False
+                    
+                    if initial_risk > max_risk:
+                        sl = entry_long - max_risk
+                        effective_risk = max_risk
+                        stop_cap_applied = True
+                    
+                    tp = entry_long + (effective_risk * self.config.risk_reward_ratio)
+                    
+                    signal = RawSignal(
+                        timestamp=ts,
+                        side='BUY',
+                        entry_price=entry_long,
+                        stop_loss=sl,
+                        take_profit=tp,
+                        metadata={
+                            'pattern': 'inside_bar_breakout',
+                            'session_key': str(session_key),
+                            'ib_idx': state['ib_idx'],
+                            'entry_mode': entry_mode,
+                            'stop_cap_applied': stop_cap_applied,
+                            'initial_risk': initial_risk,
+                            'effective_risk': effective_risk,
+                            'mother_high': levels['mother_high'],
+                            'mother_low': levels['mother_low'],
+                            'atr': levels['atr'],
+                            'symbol': symbol
+                        }
+                    )
+                    signals.append(signal)
+                    state['done'] = True
+                    signals_per_session[session_key] = signals_per_session.get(session_key, 0) + 1
+                    
+                    emit({
+                        'event': 'signal_generated',
+                        'side': 'BUY',
+                        'session_key': str(session_key),
+                        'entry': entry_long,
+                        'sl': sl,
+                        'tp': tp,
+                        'stop_cap_applied': stop_cap_applied
+                    })
+                    
+                # Check SHORT breakout
+                elif current['close'] < entry_short:
+                    # Calculate SL with cap
+                    sl = levels['mother_high']
+                    initial_risk = sl - entry_short
+                    
+                    if initial_risk <= 0:
+                        emit({
+                            'event': 'signal_rejected',
+                            'reason': 'non_positive_risk',
+                            'idx': int(idx),
+                            'entry': entry_short,
+                            'sl': sl
+                        })
+                        continue
+                    
+                    # === SL CAP ===
+                    effective_risk = initial_risk
+                    stop_cap_applied = False
+                    
+                    if initial_risk > max_risk:
+                        sl = entry_short + max_risk
+                        effective_risk = max_risk
+                        stop_cap_applied = True
+                    
+                    tp = entry_short - (effective_risk * self.config.risk_reward_ratio)
+                    
+                    signal = RawSignal(
+                        timestamp=ts,
+                        side='SELL',
+                        entry_price=entry_short,
+                        stop_loss=sl,
+                        take_profit=tp,
+                        metadata={
+                            'pattern': 'inside_bar_breakout',
+                            'session_key': str(session_key),
+                            'ib_idx': state['ib_idx'],
+                            'entry_mode': entry_mode,
+                            'stop_cap_applied': stop_cap_applied,
+                            'initial_risk': initial_risk,
+                            'effective_risk': effective_risk,
+                            'mother_high': levels['mother_high'],
+                            'mother_low': levels['mother_low'],
+                            'atr': levels['atr'],
+                            'symbol': symbol
+                        }
+                    )
+                    signals.append(signal)
+                    state['done'] = True
+                    signals_per_session[session_key] = signals_per_session.get(session_key, 0) + 1
+                    
+                    emit({
+                        'event': 'signal_generated',
+                        'side': 'SELL',
+                        'session_key': str(session_key),
+                        'entry': entry_short,
+                        'sl': sl,
+                        'tp': tp,
+                        'stop_cap_applied': stop_cap_applied
+                    })
 
         return signals
     
