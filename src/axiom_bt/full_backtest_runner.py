@@ -264,6 +264,7 @@ def run_backtest_full(
                         lookback_days=lookback_days,
                         data_sanity=data_sanity_payload,
                         warmup=warmup_payload,
+                        strategy_params=strategy_params,
                     )
                     diagnostics_written = True
 
@@ -914,6 +915,7 @@ def _write_diagnostics_file(
     lookback_days: int,
     data_sanity: Dict[str, object],
     warmup: Dict[str, object],
+    strategy_params: Dict[str, object],
 ) -> None:
     """Write consolidated always-on diagnostics.json for a backtest run."""
 
@@ -997,6 +999,26 @@ def _write_diagnostics_file(
         },
     }
 
+    # PHASE 5: Build strategy_policy block for audit trail
+    strategy_policy = {
+        "session_timezone": strategy_params.get("session_timezone", "Europe/Berlin"),
+        "session_windows": strategy_params.get("session_windows", ["15:00-16:00", "16:00-17:00"]),
+        "max_trades_per_session": strategy_params.get("max_trades_per_session", 1),
+        "entry_level_mode": strategy_params.get("entry_level_mode", "mother_bar"),
+        "order_validity_policy": strategy_params.get("order_validity_policy", "session_end"),
+        "order_validity_minutes": strategy_params.get("order_validity_minutes", 60),
+        "valid_from_policy": strategy_params.get("valid_from_policy", "signal_ts"),
+        "stop_distance_cap_ticks": strategy_params.get("stop_distance_cap_ticks", 40),
+        "tick_size": strategy_params.get("tick_size", 0.01),
+        "trailing_enabled": strategy_params.get("trailing_enabled", False),
+        "trailing_trigger_tp_pct": strategy_params.get("trailing_trigger_tp_pct", 0.70),
+        "trailing_risk_remaining_pct": strategy_params.get("trailing_risk_remaining_pct", 0.50),
+        "trailing_apply_mode": strategy_params.get("trailing_apply_mode", "next_bar"),
+        "atr_period": strategy_params.get("atr_period", 14),
+        "risk_reward_ratio": strategy_params.get("risk_reward_ratio", 2.0),
+        "min_mother_bar_size": strategy_params.get("min_mother_bar_size", 0.5),
+    }
+
     diagnostics = {
         "run_id": run_id,
         "symbol": symbol,
@@ -1007,6 +1029,7 @@ def _write_diagnostics_file(
         "lookback_days": lookback_days,
         "data_sanity": data_sanity_block,
         "warmup": warm_block,
+        "strategy_policy": strategy_policy,
     }
 
     (run_dir / "diagnostics.json").write_text(
