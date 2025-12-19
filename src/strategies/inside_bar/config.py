@@ -68,33 +68,37 @@ class SessionFilter:
         """Check if timestamp falls within any session window (timezone-aware).
         
         Args:
-            timestamp: Timestamp to check
+            timestamp: Timestamp to check (tz-aware or naive)
             tz: Target timezone for session check (default: Europe/Berlin)
             
         Returns:
             True if timestamp is within any session window,
             False otherwise
-            
-        Raises:
-            ValueError: If timestamp has no timezone info and config doesn't allow naive
+        
+        Note:
+            CRITICAL FIX: Naive timestamps are assumed to be UTC (EODHD convention).
+            Always converts to target timezone before extracting time to prevent
+            checking UTC time against timezone-specific windows.
         """
         if not self.windows:
             return False  # No windows = reject all (ALWAYS ON enforcement)
         
-        # Handle naive timestamps
+        # CRITICAL FIX: Handle naive timestamps
+        # EODHD intraday data comes as naive timestamps in UTC
         if timestamp.tz is None:
-            raise ValueError(
-                f"Naive timestamp not allowed: {timestamp}. "
-                "All timestamps must have timezone info for session filtering."
-            )
+            timestamp = timestamp.tz_localize("UTC")
         
-        # Convert to target timezone
+        # CRITICAL: Always convert to target timezone before extracting time
+        # This prevents checking UTC time (14:15) against NY windows (14:00-15:00)
+        # Example: 14:15 UTC → 09:15 EST (correctly rejected for 10:00-11:00 window)
         ts_tz = timestamp.tz_convert(tz)
         
+        # Extract local time and check windows
         t = ts_tz.time()
         for start, end in self.windows:
             if start <= t < end:
                 return True
+        
         return False
     
     def get_session_index(self, timestamp: pd.Timestamp, tz: str = "Europe/Berlin") -> Optional[int]:

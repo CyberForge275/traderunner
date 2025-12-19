@@ -252,6 +252,7 @@ class InsideBarCore:
         df: pd.DataFrame,
         symbol: str,
         tracer: Optional[Callable[[Dict[str, Any]], None]] = None,
+        debug_file: Optional[Path] = None,
     ) -> List[RawSignal]:
         """
         Generate trading signals with First-IB-per-session semantics.
@@ -282,6 +283,14 @@ class InsideBarCore:
             session_filter = SessionFilter(windows=[])
         
         session_tz = getattr(self.config, 'session_timezone', 'Europe/Berlin')
+        
+        # DEBUG: Print session config (guaranteed visible)
+        print("\n" + "="*70)
+        print("[SESSION_FILTER_CONFIG]")
+        print(f"  session_tz: {session_tz}")
+        print(f"  windows: {session_filter.to_strings() if session_filter and hasattr(session_filter, 'to_strings') else 'empty'}")
+        print(f"  windows_count: {len(session_filter.windows) if session_filter else 0}")
+        print("="*70 + "\n")
         
         # DEBUG: Log session filter configuration
         emit({
@@ -638,6 +647,14 @@ class InsideBarCore:
         if self.config.session_filter is not None:
             session_tz = getattr(self.config, 'session_timezone', None) or "Europe/Berlin"
             
+            # DEBUG: Print final filter application
+            print("\n" + "="*70)
+            print("[FINAL_FILTER_APPLY]")
+            print(f"  signals_before: {len(signals)}")
+            print(f"  session_tz: {session_tz}")
+            print(f"  session_windows: {self.config.session_filter.to_strings()}")
+            print("="*70)
+            
             # DEBUG: Log final filter application
             if tracer:
                 tracer({
@@ -651,7 +668,21 @@ class InsideBarCore:
             for sig in signals:
                 # Ensure timestamp is a pd.Timestamp
                 ts = pd.to_datetime(sig.timestamp)
+                
+                # DEBUG: Print timestamp details BEFORE filter check
+                print(f"\n[FILTER_CHECK] Checking signal:")
+                print(f"  sig.timestamp: {sig.timestamp} (type={type(sig.timestamp).__name__})")
+                print(f"  after pd.to_datetime: {ts} (tz={ts.tz})")
+                if ts.tz:
+                    ts_local = ts.tz_convert(session_tz)
+                    print(f"  converted to {session_tz}: {ts_local} (time={ts_local.time()})")
+                else:
+                    print(f"  WARNING: Timestamp has no timezone!")
+                
                 in_session = self.config.session_filter.is_in_session(ts, session_tz)
+                
+                print(f"  in_session result: {in_session}")
+                print(f"  side: {sig.side}")
                 
                 # DEBUG: Log each filter decision
                 if tracer:
@@ -666,6 +697,16 @@ class InsideBarCore:
                 
                 if in_session:
                     filtered_signals.append(sig)
+                    print(f"  ✅ ACCEPTED")
+                else:
+                    print(f"  ❌ REJECTED (outside session)")
+            
+            # DEBUG: Print final filter result
+            print("\n" + "="*70)
+            print("[FINAL_FILTER_RESULT]")
+            print(f"  signals_after: {len(filtered_signals)}")
+            print(f"  filtered_out: {len(signals) - len(filtered_signals)}")
+            print("="*70 + "\n")
             
             if tracer:
                 tracer({
