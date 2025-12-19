@@ -612,11 +612,12 @@ class InsideBarCore:
         
         # Apply session filtering if configured
         if self.config.session_filter is not None:
+            session_tz = getattr(self.config, 'session_timezone', None) or "Europe/Berlin"
             filtered_signals = []
             for sig in signals:
                 # Ensure timestamp is a pd.Timestamp
                 ts = pd.to_datetime(sig.timestamp)
-                if self.config.session_filter.is_in_session(ts):
+                if self.config.session_filter.is_in_session(ts, session_tz):
                     filtered_signals.append(sig)
             return filtered_signals
         
