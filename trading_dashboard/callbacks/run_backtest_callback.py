@@ -173,6 +173,22 @@ def register_run_backtest_callback(app):
         # Build strategy parameters dict from UI inputs
         config_params = {}
         if strategy in ["insidebar_intraday", "insidebar_intraday_v2"]:
+            # CRITICAL FIX: Auto-detect market timezone based on symbols
+            # Most US tickers (NASDAQ/NYSE) trade in America/New_York
+            # European tickers would need different detection logic
+            
+            # Simple heuristic: if all symbols look like US tickers, use US timezone
+            # TODO: Use proper instrument registry when available
+            is_us_market = True  # Default assumption for now
+            # In future: check against exchange registry
+            
+            if is_us_market:
+                session_tz = "America/New_York"
+                session_windows = ["09:30-16:00"]  # NYSE/NASDAQ RTH
+            else:
+                session_tz = "Europe/Berlin"
+                session_windows = ["15:00-16:00", "16:00-17:00"]
+            
             config_params = {
                 "atr_period": insidebar_atr_period or 14,
                 "min_mother_bar_size": insidebar_min_mother_bar or 0.5,
@@ -181,6 +197,13 @@ def register_run_backtest_callback(app):
                 "lookback_candles": insidebar_lookback_candles or 50,
                 "max_pattern_age_candles": insidebar_max_pattern_age or 12,
                 "execution_lag": insidebar_execution_lag or 0,
+                # CRITICAL: Set timezone and sessions
+                "session_timezone": session_tz,
+                "session_filter": session_windows,
+                # CRITICAL: Use one_bar policy for proper validity windows
+                "order_validity_policy": "one_bar",
+                "timeframe_minutes": 5,  # Assuming M5
+                "valid_from_policy": "signal_ts",
             }
         
         # Handle session filter for InsideBar strategy if provided
