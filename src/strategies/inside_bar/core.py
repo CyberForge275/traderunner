@@ -283,6 +283,14 @@ class InsideBarCore:
         
         session_tz = getattr(self.config, 'session_timezone', 'Europe/Berlin')
         
+        # DEBUG: Log session filter configuration
+        emit({
+            'event': 'session_filter_config',
+            'session_tz': session_tz,
+            'session_windows': session_filter.to_strings() if session_filter and hasattr(session_filter, 'to_strings') else 'empty',
+            'windows_count': len(session_filter.windows) if session_filter else 0
+        })
+        
         # Session state machine: {session_key: state_dict}
         session_states: Dict[tuple, Dict[str, Any]] = {}
         
@@ -338,8 +346,24 @@ class InsideBarCore:
                 })
                 continue
             
+            # DEBUG: Log session gate check
+            emit({
+                'event': 'session_gate_check',
+                'idx': int(idx),
+                'ts': ts.isoformat(),
+                'ts_local': ts.tz_convert(session_tz).strftime('%H:%M'),
+                'session_idx': session_idx,
+                'prev_session_idx': prev_session_idx
+            })
+            
             if session_idx is None:
                 # Current bar outside session - skip
+                emit({
+                    'event': 'bar_rejected_outside_session',
+                    'idx': int(idx),
+                    'ts': ts.isoformat(),
+                    'ts_local': ts.tz_convert(session_tz).strftime('%H:%M')
+                })
                 continue
             
             # Build session key
@@ -613,12 +637,43 @@ class InsideBarCore:
         # Apply session filtering if configured
         if self.config.session_filter is not None:
             session_tz = getattr(self.config, 'session_timezone', None) or "Europe/Berlin"
+            
+            # DEBUG: Log final filter application
+            if tracer:
+                tracer({
+                    'event': 'final_filter_apply',
+                    'signals_before': len(signals),
+                    'session_tz': session_tz,
+                    'session_windows': self.config.session_filter.to_strings()
+                })
+            
             filtered_signals = []
             for sig in signals:
                 # Ensure timestamp is a pd.Timestamp
                 ts = pd.to_datetime(sig.timestamp)
-                if self.config.session_filter.is_in_session(ts, session_tz):
+                in_session = self.config.session_filter.is_in_session(ts, session_tz)
+                
+                # DEBUG: Log each filter decision
+                if tracer:
+                    ts_local = ts.tz_convert(session_tz).strftime('%H:%M')
+                    tracer({
+                        'event': 'final_filter_check',
+                        'ts': ts.isoformat(),
+                        'ts_local': ts_local,
+                        'in_session': in_session,
+                        'side': sig.side
+                    })
+                
+                if in_session:
                     filtered_signals.append(sig)
+            
+            if tracer:
+                tracer({
+                    'event': 'final_filter_result',
+                    'signals_after': len(filtered_signals),
+                    'filtered_out': len(signals) - len(filtered_signals)
+                })
+            
             return filtered_signals
         
         return signals
