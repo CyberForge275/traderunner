@@ -339,8 +339,11 @@ class IntradayStore:
         if not path.exists():
             raise FileNotFoundError(f"Intraday parquet not found: {path}")
 
+        # Load parquet file
         frame = pd.read_parquet(path)
-        df = _normalize_ohlcv_frame(frame, target_tz=tz or self._default_tz)
+        
+        # Load and normalize OHLCV
+        df = _normalize_ohlcv_frame(frame, target_tz=tz or self._default_tz, symbol=symbol)
 
         # v2 Data Contract Validation
         import os
@@ -378,16 +381,20 @@ def _to_date_str(value: str | date) -> str:
     return value
 
 
-def _normalize_ohlcv_frame(frame: pd.DataFrame, target_tz: str) -> pd.DataFrame:
+def _normalize_ohlcv_frame(frame: pd.DataFrame, target_tz: str, symbol: str = "UNKNOWN") -> pd.DataFrame:
     """Normalize raw parquet to a standard OHLCV frame.
 
     - Accepts either a datetime index or a 'timestamp' column.
     - Ensures tz-aware index in ``target_tz``.
     - Ensures columns: open, high, low, close, volume.
+    - DEFENSIVE: Merges duplicate uppercase/lowercase columns
+    - LOGS: Column transformations and NaN statistics for debugging
     """
 
     df = frame.copy()
     original_columns = list(df.columns)
+    had_duplicates = False
+    merge_log = []
 
     if "timestamp" in df.columns:
         ts = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
@@ -420,8 +427,16 @@ def _normalize_ohlcv_frame(frame: pd.DataFrame, target_tz: str) -> pd.DataFrame:
         has_low = low_name in df.columns
 
         if has_cap and has_low:
+            # DEBUG: Duplicate column detected
+            had_duplicates = True
+            cap_count = df[cap_name].notna().sum()
+            low_count = df[low_name].notna().sum()
+            
             series = df[cap_name].fillna(df[low_name])
             source_name = cap_name
+            
+            merge_log.append(f"{cap_name}({cap_count})+{low_name}({low_count})→{name}")
+            
         elif has_cap:
             series = df[cap_name]
             source_name = cap_name
@@ -439,10 +454,38 @@ def _normalize_ohlcv_frame(frame: pd.DataFrame, target_tz: str) -> pd.DataFrame:
     ordered = pd.DataFrame(result_cols, index=df.index)
     ordered.columns = required_raw
 
+    # Calculate NaN statistics for OHLC (not volume, that can be 0)
+    nan_stats = {}
+    for col in ["open", "high", "low", "close"]:
+        nan_count = ordered[col].isna().sum()
+        nan_pct = (nan_count / len(ordered) * 100) if len(ordered) > 0 else 0
+        nan_stats[col] = {'count': nan_count, 'pct': nan_pct}
+    
+    # DEBUG LOGGING
+    logger.debug(
+        f"[OHLCV_NORMALIZE] symbol={symbol} rows={len(ordered)} "
+        f"columns_before={original_columns} columns_after={list(ordered.columns)} "
+        f"had_duplicates={had_duplicates}"
+    )
+    
+    if merge_log:
+        logger.info(
+            f"[OHLCV_NORMALIZE] {symbol}: Merged duplicate columns: {', '.join(merge_log)}"
+        )
+    
+    if nan_stats:
+        nan_summary = ", ".join([f"{k}={v['count']}({v['pct']:.1f}%)" for k, v in nan_stats.items() if v['count'] > 0])
+        if nan_summary:
+            logger.warning(
+                f"[OHLCV_NORMALIZE] {symbol}: NaN detected: {nan_summary}"
+            )
+
     # Attach metadata so downstream debug tooling can report how the
     # canonical OHLCV view was derived from the raw source.
     ordered.attrs["ohlcv_raw_columns"] = original_columns
     ordered.attrs["ohlcv_canonical_columns"] = required_raw
     ordered.attrs["ohlcv_column_mapping"] = column_mapping
+    ordered.attrs["ohlcv_had_duplicates"] = had_duplicates
+    ordered.attrs["ohlcv_nan_stats"] = nan_stats
 
     return ordered
