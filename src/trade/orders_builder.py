@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pandas as pd
 
@@ -80,7 +80,12 @@ def _build_args_from_params(strategy_params: Dict, market_tz: str) -> argparse.N
 
     tick_size = float(strategy_params.get("tick_size", 0.01))
     round_mode = str(strategy_params.get("round_mode", "floor"))
-    expire_policy = str(strategy_params.get("expire_policy", "session_end"))
+    expire_policy = str(
+        strategy_params.get(
+            "order_validity_policy",
+            strategy_params.get("expire_policy", "session_end"),
+        )
+    )
 
     initial_cash = float(strategy_params.get("initial_cash", 100000.0))
     risk_pct = float(strategy_params.get("risk_pct", 1.0))
@@ -95,11 +100,30 @@ def _build_args_from_params(strategy_params: Dict, market_tz: str) -> argparse.N
     if max_notional is None:
         max_notional = initial_cash * max_position_pct / 100.0
 
+    # Infer timeframe_minutes for validity calculations; default to 5 for M5.
+    timeframe_minutes: int = 5
+    tf_param: Optional[object] = strategy_params.get("timeframe_minutes")
+    if tf_param is None:
+        tf_param = strategy_params.get("timeframe") or strategy_params.get("timeframe_min")
+    if isinstance(tf_param, str):
+        tf_upper = tf_param.upper()
+        if tf_upper.startswith("M") and tf_upper[1:].isdigit():
+            timeframe_minutes = int(tf_upper[1:])
+    elif isinstance(tf_param, (int, float)):
+        timeframe_minutes = int(tf_param)
+
+    validity_minutes = int(strategy_params.get("validity_minutes", 60))
+    valid_from_policy = str(strategy_params.get("valid_from_policy", "signal_ts"))
+
     args = argparse.Namespace(
         tz=market_tz,
         tick_size=tick_size,
         round_mode=round_mode,
         expire_policy=expire_policy,
+        validity_policy=expire_policy,
+        validity_minutes=validity_minutes,
+        valid_from_policy=valid_from_policy,
+        timeframe_minutes=timeframe_minutes,
         tif=str(strategy_params.get("tif", "DAY")),
         sizing=sizing,
         qty=qty,
@@ -149,6 +173,44 @@ def build_orders_for_backtest(
 
     # Build base orders using existing logic
     orders_df = _build_inside_bar_orders(signals, ts_col, sessions, args)
+
+    # Recompute validity windows using the canonical validity calculator so that
+    # policies like "one_bar" take effect even when expire_policy was not set.
+    if not orders_df.empty:
+        session_windows = strategy_params.get("session_filter") or ["09:30-16:00"]
+        session_filter = SessionFilter.from_strings(session_windows)
+        session_timezone = strategy_params.get("session_timezone", market_tz)
+        validity_policy = args.validity_policy
+        validity_minutes = args.validity_minutes
+        timeframe_minutes = args.timeframe_minutes
+        valid_from_policy = args.valid_from_policy
+
+        def _to_tz(ts_val: object) -> pd.Timestamp:
+            ts = pd.to_datetime(ts_val)
+            if ts.tzinfo is None:
+                return ts.tz_localize(session_timezone)
+            return ts.tz_convert(session_timezone)
+
+        new_valid_from: List[str] = []
+        new_valid_to: List[str] = []
+
+        for _, row in orders_df.iterrows():
+            signal_ts = _to_tz(row["valid_from"])
+            vf, vt = calculate_validity_window(
+                signal_ts=signal_ts,
+                timeframe_minutes=timeframe_minutes,
+                session_filter=session_filter,
+                session_timezone=session_timezone,
+                validity_policy=validity_policy,
+                validity_minutes=validity_minutes,
+                valid_from_policy=valid_from_policy,
+            )
+            new_valid_from.append(vf.isoformat())
+            new_valid_to.append(vt.isoformat())
+
+        orders_df = orders_df.copy()
+        orders_df["valid_from"] = new_valid_from
+        orders_df["valid_to"] = new_valid_to
     
     # Phase 5: Apply validity validation (CRITICAL for fills)
     if not orders_df.empty and 'valid_from' in orders_df.columns and 'valid_to' in orders_df.columns:
