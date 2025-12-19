@@ -186,9 +186,7 @@ def build_orders_for_backtest(
         valid_from_policy = args.valid_from_policy
 
         def _to_tz(ts_val: object) -> pd.Timestamp:
-            ts = pd.to_datetime(ts_val)
-            if ts.tzinfo is None:
-                return ts.tz_localize(session_timezone)
+            ts = pd.to_datetime(ts_val, utc=True)
             return ts.tz_convert(session_timezone)
 
         new_valid_from: List[str] = []
@@ -215,7 +213,10 @@ def build_orders_for_backtest(
     # Phase 5: Apply validity validation (CRITICAL for fills)
     if not orders_df.empty and 'valid_from' in orders_df.columns and 'valid_to' in orders_df.columns:
         # Check for invalid windows (valid_to <= valid_from)
-        invalid_mask = pd.to_datetime(orders_df['valid_to']) <= pd.to_datetime(orders_df['valid_from'])
+        invalid_mask = (
+            pd.to_datetime(orders_df['valid_to'], utc=True)
+            <= pd.to_datetime(orders_df['valid_from'], utc=True)
+        )
         
         if invalid_mask.any():
             num_invalid = invalid_mask.sum()
@@ -239,8 +240,8 @@ def build_orders_for_backtest(
     # Add timezone debug columns for easier debugging
     if not orders_df.empty and 'valid_from' in orders_df.columns:
         # Convert valid_from to NY and Berlin time for debug visibility
-        valid_from_ts = pd.to_datetime(orders_df['valid_from'])
-        
+        valid_from_ts = pd.to_datetime(orders_df['valid_from'], utc=True)
+
         # NY time (already in this TZ usually, but ensure conversion)
         ny_time = valid_from_ts.dt.tz_convert('America/New_York')
         orders_df['NY_time'] = ny_time.dt.strftime('%Y-%m-%d %H:%M:%S %Z')
