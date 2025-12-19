@@ -45,7 +45,11 @@ def check_local_m1_coverage(
     end: str,
     tz: str = "America/New_York"
 ) -> dict:
-    """Check how many days of M1 data are available locally.
+    """Check how many days of M1 data are available locally and identify precise gaps.
+    
+    This function determines exactly which data is missing by comparing the requested
+    range against existing data. It returns precise gap boundaries to avoid re-fetching
+    data that already exists.
     
     Args:
         symbol: Stock symbol (e.g., "AAPL")
@@ -55,15 +59,24 @@ def check_local_m1_coverage(
     
     Returns:
         Dict with keys:
-            - available_days: int
-            - requested_days: int
-            - has_gap: bool
-            - earliest_data: str (ISO) if data exists
-            - latest_data: str (ISO) if data exists
-            - gap_start: str (ISO) if has_gap
-            - gap_end: str (ISO) if has_gap
+            - available_days: int - Days of data currently in file
+            - requested_days: int - Days of data needed
+            - has_gap: bool - True if any data is missing
+            - earliest_data: str (ISO) - Earliest date in existing data (if exists)
+            - latest_data: str (ISO) - Latest date in existing data (if exists)
+            - gaps: list[dict] - List of missing ranges, each with:
+                - gap_start: str (ISO)
+                - gap_end: str (ISO)
+                - gap_days: int
+    
+    Example:
+        >>> # Existing data: 2024-12-01 to 2024-12-19
+        >>> # Requested: 2024-10-01 to 2024-12-19
+        >>> result = check_local_m1_coverage('TSLA', '2024-10-01', '2024-12-19')
+        >>> result['gaps']
+        [{'gap_start': '2024-10-01', 'gap_end': '2024-11-30', 'gap_days': 61}]
     """
-    from datetime import datetime
+    from datetime import datetime, timedelta
     
     m1_path = DATA_M1 / f"{symbol}.parquet"
     
@@ -72,71 +85,100 @@ def check_local_m1_coverage(
     requested_days = (requested_end - requested_start).days + 1
     
     if not m1_path.exists():
-        # No data at all
+        # No data at all - entire range is a gap
         return {
             "available_days": 0,
             "requested_days": requested_days,
             "has_gap": True,
-            "gap_start": start,
-            "gap_end": end
+            "gaps": [{
+                "gap_start": start,
+                "gap_end": end,
+                "gap_days": requested_days
+            }]
         }
     
     # Load existing M1 data
     try:
         df = pd.read_parquet(m1_path)
         
-        # Get index with timezone
+        # Get index in UTC (critical: keep in UTC for date() calculations)
+        # EODHD provides UTC timestamps, so we extract dates in UTC
         if "timestamp" in df.columns:
-            df_index = pd.to_datetime(df["timestamp"], errors="coerce", utc=True).dt.tz_convert(tz)
+            df_index_utc = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
         elif isinstance(df.index, pd.DatetimeIndex):
             if df.index.tz is None:
-                df_index = pd.to_datetime(df.index, errors="coerce", utc=True).dt.tz_convert(tz)
+                df_index_utc = pd.to_datetime(df.index, errors="coerce", utc=True)
             else:
-                df_index = df.index.tz_convert(tz)
+                df_index_utc = df.index.tz_convert("UTC")
         else:
-            # Can't determine index, assume gap
+            # Can't determine index, assume entire range is gap
             return {
                 "available_days": 0,
                 "requested_days": requested_days,
                 "has_gap": True,
-                "gap_start": start,
-                "gap_end": end
+                "gaps": [{
+                    "gap_start": start,
+                    "gap_end": end,
+                    "gap_days": requested_days
+                }]
             }
         
-        # Get date range of existing data
-        earliest = df_index.min().date()
-        latest = df_index.max().date()
-        
-        # Calculate coverage
+        # Get date range of existing data (in UTC!)
+        # IMPORTANT: .date() on UTC time to avoid timezone shift bugs
+        earliest = df_index_utc.min().date()
+        latest = df_index_utc.max().date()
         available_days = (latest - earliest).days + 1
         
-        # Check if gap exists (need more data than available, or dates don't cover requested range)
-        has_gap = (earliest > requested_start) or (latest < requested_end) or (available_days < requested_days * 0.8)
+        # Identify precise gaps
+        gaps = []
         
+        # Gap 1: Before existing data (if requested_start < earliest)
+        if requested_start < earliest:
+            gap_end = earliest - timedelta(days=1)
+            gap_days = (gap_end - requested_start).days + 1
+            gaps.append({
+                "gap_start": requested_start.isoformat(),
+                "gap_end": gap_end.isoformat(),
+                "gap_days": gap_days,
+                "reason": "before_existing_data"
+            })
+        
+        # Gap 2: After existing data (if requested_end > latest)
+        if requested_end > latest:
+            gap_start = latest + timedelta(days=1)
+            gap_days = (requested_end - gap_start).days + 1
+            gaps.append({
+                "gap_start": gap_start.isoformat(),
+                "gap_end": requested_end.isoformat(),
+                "gap_days": gap_days,
+                "reason": "after_existing_data"
+            })
+        
+        # Build result
         result = {
             "available_days": available_days,
             "requested_days": requested_days,
-            "has_gap": has_gap,
+            "has_gap": len(gaps) > 0,
             "earliest_data": earliest.isoformat(),
             "latest_data": latest.isoformat(),
+            "gaps": gaps
         }
-        
-        if has_gap:
-            # Gap exists - need to fetch more data
-            result["gap_start"] = requested_start.isoformat()
-            result["gap_end"] = requested_end.isoformat()
         
         return result
     
     except Exception as e:
         logger.warning(f"Could not read {m1_path} for coverage check: {e}")
-        # On error, assume gap to be safe
+        # On error, assume entire range is gap to be safe
         return {
             "available_days": 0,
             "requested_days": requested_days,
             "has_gap": True,
-            "gap_start": start,
-            "gap_end": end
+            "gaps": [{
+                "gap_start": start,
+                "gap_end": end,
+                "gap_days": requested_days,
+                "reason": "error_reading_file"
+            }]
         }
 
 
@@ -229,24 +271,64 @@ class IntradayStore:
                 )
                 
                 if coverage["has_gap"]:
-                    # Gap detected - need to fetch
+                    # Gap(s) detected - fetch only missing data
                     logger.info(
                         f"[{symbol}] Gap detected: have {coverage['available_days']} days, "
-                        f"need {coverage['requested_days']} days. Fetching from EODHD..."
+                        f"need {coverage['requested_days']} days. "
+                        f"Found {len(coverage['gaps'])} gap(s)."
                     )
                     
-                    fetch_intraday_1m_to_parquet(
-                        symbol=symbol,
-                        exchange="US",
-                        start_date=coverage["gap_start"],
-                        end_date=coverage["gap_end"],
-                        out_dir=DATA_M1,
-                        tz=tz,
-                        use_sample=use_sample,
-                    )
-                    sym_actions.append(f"gap_fill_m1_{coverage['requested_days']}_days")
+                    # Fetch each gap separately
+                    for gap in coverage["gaps"]:
+                        logger.info(
+                            f"[{symbol}] Fetching gap: {gap['gap_start']} to {gap['gap_end']} "
+                            f"({gap['gap_days']} days, reason: {gap.get('reason', 'unknown')})"
+                        )
+                        
+                        # Fetch gap data to temp location first
+                        import tempfile
+                        import shutil
+                        temp_dir = Path(tempfile.mkdtemp(prefix="eodhd_gap_"))
+                        
+                        try:
+                            gap_path = fetch_intraday_1m_to_parquet(
+                                symbol=symbol,
+                                exchange="US",
+                                start_date=gap['gap_start'],
+                                end_date=gap['gap_end'],
+                                out_dir=temp_dir,
+                                tz=tz,
+                                use_sample=use_sample,
+                            )
+                            
+                            # Merge with existing data if file exists
+                            if m1_path.exists():
+                                existing_df = pd.read_parquet(m1_path)
+                                gap_df = pd.read_parquet(gap_path)
+                                
+                                # Merge
+                                merged_df = pd.concat([existing_df, gap_df])
+                                merged_df = merged_df.sort_index().drop_duplicates()
+                                
+                                # Save merged result
+                                merged_df.to_parquet(m1_path)
+                                logger.info(
+                                    f"[{symbol}] Merged {len(gap_df)} new rows with "
+                                    f"{len(existing_df)} existing → {len(merged_df)} total"
+                                )
+                            else:
+                                # No existing file, just move gap data
+                                shutil.move(str(gap_path), str(m1_path))
+                                logger.info(f"[{symbol}] Created new M1 file with gap data")
+                        
+                        finally:
+                            # Clean up temp dir
+                            if temp_dir.exists():
+                                shutil.rmtree(temp_dir)
+                    
+                    sym_actions.append(f"gap_fill_{len(coverage['gaps'])}_gaps_{sum(g['gap_days'] for g in coverage['gaps'])}_days")
                 else:
-                    #Sufficient coverage
+                    # Sufficient coverage
                     logger.info(
                         f"[{symbol}] Sufficient M1 coverage: {coverage['available_days']} days"
                     )

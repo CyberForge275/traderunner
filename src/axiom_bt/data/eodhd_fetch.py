@@ -38,6 +38,14 @@ Architecture:
                                                   ↓
                                               M5/M15 parquet
 
+EODHD API Limitations:
+    - Interval 1m: Maximum 120 days per request
+    - Interval 5m: Maximum 600 days per request
+    - No from/to parameters: Returns last 120 days automatically
+    
+    For historical data beyond 120 days, use chunked fetching (fetch in
+    120-day windows and merge results).
+
 API Documentation: 
     https://eodhd.com/financial-apis/intraday-historical-data-api
 
@@ -51,7 +59,7 @@ Example Usage:
     >>> from axiom_bt.data.eodhd_fetch import fetch_intraday_1m_to_parquet
     >>> from pathlib import Path
     >>> 
-    >>> # Fetch TSLA data (gets all available ~60 days)
+    >>> # Fetch TSLA data (gets all available ~120 days max)
     >>> path = fetch_intraday_1m_to_parquet(
     ...     symbol='TSLA',
     ...     exchange='US',
@@ -64,8 +72,9 @@ Example Usage:
 
 Author: Droid Trading Team
 Last Modified: 2025-12-19
-Version: 2.0 (Simplified fetch - no date range)
+Version: 2.0 (Simplified fetch - no date range, max 120 days)
 """
+
 
 
 
@@ -245,37 +254,111 @@ def _request(url: str, params: dict) -> list:
 def fetch_intraday_1m_to_parquet(
     symbol: str,
     exchange: str,
-    start_date: str,
-    end_date: str,
-    out_dir: Path,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    out_dir: Path = Path("artifacts/data_m1"),
     tz: str = "Europe/Berlin",
     use_sample: bool = False,
 ) -> Path:
+    """
+    Fetch 1-minute intraday OHLCV data from EODHD and save as parquet.
+    
+    Behavior:
+        - If start_date/end_date are None: Fetches last 120 days (EODHD default)
+        - If start_date/end_date provided: Fetches exact range
+        - Validates range ≤ 120 days (EODHD limit for 1m interval)
+    
+    EODHD Limitation:
+        - 1-minute interval: Maximum 120 days per request
+        - Raises ValueError if requested range exceeds 120 days
+    
+    Args:
+        symbol: Stock ticker (e.g., 'TSLA', 'AAPL')
+        exchange: Exchange code (e.g., 'US', 'NASDAQ')
+        start_date: Start date 'YYYY-MM-DD' or None for default (last 120 days)
+        end_date: End date 'YYYY-MM-DD' or None for default (last 120 days)
+        out_dir: Output directory for parquet file (default: artifacts/data_m1)
+        tz: Target timezone (default: 'Europe/Berlin')
+        use_sample: If True, generate synthetic data instead of API call
+    
+    Returns:
+        Path: Absolute path to saved parquet file
+        
+    Raises:
+        ValueError: If (end_date - start_date) > 120 days
+        SystemExit: If EODHD_API_TOKEN not found and use_sample=False
+        SystemExit: If API returns no data
+        requests.HTTPError: If API request fails (4xx/5xx)
+    
+    Examples:
+        >>> # Default: Last 120 days
+        >>> path = fetch_intraday_1m_to_parquet('TSLA', 'US')
+        
+        >>> # Specific range (60 days, valid)
+        >>> path = fetch_intraday_1m_to_parquet(
+        ...     'HOOD', 'US',
+        ...     start_date='2024-10-01',
+        ...     end_date='2024-11-30'
+        ... )
+        
+        >>> # Invalid range (> 120 days) raises ValueError
+        >>> path = fetch_intraday_1m_to_parquet(
+        ...     'SPY', 'US',
+        ...     start_date='2024-01-01',
+        ...     end_date='2024-06-01'  # 152 days → ValueError!
+        ... )
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     token = _read_token()
 
     if use_sample or not token:
         if not token and not use_sample:
             raise SystemExit("EODHD token not found. Set EODHD_API_TOKEN or pass use_sample=True.")
-        df = _generate_sample_intraday(symbol, start_date, end_date, tz, interval="1m")
+        # For sample data, use provided dates or defaults
+        sample_start = start_date or "2025-01-01"
+        sample_end = end_date or "2025-12-19"
+        df = _generate_sample_intraday(symbol, sample_start, sample_end, tz, interval="1m")
     else:
-        rows = []
-        for day in pd.date_range(start_date, end_date, freq="D"):
-            start_ts = int(datetime(day.year, day.month, day.day, 0, 0, 0, tzinfo=timezone.utc).timestamp())
-            end_ts = int(datetime(day.year, day.month, day.day, 23, 59, 59, tzinfo=timezone.utc).timestamp())
-            url = f"https://eodhd.com/api/intraday/{symbol}.{exchange}"
-            payload = {
-                "api_token": token,
-                "interval": "1m",
-                "from": start_ts,
-                "to": end_ts,
-                "fmt": "json",
-            }
-            rows.extend(_request(url, payload))
+        # Build API request
+        url = f"https://eodhd.com/api/intraday/{symbol}.{exchange}"
+        payload = {
+            "api_token": token,
+            "interval": "1m",
+            "fmt": "json",
+        }
+        
+        # Add date range if specified
+        if start_date and end_date:
+            # Convert dates to UTC timestamps
+            start_dt = pd.to_datetime(start_date).tz_localize("UTC")
+            end_dt = pd.to_datetime(end_date).tz_localize("UTC") + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+            
+            from_ts = int(start_dt.timestamp())
+            to_ts = int(end_dt.timestamp())
+            
+            # Validate 120-day limit
+            range_days = (end_dt - start_dt).days
+            if range_days > 120:
+                raise ValueError(
+                    f"Requested range ({range_days} days) exceeds EODHD limit of 120 days "
+                    f"for 1-minute interval. Split request into chunks ≤ 120 days."
+                )
+            
+            payload["from"] = from_ts
+            payload["to"] = to_ts
+        # else: No from/to → EODHD returns last 120 days by default
+        
+        rows = _request(url, payload)
         if not rows:
-            raise SystemExit(f"No data from EODHD for {symbol}.{exchange} {start_date}..{end_date}")
+            range_info = f"{start_date} to {end_date}" if start_date else "all available data"
+            raise SystemExit(f"No data from EODHD for {symbol}.{exchange} ({range_info})")
+        
         df = pd.DataFrame(rows)
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s", utc=True).dt.tz_convert(tz)
+
+
+
+
         df = df.rename(
             columns={"open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume"}
         ).set_index("timestamp")[["Open", "High", "Low", "Close", "Volume"]]
