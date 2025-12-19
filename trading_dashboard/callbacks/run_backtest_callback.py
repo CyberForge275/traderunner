@@ -184,7 +184,9 @@ def register_run_backtest_callback(app):
             
             if is_us_market:
                 session_tz = "America/New_York"
-                session_windows = ["09:30-16:00"]  # NYSE/NASDAQ RTH
+                # FIXED: session_windows MUST be in session_timezone!
+                # NYSE/NASDAQ RTH = 09:30-16:00 Eastern Time
+                session_windows = ["09:30-16:00"]  # US market hours in America/New_York
             else:
                 session_tz = "Europe/Berlin"
                 session_windows = ["15:00-16:00", "16:00-17:00"]
@@ -197,9 +199,9 @@ def register_run_backtest_callback(app):
                 "lookback_candles": insidebar_lookback_candles or 50,
                 "max_pattern_age_candles": insidebar_max_pattern_age or 12,
                 "execution_lag": insidebar_execution_lag or 0,
-                # CRITICAL: Set timezone and sessions
+                # CRITICAL: Set timezone and sessions (FIXED - now consistent!)
                 "session_timezone": session_tz,
-                "session_filter": session_windows,
+                "session_filter": session_windows,  # Now in session_timezone!
                 # CRITICAL: Use one_bar policy for proper validity windows
                 "order_validity_policy": "one_bar",
                 "timeframe_minutes": 5,  # Assuming M5

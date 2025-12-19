@@ -761,17 +761,32 @@ def create_backtests_layout():
                 style={"color": "#000", "marginBottom": "8px"},
             ),
             
+            
             # NEW: Session Hours Filter
-            html.Label("Session Hours (optional)", style={"fontWeight": "bold", "marginTop": "12px"}),
+            html.Label([
+                "Session Hours ",
+                html.Span(
+                    "(Market TZ: Auto-detected)",
+                    style={"fontSize": "0.85em", "color": "#999", "fontWeight": "normal"}
+                ),
+                html.Span(" ⓘ", id="session-tz-info", style={"cursor": "help", "marginLeft": "4px"})
+            ], style={"fontWeight": "bold", "marginTop": "12px"}),
+            dbc.Tooltip(
+                "For US tickers (NASDAQ/NYSE): Enter times in America/New_York (EST/EDT). "
+                "Example: '09:30-16:00' for regular trading hours. "
+                "System auto-detects market timezone based on symbols.",
+                target="session-tz-info",
+                placement="top"
+            ),
             dcc.Input(
                 id="backtests-session-filter",
                 type="text",
-                placeholder="15:00-16:00,16:00-17:00",
+                placeholder="09:30-16:00 (optional)",
                 value="",
                 style={"width": "100%", "marginBottom": "4px"},
             ),
             html.Small(
-                "Filter signals to specific time windows (24-hour format). Leave empty for no filtering.",
+                "Filter signals to specific time windows (in market timezone). Leave empty for all trading hours.",
                 style={"fontSize": "0.85em", "color": "var(--text-secondary)", "display": "block", "marginBottom": "8px"}
             ),
             
