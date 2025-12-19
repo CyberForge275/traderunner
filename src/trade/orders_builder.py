@@ -236,4 +236,19 @@ def build_orders_for_backtest(
             orders_df = orders_df[~invalid_mask].copy()
             logger.info(f"Remaining valid orders: {len(orders_df)}")
     
+    # Add timezone debug columns for easier debugging
+    if not orders_df.empty and 'valid_from' in orders_df.columns:
+        # Convert valid_from to NY and Berlin time for debug visibility
+        valid_from_ts = pd.to_datetime(orders_df['valid_from'])
+        
+        # NY time (already in this TZ usually, but ensure conversion)
+        ny_time = valid_from_ts.dt.tz_convert('America/New_York')
+        orders_df['NY_time'] = ny_time.dt.strftime('%Y-%m-%d %H:%M:%S %Z')
+        
+        # Berlin time
+        berlin_time = valid_from_ts.dt.tz_convert('Europe/Berlin')
+        orders_df['Berlin_time'] = berlin_time.dt.strftime('%Y-%m-%d %H:%M:%S %Z')
+        
+        logger.debug(f"Added timezone debug columns: NY_time, Berlin_time")
+    
     return orders_df
