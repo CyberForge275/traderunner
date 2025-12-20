@@ -259,6 +259,8 @@ def fetch_intraday_1m_to_parquet(
     out_dir: Path = Path("artifacts/data_m1"),
     tz: str = "Europe/Berlin",
     use_sample: bool = False,
+    save_raw: bool = True,
+    filter_rth: bool = True,
 ) -> Path:
     """
     Fetch 1-minute intraday OHLCV data from EODHD and save as parquet.
@@ -278,17 +280,22 @@ def fetch_intraday_1m_to_parquet(
         start_date: Start date 'YYYY-MM-DD' or None for default (last 120 days)
         end_date: End date 'YYYY-MM-DD' or None for default (last 120 days)
         out_dir: Output directory for parquet file (default: artifacts/data_m1)
-        tz: Target timezone (default: 'Europe/Berlin')
-        use_sample: If True, generate synthetic data instead of API call
+        tz: Timezone for output timestamp conversion (default: Europe/Berlin)
+        use_sample: If True, load sample data instead of calling API (for testing)
+        save_raw: If True, save unfiltered data to *_raw.parquet (default: True)
+        filter_rth: If True, filter final output to RTH only 09:30-16:00 ET (default: True)
     
     Returns:
-        Path: Absolute path to saved parquet file
-        
+        Path to saved parquet file (RTH-filtered if filter_rth=True, otherwise raw)
+    
     Raises:
-        ValueError: If (end_date - start_date) > 120 days
-        SystemExit: If EODHD_API_TOKEN not found and use_sample=False
-        SystemExit: If API returns no data
-        requests.HTTPError: If API request fails (4xx/5xx)
+        ValueError: If requested date range exceeds 120 days
+        SystemExit: If no data returned from EODHD API
+    
+    Notes:
+        - Raw data saved to {symbol}_raw.parquet contains all hours (Pre+RTH+After)
+        - Filtered data saved to {symbol}.parquet contains only RTH (09:30-16:00 ET)
+        - M5/M15 aggregation should use RTH-filtered data for accurate signals
     
     Examples:
         >>> # Default: Last 120 days
@@ -363,8 +370,29 @@ def fetch_intraday_1m_to_parquet(
             columns={"open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume"}
         ).set_index("timestamp")[["Open", "High", "Low", "Close", "Volume"]]
 
+    # Save raw data (all hours) if requested
+    if save_raw:
+        raw_path = out_dir / f"{symbol}_raw.parquet"
+        df.sort_index().to_parquet(raw_path)
+        logger.info(f"[{symbol}] Saved raw data: {raw_path} ({len(df):,} rows, all hours)")
+    
+    # Filter to RTH if requested
+    if filter_rth:
+        from axiom_bt.data.session_filter import filter_rth_session
+        
+        # Filter to RTH (09:30-16:00 ET)
+        df_rth = filter_rth_session(df, tz="America/New_York")
+        logger.info(
+            f"[{symbol}] Filtered to RTH: {len(df_rth):,} rows "
+            f"({len(df_rth)/len(df)*100:.1f}% of raw data)"
+        )
+        df = df_rth
+    
+    # Save final data (RTH-filtered or raw depending on filter_rth)
     path = out_dir / f"{symbol}.parquet"
     df.sort_index().to_parquet(path)
+    logger.info(f"[{symbol}] Saved final data: {path} ({len(df):,} rows)")
+    
     return path
 
 

@@ -299,6 +299,8 @@ class IntradayStore:
                                 out_dir=temp_dir,
                                 tz=tz,
                                 use_sample=use_sample,
+                                save_raw=True,   # Save raw data with Pre/After-Market
+                                filter_rth=True, # Filter to RTH for final output
                             )
                             
                             # Merge with existing data if file exists
@@ -344,6 +346,8 @@ class IntradayStore:
                     out_dir=DATA_M1,
                     tz=tz,
                     use_sample=use_sample,
+                    save_raw=True,   # Save raw data with Pre/After-Market
+                    filter_rth=True, # Filter to RTH for final output
                 )
                 sym_actions.append("fetch_m1")
             else:
