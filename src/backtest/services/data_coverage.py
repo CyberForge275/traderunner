@@ -171,14 +171,29 @@ def check_coverage(
         
         cached_range = DateRange(start=meta.first_ts, end=meta.last_ts) if meta.first_ts else None
         
-        # Check coverage
-        if cached_range and cached_range.start <= requested_start and cached_range.end >= requested_end:
-            logger.info(f"Coverage sufficient: {symbol} {timeframe} {cached_range}")
-            return CoverageCheckResult(
-                status=CoverageStatus.SUFFICIENT,
-                requested_range=requested_range,
-                cached_range=cached_range
-            )
+        # CRITICAL FIX: EODHD delivers only TRADING DAYS
+        # Weekend/holiday gaps at range boundaries are EXPECTED, not errors
+        # Allow up to 4 calendar days difference (weekend + holiday buffer)
+        MAX_BOUNDARY_GAP_DAYS = 4
+        
+        if cached_range:
+            start_gap_days = (cached_range.start - requested_start).days
+            end_gap_days = (requested_end - cached_range.end).days
+            
+            # Check if gaps are within acceptable boundary tolerance
+            start_ok = start_gap_days <= MAX_BOUNDARY_GAP_DAYS
+            end_ok = end_gap_days <= MAX_BOUNDARY_GAP_DAYS
+            
+            if start_ok and end_ok:
+                logger.info(f"Coverage sufficient: {symbol} {timeframe} {cached_range} (boundary gaps: start={start_gap_days}d, end={end_gap_days}d)")
+                return CoverageCheckResult(
+                    status=CoverageStatus.SUFFICIENT,
+                    requested_range=requested_range,
+                    cached_range=cached_range
+                )
+            else:
+                logger.warning(f"Coverage gap: start_gap={start_gap_days}d (ok={start_ok}), end_gap={end_gap_days}d (ok={end_ok})")
+
         
         # Gap detected
         gap = _calculate_gap(requested_range, cached_range)

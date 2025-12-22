@@ -39,18 +39,54 @@ def register_backtests_callbacks(app):
             )
 
     @app.callback(
+        Output("backtests-run-dropdown", "value"),
+        Input("backtests-refresh-button", "n_clicks"),
+        State("backtests-run-dropdown", "value"),
+        prevent_initial_call=True,
+    )
+    def select_latest_on_refresh(n_clicks, current_value):
+        """Select latest backtest run when refresh button is clicked."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        if n_clicks is None:
+            from dash.exceptions import PreventUpdate
+            raise PreventUpdate
+        
+        from ..repositories.backtests import list_backtests
+        from datetime import datetime, timedelta
+        
+        # Get runs from last 7 days
+        today = datetime.utcnow().date()
+        week_ago = today - timedelta(days=7)
+        df = list_backtests(start_date=week_ago, end_date=today)
+        
+        if df is None or df.empty:
+            logger.warning("🔄 [refresh] No backtests found in last 7 days")
+            from dash.exceptions import PreventUpdate
+            raise PreventUpdate
+        
+        # Get latest run (first in list, already sorted by date desc)
+        latest_run = df.iloc[0]["run_name"]
+        logger.info(f"🔄 [refresh] Selected latest run: {latest_run}")
+        
+        # Return latest run name to update dropdown
+        return latest_run
+
+
+    @app.callback(
         Output("backtests-detail", "children"),
         Input("backtests-run-dropdown", "value"),
-        Input("backtests-refresh-interval", "n_intervals"),
-        # prevent_initial_call removed - allow initial render when dropdown has default value
+        Input("backtests-refresh-button", "n_clicks"),
+        prevent_initial_call=False,  # Allow initial render when dropdown has default value
     )
-    def update_backtests_detail(run_name, n_intervals):
+    def update_backtests_detail(run_name, n_clicks):
         import logging
         from pathlib import Path
         logger = logging.getLogger(__name__)
         
         # Comprehensive logging for evidence/debugging
-        logger.info(f"🔍 [backtests_detail] CALLBACK TRIGGERED: run_name={run_name}, n_intervals={n_intervals}")
+        logger.info(f"🔍 [backtests_detail] CALLBACK TRIGGERED: run_name={run_name}, n_clicks={n_clicks}")
         
         from ..services.backtest_details_service import BacktestDetailsService
         from ..repositories.backtests import (

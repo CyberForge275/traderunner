@@ -128,13 +128,20 @@ def _derive_m1_dir(data_path: Path) -> Optional[Path]:
 
 
 def _resolve_symbol_path(symbol: str, m1_dir: Optional[Path], fallback_dir: Path) -> Tuple[Optional[Path], bool]:
+    import logging
+    logger = logging.getLogger(__name__)
+    
     if m1_dir is not None:
         candidate = m1_dir / f"{symbol}.parquet"
         if candidate.exists():
+            logger.debug(f"Resolved {symbol} → {candidate} (M1 data)")
             return candidate, True
     fallback = fallback_dir / f"{symbol}.parquet"
     if fallback.exists():
+        logger.debug(f"Resolved {symbol} → {fallback} (fallback data)")
         return fallback, False
+    
+    logger.warning(f"No data file found for {symbol} (searched: {m1_dir}, {fallback_dir})")
     return None, False
 
 
@@ -223,6 +230,17 @@ def simulate_insidebar_from_orders(
 
     data_path = Path(data_path)
     m1_dir = Path(data_path_m1) if data_path_m1 is not None else _derive_m1_dir(data_path)
+
+    # Defensive: Ensure paths are directories, not files
+    # If user passed a file path, use the parent directory
+    if m1_dir is not None and m1_dir.is_file():
+        logger.warning(f"data_path_m1 points to file instead of directory, using parent: {m1_dir} → {m1_dir.parent}")
+        m1_dir = m1_dir.parent
+    
+    if data_path.is_file():
+        logger.warning(f"data_path points to file instead of directory, using parent: {data_path} → {data_path.parent}")
+        data_path = data_path.parent
+
 
     filled = []
     trades = []

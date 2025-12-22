@@ -19,7 +19,7 @@ import json
 import pandas as pd
 
 # Import existing components
-from core.settings import DEFAULT_INITIAL_CASH
+from core.settings import DEFAULT_INITIAL_CASH, DEFAULT_FEE_BPS, DEFAULT_SLIPPAGE_BPS
 from axiom_bt.fs import ensure_layout
 from axiom_bt.metrics import compose_metrics
 from axiom_bt.report import save_drawdown_png, save_equity_png
@@ -36,6 +36,50 @@ from backtest.services.step_tracker import StepTracker
 logger = logging.getLogger(__name__)
 
 
+def calculate_warmup_days(
+    timeframe: str,
+    strategy_params: dict,
+) -> int:
+    """Calculate required warmup days for indicator lookback needs.
+    
+    Warmup ensures indicators like ATR have sufficient historical bars
+    before the backtest window starts.
+    
+    Args:
+        timeframe: M1, M5, M15
+        strategy_params: Dict with 'atr_period' etc.
+    
+    Returns:
+        Warmup days needed (minimum 1, maximum 5)
+    
+    Example:
+        M5 + ATR(14):
+        - 78 bars/day (6.5h * 60min / 5min)
+        - Warmup = ceil(14 / 78) = 1 day
+    """
+    from math import ceil
+    
+    # Get indicator requirements
+    atr_period = int(strategy_params.get("atr_period", 14))
+    required_warmup_bars = max(atr_period, 1)
+    
+    # Calculate bars per trading day
+    tf_minutes = {"M1": 1, "M5": 5, "M15": 15}.get(timeframe.upper(), 5)
+    bars_per_day = int(6.5 * 60 / tf_minutes) if tf_minutes > 0 else 78
+    
+    # Calculate days needed, cap at reasonable bounds
+    warmup_days = ceil(required_warmup_bars / max(bars_per_day, 1))
+    warmup_days = max(1, min(5, warmup_days))
+    
+    logger.debug(
+        f"Warmup calculation: {timeframe} + ATR({atr_period}) → "
+        f"{required_warmup_bars} bars / {bars_per_day} bars/day = {warmup_days} days"
+    )
+    
+    return warmup_days
+
+
+
 def run_backtest_full(
     run_id: str,
     symbol: str,
@@ -46,7 +90,7 @@ def run_backtest_full(
     strategy_params: dict,
     artifacts_root: Path,
     market_tz: str = "America/New_York",
-    initial_cash: float = 100000.0,
+    initial_cash: float = 10000.0,
     costs: Optional[dict] = None,
     orders_source_csv: Optional[Path | str] = None,
     debug_trace: bool = False,
@@ -72,7 +116,7 @@ def run_backtest_full(
         strategy_params: Strategy parameters dict
         artifacts_root: Artifacts directory (e.g., Path("artifacts/backtests"))
         market_tz: Market timezone (default: "America/New_York")
-        initial_cash: Initial equity (default: 100000.0)
+        initial_cash: Initial equity (default: 10000.0)
         costs: Trading costs dict {"fees_bps": 0.0, "slippage_bps": 0.0}
     
     Returns:
@@ -134,16 +178,32 @@ def run_backtest_full(
             )
             logger.info(f"[{run_id}] run_meta.json written via ArtifactsManager (execution_mode=full_backtest)")
         
-        # Phase 0.7: Ensure Intraday Data (NEW - before coverage gate)
+        # Phase 0.7: Ensure Intraday Data (with warmup buffer)
         with tracker.step("ensure_intraday_data") as step:
             logger.info(f"[{run_id}] Ensuring intraday data availability...")
             
             from axiom_bt.intraday import IntradayStore, IntradaySpec, Timeframe
-            from datetime import timedelta
             
-            # Calculate exact same range as coverage gate
+            # CRITICAL: Calculate warmup days BEFORE fetching data
+            # This ensures indicators have sufficient historical bars
+            warmup_days = calculate_warmup_days(
+                timeframe=timeframe,
+                strategy_params=strategy_params
+            )
+            logger.info(
+                f"[{run_id}] Warmup buffer: {warmup_days} days for {timeframe} "
+                f"(ATR period: {strategy_params.get('atr_period', 14)})"
+            )
+            
+            # Calculate range WITH warmup extension
             end_ts = pd.Timestamp(requested_end, tz=market_tz)
-            start_ts = (end_ts - pd.Timedelta(days=int(lookback_days))).normalize()
+            start_ts = (end_ts - pd.Timedelta(days=int(lookback_days + warmup_days))).normalize()
+            
+            logger.info(
+                f"[{run_id}] Data range: {start_ts.date()} to {end_ts.date()} "
+                f"(requested: {lookback_days}d + warmup: {warmup_days}d = {lookback_days + warmup_days}d total)"
+            )
+
             
             # Convert timeframe string to enum
             tf_enum = Timeframe[timeframe.upper()] if isinstance(timeframe, str) else timeframe
@@ -164,6 +224,9 @@ def run_backtest_full(
             logger.info(f"[{run_id}] ensure() actions: {actions}")
             step.add_detail("actions", str(actions))
             step.add_detail("date_range", f"{spec.start} to {spec.end}")
+            step.add_detail("warmup_days", warmup_days)
+            step.add_detail("total_days", lookback_days + warmup_days)
+
         
         # Phase 1: Coverage Gate
         with tracker.step("coverage_gate") as step:
@@ -453,12 +516,19 @@ def run_backtest_full(
             logger.info(f"[{run_id}] Running trade simulation...")
             
             # Prepare data paths
-            data_path = Path(f"artifacts/data_{timeframe.lower()}/{symbol}.parquet")
-            data_path_m1 = Path(f"artifacts/data_m1/{symbol}.parquet")
+            # NOTE: These must be DIRECTORIES, not files!
+            # The replay engine will append /{symbol}.parquet
+            data_path = Path(f"artifacts/data_{timeframe.lower()}")
+            data_path_m1 = Path(f"artifacts/data_m1")
             
-            # Prepare costs
+            # Prepare costs (default to configured bps if not provided)
             if costs is None:
-                costs_dict = {"fees_bps": 0.0, "slippage_bps": 0.0}
+                costs_dict = {"fees_bps": DEFAULT_FEE_BPS, "slippage_bps": DEFAULT_SLIPPAGE_BPS}
+            elif isinstance(costs, dict):
+                costs_dict = {
+                    "fees_bps": costs.get("fees_bps", DEFAULT_FEE_BPS),
+                    "slippage_bps": costs.get("slippage_bps", DEFAULT_SLIPPAGE_BPS),
+                }
             else:
                 costs_dict = costs
             
@@ -487,12 +557,22 @@ def run_backtest_full(
             
             # Run simulation
             try:
+                # Convert costs dict to Costs object
+                from axiom_bt.engines.replay_engine import Costs
+                if isinstance(costs_dict, dict):
+                    costs_obj = Costs(
+                        fees_bps=costs_dict.get('fees_bps', 0.0),
+                        slippage_bps=costs_dict.get('slippage_bps', 0.0)
+                    )
+                else:
+                    costs_obj = costs_dict
+                
                 sim_result = replay_engine.simulate_insidebar_from_orders(
                     orders_csv=orders_csv,
                     data_path=data_path,
                     data_path_m1=data_path_m1 if data_path_m1.exists() else None,
                     tz=market_tz,
-                    costs=costs_dict,
+                    costs=costs_obj,
                     initial_cash=initial_cash,
                     requested_end=requested_end,
                 )
@@ -540,7 +620,7 @@ def run_backtest_full(
             if not equity.empty and "equity" in equity.columns:
                 equity_values = pd.to_numeric(equity["equity"], errors="coerce")
                 running_max = equity_values.cummax()
-                equity["drawdown_pct"] = ((equity_values / running_max) - 1.0) * 100.0
+                equity["drawdown_pct"] = ((equity_values / running_max) - 1.0)
                 equity.to_csv(run_dir / "equity_curve.csv", index=False)
                 logger.info(f"[{run_id}] Wrote equity_curve.csv ({len(equity)} rows)")
             

@@ -279,11 +279,25 @@ class IntradayStore:
                     )
                     
                     # Fetch each gap separately
+                    # CRITICAL FIX: Skip weekend/holiday gaps (<=4 days)
+                    # EODHD delivers only TRADING DAYS - weekend/holiday gaps are EXPECTED
+                    # Only fetch gaps > 4 days which indicate actual missing trading data
+                    MAX_EXPECTED_CALENDAR_GAP = 4
+                    
                     for gap in coverage["gaps"]:
+                        # Skip small gaps (weekends, 3-day weekends, holiday closures)
+                        if gap["gap_days"] <= MAX_EXPECTED_CALENDAR_GAP:
+                            logger.info(
+                                f"[{symbol}] Skipping gap: {gap['gap_start']} to {gap['gap_end']} "
+                                f"({gap['gap_days']} days) - likely weekend/holiday, within {MAX_EXPECTED_CALENDAR_GAP}d threshold"
+                            )
+                            continue
+                        
                         logger.info(
                             f"[{symbol}] Fetching gap: {gap['gap_start']} to {gap['gap_end']} "
                             f"({gap['gap_days']} days, reason: {gap.get('reason', 'unknown')})"
                         )
+
                         
                         # Fetch gap data to temp location first
                         import tempfile

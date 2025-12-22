@@ -21,6 +21,7 @@ def register_run_backtest_callback(app):
         Output("backtests-refresh-interval", "disabled"),
         Output("backtests-pipeline-log", "children"),  # NEW: Pipeline execution log
         Output("backtests-current-job-id", "data"),  # NEW: Store current job ID
+        Output("backtests-run-status-icon", "children", allow_duplicate=True),  # NEW: Status icon
         Input("backtests-run-button", "n_clicks"),
         State("backtests-new-strategy", "value"),
         State("backtests-new-symbols", "value"),
@@ -76,7 +77,7 @@ def register_run_backtest_callback(app):
         from datetime import datetime
         
         if not n_clicks:
-            return "", "", True, "", None  # Added job_id
+            return "", "", True, "", None, ""  # Added job_id + status_icon
         
         # Validate run name is provided
         if not run_name or not run_name.strip():
@@ -84,7 +85,7 @@ def register_run_backtest_callback(app):
                 "❌ Please enter a name for this backtest run",
                 style={"color": "red", "fontWeight": "bold"}
             )
-            return error_msg, run_name, True, "", None
+            return error_msg, run_name, True, "", None, ""
         
         # Prepend timestamp to run name
         timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
@@ -107,7 +108,7 @@ def register_run_backtest_callback(app):
                         html.Span("❌ Invalid version format. ", style={"color": "red", "fontWeight": "bold"}),
                         html.Span(f"Use pattern v#.## (e.g., v1.01, v2.00). You entered: '{insidebar_new_version}'"),
                     ])
-                    return error_msg, run_name, True
+                    return error_msg, run_name, True, "", None, ""
             elif insidebar_strategy_version:
                 # Use selected version from dropdown
                 version_to_use = insidebar_strategy_version
@@ -119,11 +120,11 @@ def register_run_backtest_callback(app):
                     html.Span("Select an existing version from dropdown OR enter a new version (e.g., v1.01)", 
                              style={"fontSize": "0.9em"}),
                 ], style={"padding": "8px", "backgroundColor": "#ffebee", "borderLeft": "3px solid red"})
-                return error_msg, run_name, True, "", None
+                return error_msg, run_name, True, "", None, ""
         
         # Validate inputs
         if not strategy or not symbols_str or not timeframe:
-            return html.Div("❌ Please select strategy, symbols, and timeframe", style={"color": "red"}), run_name, True, "", None
+            return html.Div("❌ Please select strategy, symbols, and timeframe", style={"color": "red"}), run_name, True, "", None, ""
         
         # Validate symbols
         if not symbols_str or not symbols_str.strip():
@@ -131,7 +132,7 @@ def register_run_backtest_callback(app):
                 html.Span("⚠️ ", style={"color": "var(--accent-yellow)"}),
                 html.Span("Error: Please enter at least one symbol"),
             ])
-            return error_msg, run_name, True
+            return error_msg, run_name, True, "", None, ""
         
         symbols = [s.strip() for s in symbols_str.split(",") if s.strip()]
         
@@ -140,7 +141,7 @@ def register_run_backtest_callback(app):
                 html.Span("⚠️ ", style={"color": "var(--accent-yellow)"}),
                 html.Span("Error: Please enter at least one symbol"),
             ])
-            return error_msg, run_name, True, "", None
+            return error_msg, run_name, True, "", None, ""
         
         # Calculate start/end dates based on mode
         if date_mode == "days_back":
@@ -223,7 +224,7 @@ def register_run_backtest_callback(app):
                     html.P(f"Error: {str(e)}"),
                     html.P("Format: HH:MM-HH:MM or HH:MM-HH:MM,HH:MM-HH:MM"),
                 ])
-                return error_msg, run_name, True, "", None
+                return error_msg, run_name, True, "", None, ""
         
         job_id = service.start_backtest(
             run_name=run_name,
@@ -267,7 +268,7 @@ def register_run_backtest_callback(app):
         # Enable refresh interval to poll for completion
         # Clear run name input for next run
         # Return active_run to store (SSOT)
-        return progress_msg, "", False, initial_log, active_run
+        return progress_msg, "", False, initial_log, active_run, ""
     
     @app.callback(
         Output("backtests-pipeline-log", "children", allow_duplicate=True),
@@ -638,6 +639,7 @@ def register_run_backtest_callback(app):
     @app.callback(
         Output("backtests-run-progress", "children", allow_duplicate=True),
         Output("backtests-refresh-interval", "disabled", allow_duplicate=True),
+        Output("backtests-run-status-icon", "children"),  # NEW: Status icon
         Input("backtests-refresh-interval", "n_intervals"),
         prevent_initial_call=True
     )
@@ -669,8 +671,8 @@ def register_run_backtest_callback(app):
                         pass
         
         if not running_jobs and not recent_jobs:
-            # No jobs to display - clear progress
-            return "", True
+            # No jobs to display - clear progress and icon
+            return "", True, ""
         
         # Show status of all relevant jobs
         job_statuses = []
@@ -765,4 +767,27 @@ def register_run_backtest_callback(app):
                 ], style={"marginBottom": "12px"})
             )
         
-        return html.Div(job_statuses), len(running_jobs) == 0
+        # Determine status icon based on job states
+        status_icon = ""
+        if running_jobs:
+            status_icon = html.Span(
+                "⏳ Running...",
+                style={"color": "#888", "fontSize": "0.9em"}
+            )
+        elif recent_jobs:
+            # Check if any completed successfully
+            completed_jobs = [j for j in recent_jobs.values() if j.get("status") == "completed"]
+            failed_jobs = [j for j in recent_jobs.values() if j.get("status") == "failed"]
+            
+            if completed_jobs and not failed_jobs:
+                status_icon = html.Span(
+                    "✅ Complete - Click refresh to update results",
+                    style={"color": "green", "fontSize": "0.9em"}
+                )
+            elif failed_jobs:
+                status_icon = html.Span(
+                    "⚠️ Failed - Click refresh to see details",
+                    style={"color": "orange", "fontSize": "0.9em"}
+                )
+        
+        return html.Div(job_statuses), len(running_jobs) == 0, status_icon

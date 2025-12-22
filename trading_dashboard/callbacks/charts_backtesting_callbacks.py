@@ -1,4 +1,5 @@
 """
+from dash import html
 Backtesting Charts Callbacks
 =============================
 

@@ -911,6 +911,33 @@ def create_backtests_layout():
                         clearable=True,
                         style={"color": "#000"},
                     ),
+                    # NEW: Status Icon + Refresh Button
+                    html.Div(
+                        id="backtests-status-container",
+                        style={
+                            "marginTop": "12px",
+                            "display": "flex",
+                            "alignItems": "center",
+                            "gap": "10px",
+                            "padding": "8px",
+                            "backgroundColor": "rgba(255,255,255,0.02)",
+                            "borderRadius": "4px",
+                        },
+                        children=[
+                            html.Span(
+                                id="backtests-run-status-icon",
+                                children="",
+                                style={"flex": "1", "fontSize": "0.9em"},
+                            ),
+                            dbc.Button(
+                                "🔄 Refresh Results",
+                                id="backtests-refresh-button",
+                                size="sm",
+                                color="primary",
+                                outline=True,
+                            ),
+                        ],
+                    ),
                 ],
                 style={"marginBottom": "20px"}
             ),

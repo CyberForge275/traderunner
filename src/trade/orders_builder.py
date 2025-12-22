@@ -14,6 +14,7 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
+from core.settings import DEFAULT_INITIAL_CASH
 from trade.cli_export_orders import _build_inside_bar_orders, Session
 from trade.validity import calculate_validity_window
 from strategies.inside_bar.config import SessionFilter
@@ -87,9 +88,10 @@ def _build_args_from_params(strategy_params: Dict, market_tz: str) -> argparse.N
         )
     )
 
-    initial_cash = float(strategy_params.get("initial_cash", 100000.0))
+    initial_cash = float(strategy_params.get("initial_cash", DEFAULT_INITIAL_CASH))
     risk_pct = float(strategy_params.get("risk_pct", 1.0))
-    max_position_pct = float(strategy_params.get("max_position_pct", 100.0))
+    pos_pct = float(strategy_params.get("pos_pct", 10.0))
+    max_position_pct = float(strategy_params.get("max_position_pct", 20.0))
 
     sizing = str(strategy_params.get("sizing", "risk"))
     qty = float(strategy_params.get("qty", 1.0))
@@ -128,7 +130,7 @@ def _build_args_from_params(strategy_params: Dict, market_tz: str) -> argparse.N
         sizing=sizing,
         qty=qty,
         equity=initial_cash,
-        pos_pct=max_position_pct,
+        pos_pct=pos_pct,
         risk_pct=risk_pct,
         min_qty=min_qty,
         max_notional=max_notional,

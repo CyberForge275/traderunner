@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import matplotlib
+
+# Use headless backend to avoid Tk/thread crashes in Dash/background threads
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 

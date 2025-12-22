@@ -24,6 +24,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from core.settings import DEFAULT_INITIAL_CASH, DEFAULT_FEE_BPS, DEFAULT_SLIPPAGE_BPS
 from axiom_bt.full_backtest_runner import run_backtest_full
 from backtest.services.run_status import RunStatus, FailureReason
 
@@ -113,8 +114,8 @@ class NewPipelineAdapter:
                 strategy_params=strategy_params,
                 artifacts_root=Path("artifacts/backtests"),
                 market_tz="America/New_York",
-                initial_cash=100000.0,
-                costs={"fees_bps": 0.0, "slippage_bps": 0.0},
+                initial_cash=DEFAULT_INITIAL_CASH,
+                costs={"fees_bps": DEFAULT_FEE_BPS, "slippage_bps": DEFAULT_SLIPPAGE_BPS},
                 debug_trace=bool(strategy_params.get("debug_trace", False)),
             )
             
