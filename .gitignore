@@ -109,3 +109,11 @@ Thumbs.db
 # Temporary project analysis folder
 tmp/
 logs/*.log
+
+# Generated binaries
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated docs artifacts
+*.pdf
