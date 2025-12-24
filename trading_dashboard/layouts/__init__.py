@@ -6,6 +6,7 @@ from .portfolio import create_portfolio_layout, get_portfolio_content
 from .history import create_history_layout, get_history_content
 from .backtests import create_backtests_layout, get_backtests_content
 from .pre_papertrade import create_pre_papertrade_layout, get_pre_papertrade_content
+from .trade_inspector_layout import get_trade_inspector_content
 
 __all__ = [
     "create_live_monitor_layout",
@@ -20,4 +21,5 @@ __all__ = [
     "get_backtests_content",
     "create_pre_papertrade_layout",
     "get_pre_papertrade_content",
+    "get_trade_inspector_content",
 ]

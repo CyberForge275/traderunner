@@ -18,6 +18,7 @@ from trading_dashboard.layouts import (
     get_backtests_content,
     get_pre_papertrade_content,
 )
+from trading_dashboard.layouts.trade_inspector_layout import get_trade_inspector_content
 from trading_dashboard.layouts.charts_live import get_charts_live_content
 from trading_dashboard.layouts.charts_backtesting import get_charts_backtesting_content
 from trading_dashboard.callbacks.chart_callbacks import register_chart_callbacks
@@ -36,6 +37,7 @@ from trading_dashboard.callbacks.timestamp_prefix_callback import register_times
 from trading_dashboard.callbacks.freshness_callback import register_freshness_callback
 from trading_dashboard.callbacks.charts_live_callbacks import register_charts_live_callbacks
 from trading_dashboard.callbacks.charts_backtesting_callbacks import register_charts_backtesting_callbacks
+from trading_dashboard.callbacks.trade_inspector_callbacks import register_trade_inspector_callbacks
 
 # Setup logging FIRST
 from trading_dashboard.logging_config import setup_logging
@@ -79,6 +81,7 @@ app.layout = html.Div([
             dbc.Tab(label="History", tab_id="history"),
             dbc.Tab(label="Backtests", tab_id="backtests"),
             dbc.Tab(label="Pre-PaperTrade Lab", tab_id="pre-papertrade"),
+            dbc.Tab(label="🔍 Trade Inspector", tab_id="trade-inspector"),
         ],
         style={"backgroundColor": "var(--bg-secondary)"}
     ),
@@ -142,6 +145,8 @@ def update_content(active_tab, n_intervals):
         content = get_backtests_content()
     elif active_tab == "pre-papertrade":
         content = get_pre_papertrade_content()
+    elif active_tab == "trade-inspector":
+        content = get_trade_inspector_content()
     else:
         content = html.Div("Unknown tab")
     
@@ -175,6 +180,7 @@ register_timestamp_prefix_callback(app)  # Timestamp prefix display
 register_freshness_callback(app)  # Data freshness indicators
 register_charts_live_callbacks(app)  # NEW: Live Charts tab
 register_charts_backtesting_callbacks(app)  # NEW: Backtesting Charts tab
+register_trade_inspector_callbacks(app)
 
 # Initialize strategy configuration plugins
 # MUST be before if __name__ == "__main__" so gunicorn can import it!

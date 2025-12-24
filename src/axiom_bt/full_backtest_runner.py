@@ -24,6 +24,7 @@ from axiom_bt.fs import ensure_layout
 from axiom_bt.metrics import compose_metrics
 from axiom_bt.report import save_drawdown_png, save_equity_png
 from axiom_bt.engines import replay_engine
+from backtest.services.trade_evidence import generate_trade_evidence
 
 # New pipeline components
 from backtest.services.run_status import RunResult, RunStatus, FailureReason
@@ -77,6 +78,68 @@ def calculate_warmup_days(
     )
     
     return warmup_days
+
+
+def _persist_bars(run_dir: Path, timeframe: str, market_tz: str, signal_df: pd.DataFrame, ohlcv_exec: pd.DataFrame, *, warmup_days: int, lookback_days: int) -> None:
+    """Persist SSOT bars used for signals/execution.
+
+    Saves bars into run-local artifacts under ``bars/`` to make trade
+    verification reproducible. If dataframes are empty, files are not
+    written.
+    """
+
+    bars_dir = run_dir / "bars"
+    bars_dir.mkdir(parents=True, exist_ok=True)
+    
+    logger.info(f"[_persist_bars] Created bars_dir: {bars_dir}")
+    logger.info(f"[_persist_bars] ohlcv_exec is None: {ohlcv_exec is None}")
+    if ohlcv_exec is not None:
+        logger.info(f"[_persist_bars] ohlcv_exec.empty: {ohlcv_exec.empty}")
+        logger.info(f"[_persist_bars] ohlcv_exec.shape: {ohlcv_exec.shape}")
+    logger.info(f"[_persist_bars] signal_df is None: {signal_df is None}")
+    if signal_df is not None:
+        logger.info(f"[_persist_bars] signal_df.empty: {signal_df.empty}")
+        logger.info(f"[_persist_bars] signal_df.shape: {signal_df.shape}")
+
+    if ohlcv_exec is not None and not ohlcv_exec.empty:
+        exec_path = bars_dir / f"bars_exec_{timeframe.upper()}_rth.parquet"
+        logger.info(f"[_persist_bars] Writing {len(ohlcv_exec)} exec bars to {exec_path}")
+        try:
+            # Remove .attrs to avoid JSON serialization issues with numpy types
+            df_clean = ohlcv_exec.copy()
+            df_clean.attrs = {}
+            df_clean.to_parquet(exec_path)
+            logger.info(f"[_persist_bars] ✅ Exec bars written successfully")
+        except Exception as e:
+            logger.error(f"[_persist_bars] ❌ Failed to write exec bars: {e}", exc_info=True)
+    else:
+        logger.warning(f"[_persist_bars] ❌ Skipping exec bars (empty={ohlcv_exec.empty if ohlcv_exec is not None else 'N/A'})")
+
+    if signal_df is not None and not signal_df.empty:
+        signal_path = bars_dir / f"bars_signal_{timeframe.upper()}_rth.parquet"
+        logger.info(f"[_persist_bars] Writing {len(signal_df)} signal bars to {signal_path}")
+        try:
+            # Remove .attrs to avoid JSON serialization issues with numpy types
+            df_clean = signal_df.copy()
+            df_clean.attrs = {}
+            df_clean.to_parquet(signal_path)
+            logger.info(f"[_persist_bars] ✅ Signal bars written successfully")
+        except Exception as e:
+            logger.error(f"[_persist_bars] ❌ Failed to write signal bars: {e}", exc_info=True)
+    else:
+        logger.warning(f"[_persist_bars] ❌ Skipping signal bars (empty={signal_df.empty if signal_df is not None else 'N/A'})")
+
+    meta = {
+        "market_tz": market_tz,
+        "timeframe": timeframe,
+        "warmup_days": warmup_days,
+        "lookback_days": lookback_days,
+        "exec_bars": f"bars_exec_{timeframe.upper()}_rth.parquet" if ohlcv_exec is not None and not ohlcv_exec.empty else None,
+        "signal_bars": f"bars_signal_{timeframe.upper()}_rth.parquet" if signal_df is not None and not signal_df.empty else None,
+        "rth_only": True,
+    }
+    (bars_dir / "bars_slice_meta.json").write_text(json.dumps(meta, indent=2))
+    logger.info(f"[_persist_bars] Wrote bars_slice_meta.json")
 
 
 
@@ -294,6 +357,28 @@ def run_backtest_full(
                 # Preserve canonical column mapping metadata across the
                 # slicing operation for consistent diagnostics.
                 windowed.attrs.update(getattr(ohlcv, "attrs", {}))
+
+                # Log windowed DataFrame info before persisting
+                logger.info(f"[{run_id}] windowed DataFrame before _persist_bars:")
+                if windowed is not None:
+                    logger.info(f"  - Shape: {windowed.shape}")
+                    logger.info(f"  - Empty: {windowed.empty}")
+                    logger.info(f"  - Columns: {windowed.columns.tolist()}")
+                    if not windowed.empty:
+                        logger.info(f"  - Index range: {windowed.index.min()} to {windowed.index.max()}")
+                else:
+                    logger.warning(f"  - windowed is None!")
+
+                # Persist SSOT bars for inspection/evidence
+                _persist_bars(
+                    run_dir=run_dir,
+                    timeframe=timeframe,
+                    market_tz=market_tz,
+                    signal_df=windowed,
+                    ohlcv_exec=windowed,
+                    warmup_days=warmup_days,
+                    lookback_days=lookback_days,
+                )
 
                 data_sanity_payload = _write_data_sanity_report(
                     df=windowed,
@@ -638,6 +723,14 @@ def run_backtest_full(
             if not trades.empty:
                 trades.to_csv(run_dir / "trades.csv", index=False)
                 logger.info(f"[{run_id}] Wrote trades.csv ({len(trades)} rows)")
+
+            # Generate trade evidence (best-effort)
+            try:
+                evidence_df = generate_trade_evidence(run_dir)
+                if evidence_df is not None:
+                    logger.info(f"[{run_id}] Wrote trade_evidence.csv ({len(evidence_df)} rows)")
+            except Exception as evidence_err:  # pragma: no cover - defensive
+                logger.warning(f"[{run_id}] Could not generate trade evidence: {evidence_err}")
             
             # Write metrics
             if metrics:
