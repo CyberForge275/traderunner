@@ -29,10 +29,15 @@ from strategies import factory, registry, strategy_hooks
 
 
 _LOG_ENTRIES: List[dict] = []
+_CURRENT_RUN_DIR: Optional[Path] = None  # NEW: Track current run directory for incremental writes
+_CURRENT_RUN_META: Optional[Dict[str, Any]] = None  # NEW: Store run metadata
 
 
 def _store_log(entry: dict) -> None:
-    """Append a log entry to the in-memory and session log buffers."""
+    """Append a log entry to the in-memory and session log buffers.
+    
+    MODIFIED: Now also writes to run_log.json incrementally for real-time progress.
+    """
     _LOG_ENTRIES.append(entry)
     try:
         log = st.session_state.setdefault("pipeline_log", [])
@@ -40,6 +45,22 @@ def _store_log(entry: dict) -> None:
     except Exception:  # pragma: no cover - defensive
         # Keep logging best-effort; don't break pipeline on UI/session issues.
         pass
+    
+    # NEW: Write incrementally to run_log.json for real-time Dash progress
+    if _CURRENT_RUN_DIR and _CURRENT_RUN_DIR.exists():
+        try:
+            log_path = _CURRENT_RUN_DIR / "run_log.json"
+            log_payload = {
+                **(_CURRENT_RUN_META or {}),
+                "entries": _LOG_ENTRIES,
+                "status": "running",  # Will be updated to final status at end
+            }
+            # Atomic write using temp file + rename
+            temp_path = log_path.with_suffix('.json.tmp')
+            temp_path.write_text(json.dumps(log_payload, indent=2), encoding="utf-8")
+            temp_path.replace(log_path)  # Atomic on POSIX systems
+        except Exception:  # pragma: no cover - best-effort, don't break pipeline
+            pass
 
 
 def get_pipeline_log() -> List[dict]:
@@ -245,14 +266,23 @@ def execute_pipeline(pipeline: PipelineConfig) -> str:
 
     # Reset in-memory log buffer at the very beginning so this run
     # has a clean, complete trace from the first event.
-    global _LOG_ENTRIES
+    global _LOG_ENTRIES, _CURRENT_RUN_DIR, _CURRENT_RUN_META
     _LOG_ENTRIES = []
-
+    
+    # NEW: Setup incremental logging
     run_name = pipeline.run_name
     run_dir = BT_DIR / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
-
+    _CURRENT_RUN_DIR = run_dir  # Enable incremental writes
+    
     run_started_at = datetime.now(timezone.utc).isoformat()
+    _CURRENT_RUN_META = {
+        "run_name": run_name,
+        "strategy": pipeline.strategy.strategy_name,
+        "symbols": list(pipeline.symbols),
+        "timeframe": pipeline.fetch.timeframe,
+        "created_at": run_started_at,
+    }
     _store_log({
         "kind": "run_meta",
         "phase": "start",
@@ -431,11 +461,153 @@ def execute_pipeline(pipeline: PipelineConfig) -> str:
                     joined = "; ".join(entries)
                     messages.append(f"{symbol}: {joined}")
                 if messages:
-                    show_step_message("0) data coverage", "\n".join(messages), status="warning")
+                    show_step_message("0) data coverage", "\\n".join(messages), status="warning")
+            
+            # Run the data fetch command
             run_cli_step("0) ensure-intraday", fetch_args)
             st.cache_data.clear()
+            
+            # ENHANCED: Verify data coverage after fetch
+            try:
+                from axiom_bt.intraday import IntradayStore, Timeframe
+                
+                verify_store = IntradayStore()
+                coverage_ok = True
+                coverage_issues = []
+                
+                for symbol in fetch_targets:
+                    try:
+                        if verify_store.has_symbol(symbol, timeframe=Timeframe(pipeline.fetch.timeframe)):
+                            df = verify_store.load(symbol, timeframe=Timeframe(pipeline.fetch.timeframe))
+                            
+                            if df.empty:
+                                coverage_ok = False
+                                coverage_issues.append(f"{symbol}: Data file exists but is empty")
+                            elif pipeline.fetch.start and pipeline.fetch.end:
+                                # Check date coverage
+                                import pandas as pd
+                                req_start = pd.Timestamp(pipeline.fetch.start)
+                                req_end = pd.Timestamp(pipeline.fetch.end)
+                                actual_start = df.index[0]
+                                actual_end = df.index[-1]
+                                
+                                if actual_end < req_start or actual_start > req_end:
+                                    coverage_ok = False
+                                    coverage_issues.append(
+                                        f"{symbol}: No overlap with requested range "
+                                        f"(have {actual_start.date()} to {actual_end.date()}, "
+                                        f"need {req_start.date()} to {req_end.date()})"
+                                    )
+                                elif actual_end < req_end:
+                                    coverage_ok = False
+                                    coverage_issues.append(
+                                        f"{symbol}: Data ends {actual_end.date()}, "
+                                        f"requested until {req_end.date()} (gap: {(req_end - actual_end).days} days)"
+                                    )
+                        else:
+                            coverage_ok = False
+                            coverage_issues.append(f"{symbol}: No data file generated after fetch")
+                    except Exception as e:
+                        coverage_ok = False
+                        coverage_issues.append(f"{symbol}: Error verifying coverage - {str(e)}")
+                
+                if coverage_issues:
+                    _store_log({
+                        "kind": "data_coverage_verification",
+                        "status": "error" if not coverage_ok else "warning",
+                        "issues": coverage_issues,
+                        "details": "\\n".join(coverage_issues)
+                    })
+                    
+                    if not coverage_ok:
+                        # Log detailed coverage failure
+                        show_step_message(
+                            "Data Coverage Verification",
+                            "\\n".join(coverage_issues),
+                            status="error"
+                        )
+                else:
+                    _store_log({
+                        "kind": "step",
+                        "title": "Data Coverage Verification",
+                        "status": "success",
+                        "details": f"All {len(fetch_targets)} symbols have required data coverage"
+                    })
+                    
+            except Exception as verify_err:
+                # Don't fail pipeline on verification error, just log it
+                _store_log({
+                    "kind": "error",
+                    "title": "Coverage Verification Failed",
+                    "message": str(verify_err),
+                    "status": "warning"
+                })
         else:
             show_step_message("0) ensure-intraday", "Skipped (cached data)")
+
+        # --- v2 Data SLA Check ---
+        try:
+            from axiom_bt.validators import DataQualitySLA
+            from axiom_bt.intraday import IntradayStore, Timeframe
+            
+            sla_store = IntradayStore()
+            sla_results = {}
+            sla_passed_all = True
+            
+            # Check all symbols that will be used
+            symbols_to_check = pipeline.symbols
+            
+            for symbol in symbols_to_check:
+                if sla_store.has_symbol(symbol, timeframe=Timeframe(pipeline.fetch.timeframe)):
+                    df = sla_store.load(symbol, timeframe=Timeframe(pipeline.fetch.timeframe))
+                    results = DataQualitySLA.check_all(df)
+                    
+                    # Convert to dict for JSON serialization
+                    sla_results[symbol] = {k: v.to_dict() for k, v in results.items()}
+                    
+                    if not DataQualitySLA.all_passed(results):
+                        sla_passed_all = False
+                        failures = [k for k, v in results.items() if not v.passed]
+                        _store_log({
+                            "kind": "sla_violation",
+                            "symbol": symbol,
+                            "violations": failures,
+                            "details": str(failures)
+                        })
+            
+            # Save SLA results to artifacts/quality
+            quality_dir = ROOT / "artifacts" / "quality"
+            quality_dir.mkdir(parents=True, exist_ok=True)
+            sla_file = quality_dir / f"{run_name}_data_sla.json"
+            
+            sla_summary = {
+                "run_name": run_name,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "passed_all": sla_passed_all,
+                "results": sla_results
+            }
+            
+            sla_file.write_text(json.dumps(sla_summary, indent=2), encoding="utf-8")
+            
+            if not sla_passed_all:
+                show_step_message("Data SLA Check", "Some data SLAs failed (see logs)", status="warning")
+            else:
+                _store_log({
+                    "kind": "step",
+                    "title": "Data SLA Check",
+                    "status": "success", 
+                    "details": "All data SLAs passed"
+                })
+                
+        except Exception as e:
+            _store_log({
+                "kind": "error",
+                "title": "SLA Check Failed",
+                "message": str(e),
+                "status": "warning"
+            })
+            # Don't fail the pipeline for SLA check errors yet
+            pass
 
         signal_args = [
             pipeline.strategy.signal_module,

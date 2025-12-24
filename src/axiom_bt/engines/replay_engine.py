@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional, Tuple
+from typing import Any, Dict, Literal, Optional, Tuple, Union
 
 import pandas as pd
 
@@ -128,13 +128,20 @@ def _derive_m1_dir(data_path: Path) -> Optional[Path]:
 
 
 def _resolve_symbol_path(symbol: str, m1_dir: Optional[Path], fallback_dir: Path) -> Tuple[Optional[Path], bool]:
+    import logging
+    logger = logging.getLogger(__name__)
+    
     if m1_dir is not None:
         candidate = m1_dir / f"{symbol}.parquet"
         if candidate.exists():
+            logger.debug(f"Resolved {symbol} → {candidate} (M1 data)")
             return candidate, True
     fallback = fallback_dir / f"{symbol}.parquet"
     if fallback.exists():
+        logger.debug(f"Resolved {symbol} → {fallback} (fallback data)")
         return fallback, False
+    
+    logger.warning(f"No data file found for {symbol} (searched: {m1_dir}, {fallback_dir})")
     return None, False
 
 
@@ -145,10 +152,37 @@ def simulate_insidebar_from_orders(
     costs: Costs,
     initial_cash: float = DEFAULT_INITIAL_CASH,
     data_path_m1: Optional[Path] = None,
+    requested_end: Optional[Union[str, pd.Timestamp]] = None,
 ) -> Dict[str, Any]:
+    import logging
+    logger = logging.getLogger(__name__)
+    
     orders = pd.read_csv(orders_csv)
-    orders["valid_from"] = pd.to_datetime(orders.get("valid_from"), utc=True, errors="coerce")
-    orders["valid_to"] = pd.to_datetime(orders.get("valid_to"), utc=True, errors="coerce")
+    
+    # Enhanced datetime conversion with better error handling
+    logger.info(f"Processing orders from {orders_csv}")
+    logger.info(f"Orders shape: {orders.shape}")
+    logger.info(f"Orders columns: {orders.columns.tolist()}")
+    
+    # Convert datetime columns with explicit error handling
+    for col in ["valid_from", "valid_to"]:
+        if col in orders.columns:
+            try:
+                # First, check if all values can be converted
+                orders[col] = pd.to_datetime(orders[col], utc=True)
+                logger.info(f"Successfully converted '{col}' to datetime. Dtype: {orders[col].dtype}")
+            except Exception as e:
+                # Log detailed error information
+                logger.error(f"Failed to convert '{col}' column to datetime")
+                logger.error(f"Error: {type(e).__name__}: {str(e)}")
+                logger.error(f"Sample values from '{col}': {orders[col].head().tolist()}")
+                logger.error(f"Column dtype: {orders[col].dtype}")
+                raise ValueError(
+                    f"Failed to convert '{col}' to datetime. "
+                    f"Please ensure all values are valid datetime strings. "
+                    f"Sample values: {orders[col].head().tolist()}"
+                ) from e
+    
     if orders.empty:
         empty = pd.DataFrame()
         return {
@@ -158,10 +192,29 @@ def simulate_insidebar_from_orders(
             "metrics": {"num_trades": 0, "pnl": 0.0},
         }
 
+    # Validate that datetime conversion worked before using .dt accessor
     for column in ["valid_from", "valid_to"]:
+        # Only validate if column exists (it should after the conversion above)
+        if column not in orders.columns:
+            logger.error(f"Required column '{column}' is missing from orders CSV")
+            raise ValueError(
+                f"Missing required column '{column}' in orders file. "
+                f"Available columns: {orders.columns.tolist()}"
+            )
+        
+        if not pd.api.types.is_datetime64_any_dtype(orders[column]):
+            logger.error(f"Column '{column}' is not datetime dtype: {orders[column].dtype}")
+            raise TypeError(
+                f"Column '{column}' must be datetime type, got {orders[column].dtype}. "
+                f"This usually means datetime conversion failed silently."
+            )
+        
+        # Handle timezone
         if orders[column].dt.tz is None:
+            logger.info(f"Localizing '{column}' to {tz}")
             orders[column] = orders[column].dt.tz_localize(tz)
         else:
+            logger.info(f"Converting '{column}' from {orders[column].dt.tz} to {tz}")
             orders[column] = orders[column].dt.tz_convert(tz)
 
     ib_orders = orders.query('order_type == "STOP"').copy()
@@ -178,12 +231,24 @@ def simulate_insidebar_from_orders(
     data_path = Path(data_path)
     m1_dir = Path(data_path_m1) if data_path_m1 is not None else _derive_m1_dir(data_path)
 
+    # Defensive: Ensure paths are directories, not files
+    # If user passed a file path, use the parent directory
+    if m1_dir is not None and m1_dir.is_file():
+        logger.warning(f"data_path_m1 points to file instead of directory, using parent: {m1_dir} → {m1_dir.parent}")
+        m1_dir = m1_dir.parent
+    
+    if data_path.is_file():
+        logger.warning(f"data_path points to file instead of directory, using parent: {data_path} → {data_path.parent}")
+        data_path = data_path.parent
+
+
     filled = []
     trades = []
     cash = initial_cash
     equity_points = []
     filled_indices: list[int] = []
     fill_ts_map: dict[int, pd.Timestamp] = {}
+    last_data_ts: Optional[pd.Timestamp] = None
 
     for symbol, group in ib_orders.groupby("symbol"):
         file_path, _ = _resolve_symbol_path(symbol, m1_dir, data_path)
@@ -193,6 +258,10 @@ def simulate_insidebar_from_orders(
         ohlcv = _ensure_dtindex_and_ohlcv(ohlcv, tz)
         # ensure chronological order when switching between sources
         ohlcv = ohlcv.sort_index()
+        if not ohlcv.empty:
+            ts_max = ohlcv.index.max()
+            if last_data_ts is None or ts_max > last_data_ts:
+                last_data_ts = ts_max
         group = group.sort_values("valid_from")
 
         for oco_group, oco_orders in group.groupby("oco_group"):
@@ -277,7 +346,66 @@ def simulate_insidebar_from_orders(
 
     filled_df = pd.DataFrame(filled)
     trades_df = pd.DataFrame(trades)
-    equity_df = pd.DataFrame(equity_points).sort_values("ts")
+
+    if equity_points:
+        equity_df = pd.DataFrame(equity_points).sort_values("ts")
+    else:
+        # No equity points were generated (e.g. all orders expired
+        # without entry). Synthesize a flat equity curve at a
+        # deterministic timestamp so downstream code can always rely on
+        # a non-empty equity frame.
+        fallback_ts: Optional[pd.Timestamp] = None
+        rule = None
+
+        # Priority 1: explicit requested_end from the caller.
+        if requested_end is not None:
+            try:
+                ts = pd.Timestamp(requested_end)
+                if ts.tzinfo is None:
+                    ts = ts.tz_localize(tz)
+                else:
+                    ts = ts.tz_convert(tz)
+                fallback_ts = ts
+                rule = "prio_requested_end"
+            except Exception:
+                fallback_ts = None
+
+        # Priority 2: derive from orders timestamps.
+        if fallback_ts is None and not orders.empty:
+            for col, label in (("valid_to", "prio_orders_valid_to"), ("valid_from", "prio_orders_valid_from")):
+                if col in orders.columns:
+                    series = pd.to_datetime(orders[col], errors="coerce", utc=True).dropna()
+                    if not series.empty:
+                        candidate = series.max().tz_convert(tz)
+                        fallback_ts = candidate
+                        rule = label
+                        break
+
+        # Priority 3: latest available market data timestamp.
+        if fallback_ts is None and last_data_ts is not None:
+            fallback_ts = last_data_ts
+            rule = "prio_data_index"
+
+        # Priority 4: deterministic epoch fallback.
+        if fallback_ts is None:
+            ts_epoch = pd.Timestamp("1970-01-01T00:00:00Z")
+            fallback_ts = ts_epoch.tz_convert(tz)
+            rule = "prio_epoch_fallback"
+
+        logger.info(
+            "simulate_insidebar_from_orders: synthesized flat equity (rule=%s, ts=%s)",
+            rule,
+            fallback_ts.isoformat() if isinstance(fallback_ts, pd.Timestamp) else None,
+        )
+
+        equity_df = pd.DataFrame(
+            [
+                {
+                    "ts": fallback_ts.isoformat(),
+                    "equity": float(initial_cash),
+                }
+            ]
+        )
     total_pnl = float(trades_df["pnl"].sum()) if not trades_df.empty else 0.0
     num_trades = int(len(trades_df))
     win_rate = float((trades_df["pnl"] > 0).mean()) if num_trades > 0 else 0.0
@@ -317,8 +445,27 @@ def simulate_daily_moc_from_orders(
     costs: Costs,
     initial_cash: float = DEFAULT_INITIAL_CASH,
 ) -> Dict[str, Any]:
+    import logging
+    logger = logging.getLogger(__name__)
+    
     orders = pd.read_csv(orders_csv)
-    orders["valid_from"] = pd.to_datetime(orders.get("valid_from"), utc=True, errors="coerce")
+    
+    # Enhanced datetime conversion with better error handling
+    logger.info(f"Processing MOC orders from {orders_csv}")
+    logger.info(f"Orders shape: {orders.shape}")
+    
+    if "valid_from" in orders.columns:
+        try:
+            orders["valid_from"] = pd.to_datetime(orders["valid_from"], utc=True)
+            logger.info(f"Successfully converted 'valid_from' to datetime. Dtype: {orders['valid_from'].dtype}")
+        except Exception as e:
+            logger.error(f"Failed to convert 'valid_from' to datetime: {type(e).__name__}: {str(e)}")
+            logger.error(f"Sample values: {orders['valid_from'].head().tolist()}")
+            raise ValueError(
+                f"Failed to convert 'valid_from' to datetime. "
+                f"Sample values: {orders['valid_from'].head().tolist()}"
+            ) from e
+    
     if orders.empty:
         empty = pd.DataFrame()
         return {
@@ -328,9 +475,18 @@ def simulate_daily_moc_from_orders(
             "metrics": {"num_trades": 0, "pnl": 0.0},
         }
 
+    # Validate datetime dtype before using .dt accessor
+    if not pd.api.types.is_datetime64_any_dtype(orders["valid_from"]):
+        logger.error(f"Column 'valid_from' is not datetime dtype: {orders['valid_from'].dtype}")
+        raise TypeError(
+            f"Column 'valid_from' must be datetime type, got {orders['valid_from'].dtype}"
+        )
+    
     if orders["valid_from"].dt.tz is None:
+        logger.info(f"Localizing 'valid_from' to {tz}")
         orders["valid_from"] = orders["valid_from"].dt.tz_localize(tz)
     else:
+        logger.info(f"Converting 'valid_from' from {orders['valid_from'].dt.tz} to {tz}")
         orders["valid_from"] = orders["valid_from"].dt.tz_convert(tz)
 
     filled = []

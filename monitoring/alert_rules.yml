@@ -1,0 +1,103 @@
+# Alert Rules for Trading System
+
+groups:
+  - name: trading_system_alerts
+    interval: 30s
+    rules:
+      # API Health
+      - alert: APIHealthCheckFailed
+        expr: up{job="automatictrader-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "automatictrader-api is down"
+          description: "The automatictrader-api service has been down for more than 2 minutes."
+
+      - alert: MarketDataStreamDown
+        expr: up{job="marketdata-stream"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "marketdata-stream is down"
+          description: "The marketdata-stream service has been down for more than 2 minutes."
+
+      # Order Intent Processing
+      - alert: OrderIntentErrorRateHigh
+        expr: rate(order_intents_error_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High order intent error rate"
+          description: "Order intent error rate is above 5% ({{ $value | humanizePercentage }}) for the last 5 minutes."
+
+      - alert: OrderIntentsPendingTooMany
+        expr: order_intents_pending > 50
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Too many pending order intents"
+          description: "There are {{ $value }} pending order intents for more than 10 minutes. Worker may be stalled."
+
+      # Worker Health
+      - alert: WorkerProcessingLag
+        expr: order_intents_pending > 10 and rate(order_intents_created_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Worker processing lag detected"
+          description: "Worker is falling behind: {{ $value }} pending intents while new intents are being created."
+
+      # TWS Connection (will need custom metric from worker)
+      - alert: TWSConnectionLost
+        expr: ib_connection_errors_total > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "TWS connection errors detected"
+          description: "IB TWS connection errors detected in the last 5 minutes."
+
+      # Daily Loss Limit (will need custom metric from position manager)
+      - alert: DailyLossLimitBreach
+        expr: daily_pnl < -500
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Daily loss limit breached"
+          description: "Daily P&L has fallen below -$500: {{ $value | humanize }}. Trading should be halted."
+
+      # Position Reconciliation
+      - alert: PositionReconciliationFailure
+        expr: position_reconciliation_discrepancy > 5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Position reconciliation discrepancy detected"
+          description: "Position discrepancy of {{ $value }} shares detected between system and IB."
+
+      # Unusual Slippage
+      - alert: UnusualSlippage
+        expr: avg_slippage_pct > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusual slippage detected"
+          description: "Average slippage is {{ $value | humanizePercentage }}, above 0.5% threshold."
+
+      # High Order Rejection Rate
+      - alert: HighOrderRejectionRate
+        expr: rate(order_rejections_total[1h]) / rate(order_intents_sent_total[1h]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High order rejection rate"
+          description: "Order rejection rate is {{ $value | humanizePercentage }}, above 10% threshold."

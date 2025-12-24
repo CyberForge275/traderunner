@@ -1,0 +1,47 @@
+================================================================================
+TIME MACHINE DRY RUN TEST
+================================================================================
+
+Test Configuration:
+  Strategy: insidebar_intraday
+  Mode: replay
+  Symbols: AAPL, TSLA
+  Timeframe: M5
+  Replay Date: 2024-11-26
+
+Executing Time Machine...
+--------------------------------------------------------------------------------
+  Loading strategy module...
+  ⏰ Time Machine activated...
+  Replaying session from 2024-11-26...
+  Lookback requirement: 100 candles (Default safety buffer for indicators)
+  Loading 5 days of M5 data for 100 candle lookback
+  Processing AAPL...
+  ⚠️ AAPL: Requested 5-day lookback, but data starts at 2025-11-24. Using -364 days of available history.
+  ⚠️ No data for AAPL in range 2025-11-24 to 2024-11-26, skipping...
+  Processing TSLA...
+  ⚠️ TSLA: Requested 5-day lookback, but data starts at 2025-11-15. Using -355 days of available history.
+  ⚠️ No data for TSLA in range 2025-11-15 to 2024-11-26, skipping...
+  Writing 0 signals to database...
+  ✅ Wrote 0 signals to /home/mirko/data/workspace/droid/traderunner/artifacts/signals.db
+--------------------------------------------------------------------------------
+
+RESULTS:
+================================================================================
+Status: completed
+✅ SUCCESS
+
+Signals Generated: 0
+Lookback Days: 5
+Replay Date: 2024-11-26
+
+⚠️ No signals generated (this may be normal if no patterns detected)
+
+Lookback Verification:
+--------------------------------------------------------------------------------
+  ✓ Lookback requirement: 100 candles (Default safety buffer for indicators)
+  ✓ Loading 5 days of M5 data for 100 candle lookback
+  ✓ ⚠️ AAPL: Requested 5-day lookback, but data starts at 2025-11-24. Using -364 days of available history.
+  ✓ ⚠️ TSLA: Requested 5-day lookback, but data starts at 2025-11-15. Using -355 days of available history.
+
+================================================================================

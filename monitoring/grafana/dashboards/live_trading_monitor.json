@@ -1,0 +1,285 @@
+{
+    "dashboard": {
+        "title": "Live Trading Monitor",
+        "tags": [
+            "trading",
+            "live",
+            "signals"
+        ],
+        "timezone": "browser",
+        "refresh": "5s",
+        "time": {
+            "from": "now-1h",
+            "to": "now"
+        },
+        "panels": [
+            {
+                "id": 1,
+                "title": "Order Intents Created (Signals Fired)",
+                "type": "stat",
+                "gridPos": {
+                    "h": 6,
+                    "w": 6,
+                    "x": 0,
+                    "y": 0
+                },
+                "targets": [
+                    {
+                        "expr": "sum(increase(order_intents_created_total[1h]))",
+                        "legendFormat": "Last Hour"
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {
+                            "mode": "thresholds"
+                        },
+                        "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                                {
+                                    "value": 0,
+                                    "color": "green"
+                                },
+                                {
+                                    "value": 5,
+                                    "color": "yellow"
+                                },
+                                {
+                                    "value": 10,
+                                    "color": "red"
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            {
+                "id": 2,
+                "title": "Order Status Distribution",
+                "type": "piechart",
+                "gridPos": {
+                    "h": 6,
+                    "w": 6,
+                    "x": 6,
+                    "y": 0
+                },
+                "targets": [
+                    {
+                        "expr": "order_intents_pending",
+                        "legendFormat": "Pending"
+                    },
+                    {
+                        "expr": "order_intents_planned",
+                        "legendFormat": "Planned"
+                    },
+                    {
+                        "expr": "order_intents_ready",
+                        "legendFormat": "Ready"
+                    },
+                    {
+                        "expr": "order_intents_sent",
+                        "legendFormat": "Sent"
+                    }
+                ]
+            },
+            {
+                "id": 3,
+                "title": "Market Data: Candles Completed",
+                "type": "graph",
+                "gridPos": {
+                    "h": 6,
+                    "w": 12,
+                    "x": 12,
+                    "y": 0
+                },
+                "targets": [
+                    {
+                        "expr": "rate(marketdata_candles_completed_total[5m])",
+                        "legendFormat": "{{symbol}} - {{interval}}"
+                    }
+                ],
+                "yaxes": [
+                    {
+                        "format": "short",
+                        "label": "Candles/sec"
+                    },
+                    {
+                        "format": "short"
+                    }
+                ]
+            },
+            {
+                "id": 4,
+                "title": "Ticks Received Per Symbol",
+                "type": "graph",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 6
+                },
+                "targets": [
+                    {
+                        "expr": "rate(marketdata_ticks_received_total[1m])",
+                        "legendFormat": "{{symbol}}"
+                    }
+                ],
+                "yaxes": [
+                    {
+                        "format": "short",
+                        "label": "Ticks/sec"
+                    },
+                    {
+                        "format": "short"
+                    }
+                ]
+            },
+            {
+                "id": 5,
+                "title": "Active WebSocket Connections",
+                "type": "stat",
+                "gridPos": {
+                    "h": 4,
+                    "w": 6,
+                    "x": 12,
+                    "y": 6
+                },
+                "targets": [
+                    {
+                        "expr": "marketdata_active_connections{type=\"ticks\"}",
+                        "legendFormat": "Tick Streams"
+                    },
+                    {
+                        "expr": "marketdata_active_connections{type=\"candles\"}",
+                        "legendFormat": "Candle Streams"
+                    }
+                ]
+            },
+            {
+                "id": 6,
+                "title": "EODHD Connection Status",
+                "type": "stat",
+                "gridPos": {
+                    "h": 4,
+                    "w": 6,
+                    "x": 18,
+                    "y": 6
+                },
+                "targets": [
+                    {
+                        "expr": "marketdata_eodhd_connected"
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "mappings": [
+                            {
+                                "type": "value",
+                                "value": 1,
+                                "text": "Connected"
+                            },
+                            {
+                                "type": "value",
+                                "value": 0,
+                                "text": "Disconnected"
+                            }
+                        ],
+                        "color": {
+                            "mode": "thresholds"
+                        },
+                        "thresholds": {
+                            "steps": [
+                                {
+                                    "value": 0,
+                                    "color": "red"
+                                },
+                                {
+                                    "value": 1,
+                                    "color": "green"
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            {
+                "id": 7,
+                "title": "Order Intent Processing Rate",
+                "type": "graph",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 10
+                },
+                "targets": [
+                    {
+                        "expr": "rate(order_intents_created_total[5m])",
+                        "legendFormat": "Created"
+                    },
+                    {
+                        "expr": "rate(order_intents_duplicate_total[5m])",
+                        "legendFormat": "Duplicates"
+                    },
+                    {
+                        "expr": "rate(order_intents_error_total[5m])",
+                        "legendFormat": "Errors"
+                    }
+                ]
+            },
+            {
+                "id": 8,
+                "title": "Worker Health Status",
+                "type": "table",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 14
+                },
+                "targets": [
+                    {
+                        "expr": "up{job=\"automatictrader-api\"}",
+                        "format": "table",
+                        "instant": true
+                    }
+                ],
+                "transformations": [
+                    {
+                        "id": "organize",
+                        "options": {
+                            "excludeByName": {
+                                "Time": true,
+                                "__name__": true
+                            },
+                            "renameByName": {
+                                "Value": "Status",
+                                "job": "Service",
+                                "instance": "Instance"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "id": 9,
+                "title": "Recent Order Intents (Log View)",
+                "type": "logs",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 18
+                },
+                "targets": [
+                    {
+                        "expr": "{job=\"automatictrader-api\"} |= \"intent\"",
+                        "refId": "A"
+                    }
+                ]
+            }
+        ]
+    },
+    "overwrite": true
+}

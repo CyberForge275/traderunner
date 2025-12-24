@@ -1,0 +1,18 @@
+.ti-chart-shell {
+  height: 620px;
+  max-height: 620px;
+  width: 920px;
+  max-width: 920px;
+  overflow: hidden;
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+}
+
+.ti-chart-graph {
+  height: 600px !important;
+  max-height: 600px !important;
+  min-height: 600px !important;
+  width: 900px !important;
+  max-width: 900px !important;
+}
