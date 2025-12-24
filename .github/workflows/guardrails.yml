@@ -10,18 +10,18 @@ jobs:
   guardrails:
     name: Repository Quality Checks
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0  # Need full history for comparison
-      
+
       - name: Check for tracked artifacts
         run: |
           echo "🔍 Checking for tracked artifact files..."
           ARTIFACTS=$(git ls-files artifacts/ | head -20)
-          
+
           if [ -n "$ARTIFACTS" ]; then
             echo "❌ FAIL: Artifact files are tracked in git!"
             echo ""
@@ -35,46 +35,62 @@ jobs:
             echo "ℹ️ artifacts/ should be gitignored, not tracked"
             exit 1
           fi
-          
+
           echo "✅ PASS: No artifact files tracked"
-      
+
       - name: Check for tracked binaries
         run: |
           echo "🔍 Checking for tracked binary files..."
-          BINARIES=$(git ls-files | grep -E '\.(db|sqlite|sqlite3|pdf)$' || true)
-          
-          if [ -n "$BINARIES" ]; then
-            echo "❌ FAIL: Binary files are tracked in git!"
+          ALL_BINARIES=$(git ls-files | grep -E '\.(db|sqlite|sqlite3|pdf)$' || true)
+
+          # Allow docs/ PDFs, block everything else
+          VIOLATIONS=""
+          while IFS= read -r file; do
+            if [ -n "$file" ]; then
+              # Skip docs/ PDFs (allowed)
+              if echo "$file" | grep -qE '^docs/.*\.pdf$'; then
+                echo "  ✓ Allowed: $file (documentation PDF)"
+              else
+                VIOLATIONS="${VIOLATIONS}${file}\n"
+              fi
+            fi
+          done <<< "$ALL_BINARIES"
+
+          if [ -n "$VIOLATIONS" ]; then
             echo ""
-            echo "Found tracked binaries:"
-            echo "$BINARIES"
+            echo "❌ FAIL: Forbidden binary files are tracked!"
+            echo ""
+            echo "Violations (binaries outside docs/):"
+            echo -e "$VIOLATIONS"
             echo ""
             echo "🔧 To fix each file:"
-            while IFS= read -r file; do
-              echo "  git rm --cached '$file'"
-            done <<< "$BINARIES"
-            echo "  git add .gitignore"
-            echo "  git commit -m 'chore: remove binaries from tracking'"
+            echo -e "$VIOLATIONS" | while IFS= read -r file; do
+              if [ -n "$file" ]; then
+                echo "  git rm --cached '$file'"
+              fi
+            done
             echo ""
-            echo "ℹ️ Binary files (*.db, *.pdf) should be gitignored"
+            echo "ℹ️ Policy:"
+            echo "  - docs/*.pdf are ALLOWED (versioned documentation)"
+            echo "  - All other *.pdf, *.db, *.sqlite files are FORBIDDEN"
             exit 1
           fi
-          
-          echo "✅ PASS: No binary files tracked"
-      
+
+          echo "✅ PASS: No forbidden binary files tracked"
+
       - name: Check for large files in PR
         if: github.event_name == 'pull_request'
         run: |
           echo "🔍 Checking for large files in PR..."
           MAX_SIZE_MB=5
           MAX_SIZE_BYTES=$((MAX_SIZE_MB * 1024 * 1024))
-          
+
           BASE_REF="${{ github.base_ref }}"
           HEAD_SHA="${{ github.sha }}"
-          
+
           # Get new/modified files in this PR
           NEW_FILES=$(git diff --name-only origin/$BASE_REF...$HEAD_SHA)
-          
+
           LARGE_FILES=""
           for file in $NEW_FILES; do
             if [ -f "$file" ]; then
@@ -85,7 +101,7 @@ jobs:
               fi
             fi
           done
-          
+
           if [ -n "$LARGE_FILES" ]; then
             echo "❌ FAIL: Large files detected in PR!"
             echo ""
@@ -100,9 +116,9 @@ jobs:
             echo "ℹ️ Large files slow down clones and increase repo size"
             exit 1
           fi
-          
+
           echo "✅ PASS: No large files in PR"
-      
+
       - name: Summary
         if: success()
         run: |

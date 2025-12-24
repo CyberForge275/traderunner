@@ -9,17 +9,18 @@ repos:
     hooks:
       - id: check-added-large-files
         args: ['--maxkb=5120']  # 5MB limit
+        exclude: '^docs/.*\.pdf$'  # Allow large docs PDFs
         name: Check for large files (>5MB)
-      
+
       - id: check-case-conflict
         name: Check for case conflicts
-      
+
       - id: check-merge-conflict
         name: Check for merge conflicts
-      
+
       - id: end-of-file-fixer
         name: Fix end of files
-      
+
       - id: trailing-whitespace
         name: Trim trailing whitespace
 
@@ -44,8 +45,8 @@ repos:
         always_run: true
 
       - id: no-binaries-tracked
-        name: Prevent tracking binaries (*.db, *.sqlite, *.pdf)
-        entry: bash -c 'BINS=$(git ls-files | grep -E "\.(db|sqlite|sqlite3|pdf)$" || true); if [ -n "$BINS" ]; then echo "❌ Binary files tracked"; echo "$BINS"; echo "Run git rm --cached <file>"; exit 1; fi'
+        name: Prevent tracking binaries (*.db, *.sqlite, *.pdf except docs/)
+        entry: bash -c 'ALL=$(git ls-files | grep -E "\.(db|sqlite|sqlite3|pdf)$" || true); BINS=$(echo "$ALL" | grep -vE "^docs/.*\.pdf$" || true); if [ -n "$BINS" ]; then echo "❌ Forbidden binaries tracked"; echo "$BINS"; echo "Run git rm --cached <file>"; echo "Note docs/*.pdf are allowed"; exit 1; fi'
         language: system
         pass_filenames: false
         always_run: true

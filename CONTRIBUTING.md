@@ -7,14 +7,16 @@
 1. **Artifacts**: Never track `artifacts/**` directory
    - Backtests results, parquet files, generated reports
    - These are outputs, not source code
-   
+
 2. **Binary files**: Never track `*.db`, `*.sqlite`, `*.pdf`
-   - SQLite databases are generated/stateful
-   - PDFs should be built artifacts, not source
-   
+   - **Exception:** Versioned documentation PDFs under `docs/` are ALLOWED
+   - SQLite databases are generated/stateful (always forbidden)
+   - PDFs outside `docs/` are build artifacts (forbidden)
+
 3. **Large files**: Nothing > 5MB without Git LFS
    - Slows down clones, increases repo size
    - Use external storage (S3, artifact repos)
+   - **Exception:** Documentation PDFs under `docs/` are exempt from size limit
 
 4. **Generated code**: Build outputs, compiled files
    - `__pycache__/`, `.pyc` files

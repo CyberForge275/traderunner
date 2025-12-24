@@ -117,3 +117,4 @@ logs/*.log
 
 # Generated docs artifacts
 *.pdf
+!docs/**/*.pdf  # Allow versioned documentation PDFs
