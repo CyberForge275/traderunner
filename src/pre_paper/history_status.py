@@ -13,7 +13,7 @@ import pandas as pd
 class HistoryStatus(Enum):
     """
     Runtime history status.
-    
+
     Strategy execution is ONLY allowed if status == SUFFICIENT.
     """
     SUFFICIENT = "sufficient"    # Ready for strategy execution
@@ -26,7 +26,7 @@ class DateRange:
     """Timestamp range for gaps."""
     start: pd.Timestamp
     end: pd.Timestamp
-    
+
     def to_dict(self):
         return {
             "start": self.start.isoformat(),
@@ -38,7 +38,7 @@ class DateRange:
 class HistoryCheckResult:
     """
     Result of runtime history check.
-    
+
     CRITICAL CONTRACT:
     - Strategy execution is ONLY allowed if status == SUFFICIENT
     - Otherwise: NO-SIGNALS with logged reason
@@ -47,25 +47,25 @@ class HistoryCheckResult:
     symbol: str
     tf: str
     base_tf_used: str  # For history calculation
-    
+
     # Required window (from manifest params)
     required_start_ts: pd.Timestamp  # market_tz
     required_end_ts: pd.Timestamp    # market_tz
-    
+
     # Cached window (from pre_paper_cache.db)
     cached_start_ts: Optional[pd.Timestamp]
     cached_end_ts: Optional[pd.Timestamp]
-    
+
     # Gaps (if any)
     gaps: List[DateRange]
-    
+
     # Backfill status
     fetch_attempted: bool
     fetch_success: bool
-    
+
     # Degradation reason
     reason: Optional[str]
-    
+
     def to_dict(self):
         return {
             "status": self.status.value,

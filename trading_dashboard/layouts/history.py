@@ -48,10 +48,10 @@ def create_event_timeline(events_df):
                 html.P("No events found for selected date range", className="text-muted", style={"padding": "40px"})
             ]
         )
-    
+
     # Format timestamp for display
     events_df['timestamp_display'] = events_df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S')
-    
+
     return html.Div(
         className="dashboard-card",
         children=[
@@ -107,20 +107,20 @@ def create_event_timeline(events_df):
 def create_history_layout():
     """Create the History tab layout."""
     from ..repositories import get_watchlist_symbols
-    
+
     # Default to today
     today = datetime.now().date()
     yesterday = today - timedelta(days=1)
-    
+
     # Get initial data
     events = get_events_by_date(yesterday, today)
     stats = get_daily_statistics(today)
-    
+
     # Get symbols for filter
     symbols = get_watchlist_symbols()
     symbol_options = [{'label': 'All Symbols', 'value': 'all'}]
     symbol_options.extend([{'label': sym, 'value': sym} for sym in symbols])
-    
+
     return html.Div([
         # Controls row
         dbc.Row([
@@ -173,16 +173,16 @@ def create_history_layout():
                 ])
             ], width=2)
         ], style={"marginBottom": "20px"}),
-        
+
         # Statistics cards
         html.Div(id="history-stats", children=create_statistics_cards(stats)),
-        
+
         # Event timeline
         html.Div(id="history-timeline", children=create_event_timeline(events)),
-        
+
         # Hidden download component
         dcc.Download(id="download-csv")
-        
+
     ], style={"padding": "20px"})
 
 

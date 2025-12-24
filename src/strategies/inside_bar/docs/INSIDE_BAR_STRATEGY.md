@@ -1,7 +1,7 @@
 # InsideBar Strategy – SSOT Contract
 
-Stand: 2025-12-18  
-SSOT: `src/strategies/inside_bar/`  
+Stand: 2025-12-18
+SSOT: `src/strategies/inside_bar/`
 Ziel: deterministischer, auditierbarer M5-Intraday Backtest + Live-Kompatibilität
 
 ## 1. Hintergrund: Warum November funktionierte und TSLA aktuell nicht

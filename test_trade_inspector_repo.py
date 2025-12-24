@@ -39,11 +39,11 @@ print(f"  ✅ Signal bars: {bars_signal.shape if bars_signal is not None else 'N
 if trades is not None and not trades.empty:
     print(f"\n🔍 Testing Trade Detail Service")
     service = TradeDetailService(repo)
-    
+
     # Get first trade
     trade_id = 0
     detail = service.get_trade_detail(run_id, trade_id)
-    
+
     if detail:
         print(f"  ✅ Trade {trade_id} loaded successfully")
         print(f"     - Symbol: {detail.trade_row.get('symbol')}")
@@ -52,10 +52,10 @@ if trades is not None and not trades.empty:
         print(f"     - Exit: {detail.trade_row.get('exit_ts')}")
         print(f"     - PnL: {detail.trade_row.get('pnl')}")
         print(f"     - Exec bars: {detail.exec_bars.shape if detail.exec_bars is not None else 'None'}")
-        
+
         # Test chart building
         from trading_dashboard.plots.trade_inspector_plot import build_trade_chart
-        
+
         fig = build_trade_chart(detail.trade_row, detail.exec_bars)
         print(f"  ✅ Chart generated successfully")
         print(f"     - Traces: {len(fig.data)}")

@@ -26,14 +26,14 @@ def test_steps_render_accepts_runstep_objects_without_500():
     """
     Regression test: Ensure layout can handle RunStep dataclass objects
     without crashing (via normalization in callback).
-    
+
     This test simulates the case where BacktestDetailsService.load_steps()
     returns dataclass objects instead of dicts. The callback should normalize
     these to dicts before passing to layout.
     """
     # Simulate what callback should do: normalize dataclass to dict
     from dataclasses import asdict
-    
+
     # Create mock RunStep objects (what service returns)
     raw_steps = [
         MockRunStep(
@@ -53,7 +53,7 @@ def test_steps_render_accepts_runstep_objects_without_500():
             details="Strategy executed"
         ),
     ]
-    
+
     # Normalize to dicts (what callback should do)
     normalized_steps = []
     for s in raw_steps:
@@ -65,7 +65,7 @@ def test_steps_render_accepts_runstep_objects_without_500():
         if 'duration_seconds' in d:
             d['duration_s'] = d.pop('duration_seconds')
         normalized_steps.append(d)
-    
+
     # Create summary with normalized steps
     summary = {
         "run_name": "test_run",
@@ -78,11 +78,11 @@ def test_steps_render_accepts_runstep_objects_without_500():
         "failure_reason": None,
         "steps": normalized_steps,  # List[dict], not List[RunStep]
     }
-    
+
     # Create mock empty dataframes
     import pandas as pd
     log_df = pd.DataFrame()
-    
+
     # This should NOT crash - layout expects List[dict]
     try:
         result = create_backtest_detail(
@@ -96,11 +96,11 @@ def test_steps_render_accepts_runstep_objects_without_500():
             trades_df=None,
             rk_df=None,
         )
-        
+
         # Verify we got a Div component back
         assert result is not None
         assert hasattr(result, 'children')  # Should be a Dash component
-        
+
     except Exception as e:
         pytest.fail(f"Layout crashed with normalized steps: {e}")
 
@@ -110,7 +110,7 @@ def test_steps_render_with_missing_duration():
     Test that layout handles steps without duration gracefully.
     """
     import pandas as pd
-    
+
     summary = {
         "run_name": "test_run",
         "status": "success",
@@ -125,9 +125,9 @@ def test_steps_render_with_missing_duration():
             }
         ]
     }
-    
+
     log_df = pd.DataFrame()
-    
+
     # Should not crash
     result = create_backtest_detail(
         run_name="test_run",
@@ -135,7 +135,7 @@ def test_steps_render_with_missing_duration():
         metrics={},
         summary=summary,
     )
-    
+
     assert result is not None
 
 
@@ -144,16 +144,16 @@ def test_steps_render_with_empty_steps():
     Test that layout handles empty steps list gracefully.
     """
     import pandas as pd
-    
+
     summary = {
         "run_name": "test_run",
         "status": "success",
         "strategy": "inside_bar",
         "steps": []  # Empty steps
     }
-    
+
     log_df = pd.DataFrame()
-    
+
     # Should not crash
     result = create_backtest_detail(
         run_name="test_run",
@@ -161,5 +161,5 @@ def test_steps_render_with_empty_steps():
         metrics={},
         summary=summary,
     )
-    
+
     assert result is not None

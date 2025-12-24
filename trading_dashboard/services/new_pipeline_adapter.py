@@ -32,7 +32,7 @@ from backtest.services.run_status import RunStatus, FailureReason
 class NewPipelineAdapter:
     """
     Adapter for FULL BACKTEST pipeline (SSOT).
-    
+
     Calls run_backtest_full() which enforces:
     - Coverage Gate (FAILED_PRECONDITION if gap)
     - Full trade simulation (ReplayEngine)
@@ -40,10 +40,10 @@ class NewPipelineAdapter:
     - Postcondition gate (FAILED_POSTCONDITION if equity missing)
     - Proper artifacts (run_meta/run_result/run_manifest + artifacts_index.json)
     """
-    
+
     def __init__(self, progress_callback: Optional[Callable[[str], None]] = None):
         self.progress_callback = progress_callback or (lambda msg: None)
-    
+
     def execute_backtest(
         self,
         run_name: str,
@@ -56,7 +56,7 @@ class NewPipelineAdapter:
     ) -> Dict:
         """
         Execute FULL backtest using complete simulation pipeline.
-        
+
         Returns:
             Dict with keys:
             - status: "success" | "failed_precondition" | "failed_postcondition" | "error"
@@ -69,7 +69,7 @@ class NewPipelineAdapter:
         """
         try:
             self.progress_callback("Initializing full backtest...")
-            
+
             # Validate inputs
             if not symbols or len(symbols) == 0:
                 return {
@@ -78,9 +78,9 @@ class NewPipelineAdapter:
                     "run_name": run_name,
                     "run_dir": f"artifacts/backtests/{run_name}"
                 }
-            
+
             symbol = symbols[0]  # Single symbol for now
-            
+
             # Parse config params
             strategy_params = config_params or {}
 
@@ -97,12 +97,12 @@ class NewPipelineAdapter:
             # requested_end is required by the coverage gate; default to
             # today's date if the UI did not provide an explicit end.
             requested_end = end_date if end_date else date.today().isoformat()
-            
+
             self.progress_callback(f"Running full backtest for {symbol}...")
-            
+
             # Determine run_dir (SSOT)
             run_dir = Path("artifacts/backtests") / run_name
-            
+
             # Call FULL BACKTEST pipeline (SSOT)
             result = run_backtest_full(
                 run_id=run_name,
@@ -118,7 +118,7 @@ class NewPipelineAdapter:
                 costs={"fees_bps": DEFAULT_FEE_BPS, "slippage_bps": DEFAULT_SLIPPAGE_BPS},
                 debug_trace=bool(strategy_params.get("debug_trace", False)),
             )
-            
+
             # Map RunResult to UI response format
             if result.status == RunStatus.SUCCESS:
                 self.progress_callback("Full backtest completed successfully!")
@@ -128,14 +128,14 @@ class NewPipelineAdapter:
                     "run_dir": str(run_dir),  # SSOT for UI
                     "result": result
                 }
-            
+
             elif result.status == RunStatus.FAILED_PRECONDITION:
                 # Precondition gate failure (coverage gap, SLA failure, etc.)
                 reason_str = result.reason.value if result.reason else "unknown"
                 details_str = str(result.details) if result.details else "No details"
-                
+
                 self.progress_callback(f"Gates blocked execution: {reason_str}")
-                
+
                 return {
                     "status": "failed_precondition",
                     "reason": reason_str,
@@ -144,14 +144,14 @@ class NewPipelineAdapter:
                     "run_dir": str(run_dir),  # SSOT for UI
                     "result": result
                 }
-            
+
             elif result.status == RunStatus.FAILED_POSTCONDITION:
                 # Postcondition gate failure (equity missing after full backtest)
                 reason_str = result.reason.value if result.reason else "unknown"
                 details_str = str(result.details) if result.details else "No details"
-                
+
                 self.progress_callback(f"Postcondition failed: {reason_str}")
-                
+
                 return {
                     "status": "failed_postcondition",
                     "reason": reason_str,
@@ -160,12 +160,12 @@ class NewPipelineAdapter:
                     "run_dir": str(run_dir),  # SSOT for UI
                     "result": result
                 }
-            
+
             else:  # ERROR
                 error_id = result.error_id or "UNKNOWN"
-                
+
                 self.progress_callback(f"Backtest error (ID: {error_id})")
-                
+
                 return {
                     "status": "error",
                     "error_id": error_id,
@@ -173,7 +173,7 @@ class NewPipelineAdapter:
                     "run_name": run_name,
                     "result": result
                 }
-        
+
         except Exception as e:
             # Unexpected exception (outside pipeline)
             import traceback
@@ -188,10 +188,10 @@ class NewPipelineAdapter:
 def create_new_adapter(progress_callback: Optional[Callable[[str], None]] = None) -> NewPipelineAdapter:
     """
     Factory function for new pipeline adapter.
-    
+
     Args:
         progress_callback: Optional progress callback
-    
+
     Returns:
         NewPipelineAdapter instance
     """

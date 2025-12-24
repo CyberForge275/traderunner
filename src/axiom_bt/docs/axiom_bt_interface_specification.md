@@ -1,7 +1,7 @@
 # axiom_bt Backtesting Framework - Interface Specification
 
-**Document Version:** 1.0  
-**Date:** 2024-12-24  
+**Document Version:** 1.0
+**Date:** 2024-12-24
 **Purpose:** Define canonical interfaces for intraday, daytrading, and hybrid backtesting modes
 
 ---
@@ -13,11 +13,11 @@ This document provides detailed interface specifications for the `axiom_bt` back
 ### Critical Findings
 
 > [!WARNING]
-> **Hybrid Mode Not Yet Implemented**  
+> **Hybrid Mode Not Yet Implemented**
 > The requested hybrid mode (daily signals + intraday SL/TP execution) is **not currently supported** in the codebase. The framework has two distinct execution paths that do not cross-communicate.
 
 > [!IMPORTANT]
-> **Timestamp Integrity**  
+> **Timestamp Integrity**
 > The framework uses strict timezone handling (UTC internally, configurable display timezone) and enforces RTH (Regular Trading Hours) filtering to prevent lookahead bias.
 
 ---
@@ -31,14 +31,14 @@ graph TB
     A[full_backtest_runner.py] -->|orchestrates| B[Signal Generation]
     A -->|loads data| C[IntradayStore / DailyStore]
     A -->|executes trades| D[ReplayEngine]
-    
+
     B -->|produces| E[orders.csv]
     C -->|provides| F[OHLCV Data]
     D -->|consumes| E
     D -->|consumes| F
     D -->|produces| G[equity_curve.csv]
     D -->|produces| H[trades.csv]
-    
+
     I[Contracts] -.validates.-> F
     I -.validates.-> E
 ```
@@ -120,7 +120,7 @@ def _first_touch_entry(
 - Returns **first bar timestamp** where condition met, or `None` if expired
 
 > [!CAUTION]
-> **Intra-bar Assumption**  
+> **Intra-bar Assumption**
 > Current implementation uses **first touch within bar** (optimistic fill). Does NOT consider bid-ask spread or order book depth.
 
 #### Exit Logic (`_exit_after_entry`)
@@ -148,7 +148,7 @@ def _exit_after_entry(
 - **SHORT (SELL)**: SL when `bar.High >= stop_loss`, TP when `bar.Low <= take_profit`
 
 > [!WARNING]
-> **Same-bar SL/TP Priority**  
+> **Same-bar SL/TP Priority**
 > If both SL and TP are touched in the same bar, the engine **always exits at SL** (line 94-95, 103-104 in `replay_engine.py`). This is **conservative** but may underestimate TP fills.
 
 #### Costs Application
@@ -202,7 +202,7 @@ def simulate_daily_moc_from_orders(
 3. **PnL:** Only fees are deducted (no actual trade P&L in single-bar mode)
 
 > [!CAUTION]
-> **Incomplete Daily Implementation**  
+> **Incomplete Daily Implementation**
 > Current daily MOC mode is a **stub** (line 441-561 in `replay_engine.py`). It fills orders at close but does NOT track multi-day positions or exits.
 
 ---
@@ -249,7 +249,7 @@ for order in orders:
     signal_bar = load_daily_bar(order.signal_bar_ts)
     if not validate_signal_pattern(signal_bar):
         skip_order()
-    
+
     # 2. Load intraday window for execution
     intraday_bars = load_intraday_bars(
         symbol=order.symbol,
@@ -257,7 +257,7 @@ for order in orders:
         end=order.entry_valid_to,
         timeframe=order.exec_timeframe
     )
-    
+
     # 3. Attempt entry using intraday bars
     entry_ts = _first_touch_entry(
         df=intraday_bars,
@@ -266,10 +266,10 @@ for order in orders:
         start=order.entry_valid_from,
         end=order.entry_valid_to
     )
-    
+
     if entry_ts is None:
         continue  # Order expired without fill
-    
+
     # 4. Track exit using intraday bars
     exit_ts, exit_price, reason = _exit_after_entry(
         df=intraday_bars,
@@ -332,7 +332,7 @@ class Timeframe(str, Enum):
 - Columns: `['open', 'high', 'low', 'close', 'volume']` (lowercase)
 
 > [!NOTE]
-> **RTH Filtering**  
+> **RTH Filtering**
 > All intraday data is **RTH-only** (line 410-424 in `intraday.py`). Pre-market and after-hours bars are excluded.
 
 ### DailyStore
@@ -374,7 +374,7 @@ Inherits all `DailyFrameSpec` invariants, plus:
 - No overnight gaps within sessions (TODO)
 
 > [!WARNING]
-> **Contract Enforcement Incomplete**  
+> **Contract Enforcement Incomplete**
 > Session validation for intraday frames is a TODO (line 137-140 in `data_contracts.py`). Current validation only checks column schema and timezone.
 
 ---
@@ -406,7 +406,7 @@ Inherits all `DailyFrameSpec` invariants, plus:
 - Lines 271-272: Converts order `valid_from`/`valid_to` to target timezone **before** searching
 
 > [!CAUTION]
-> **Warmup Data Exposure**  
+> **Warmup Data Exposure**
 > The `warmup_days` buffer (line 252-255 in `full_backtest_runner.py`) loads extra historical bars for indicators. Strategies MUST NOT emit signals during warmup period.
 
 ---
@@ -471,7 +471,7 @@ for bar in daily_bars:
         if should_exit(pos, bar):
             exit_trade(pos, bar.Close)
             del positions[pos_id]
-    
+
     # Then check entries
     for order in orders_for_date(bar.timestamp):
         if should_enter(order, bar):
@@ -502,7 +502,7 @@ def simulate_hybrid_from_orders(
     initial_cash: float,
 ) -> Dict[str, Any]:
     orders = pd.read_csv(orders_csv)
-    
+
     # Validate each order's signal bar exists
     daily_store = DailyStore(default_tz=tz)
     for idx, order in orders.iterrows():
@@ -512,11 +512,11 @@ def simulate_hybrid_from_orders(
         )
         if signal_bar is None:
             raise ValueError(f"Signal bar missing: {order.signal_bar_ts}")
-        
+
         # CRITICAL: Verify entry window starts AFTER signal bar close
         if order.entry_valid_from <= order.signal_bar_ts:
             raise ValueError("Lookahead detected: entry_valid_from must be AFTER signal_bar_ts")
-    
+
     # Use existing intraday execution logic
     return _execute_intraday_orders(
         orders=orders,

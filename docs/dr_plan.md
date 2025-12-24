@@ -356,7 +356,7 @@ After any disaster recovery:
 
 ---
 
-**Last Updated:** 2025-11-27  
-**Next Review:** 2026-02-27  
-**Last Tested:** TBD  
+**Last Updated:** 2025-11-27
+**Next Review:** 2026-02-27
+**Last Tested:** TBD
 **Owner:** Trading Team

@@ -23,7 +23,7 @@ def create_portfolio_card(portfolio: dict):
     pnl_pct = portfolio.get("daily_pnl_pct", 0)
     pnl_class = "pnl-positive" if pnl >= 0 else "pnl-negative"
     pnl_sign = "+" if pnl >= 0 else ""
-    
+
     return html.Div(
         className="dashboard-card",
         children=[
@@ -65,20 +65,20 @@ def create_live_monitor_layout():
     orders = get_order_intents(hours=24)
     system_status = get_system_status()
     portfolio = get_portfolio_summary()
-    
+
     return html.Div([
         dbc.Row([
             # Left: Watchlist
             dbc.Col([
                 create_watchlist(symbols),
             ], width=3),
-            
+
             # Center: Patterns + Orders
             dbc.Col([
                 create_patterns_panel(patterns),
                 create_order_flow_panel(orders)
             ], width=6),
-            
+
             # Right: Portfolio + Status
             dbc.Col([
                 create_portfolio_card(portfolio),

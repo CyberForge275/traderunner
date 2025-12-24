@@ -8,8 +8,8 @@ description: Project context and system knowledge for the droid-trading ecosyste
 
 ## System Overview
 
-**Organization:** CyberForge275 on GitHub  
-**Architecture:** Microservices with 3 core components  
+**Organization:** CyberForge275 on GitHub
+**Architecture:** Microservices with 3 core components
 **Owner:** Mirko
 
 ---
@@ -25,10 +25,10 @@ description: Project context and system knowledge for the droid-trading ecosyste
   ```bash
   # Activate virtual environment
   source .venv/bin/activate
-  
+
   # Generate Inside Bar signals
   PYTHONPATH=src python -m signals.cli_inside_bar --help
-  
+
   # Run dashboard
   streamlit run apps/dashboard.py
   ```
@@ -48,17 +48,17 @@ description: Project context and system knowledge for the droid-trading ecosyste
   ```bash
   # API
   bash scripts/run_dev.sh
-  
+
   # Worker (processes order intents)
   bash scripts/worker_dev.sh
-  
+
   # Sanity check
   bash scripts/sanity.sh
   ```
 - **API Endpoints:**
   - `POST /api/v1/orderintents` - Create order intent (requires Idempotency-Key header)
   - `GET /healthz` - Health check
-- **Databases:** 
+- **Databases:**
   - `trading.db` - Order intents storage
 
 ### 3. marketdata-stream
@@ -70,7 +70,7 @@ description: Project context and system knowledge for the droid-trading ecosyste
   ```bash
   # Run service
   python -m src.runner
-  
+
   # Health check
   curl http://localhost:8090/health
   ```

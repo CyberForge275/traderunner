@@ -23,17 +23,17 @@ for i, line in enumerate(lines):
         in_bad_docstring = True
         docstring_indent = len(line) - len(line.lstrip())
         continue
-    
+
     # Detect end of misplaced docstring
     if in_bad_docstring and '"""' in line:
         in_bad_docstring = False
         docstring_indent = None
         continue
-    
+
     # Skip lines inside bad docstring
     if in_bad_docstring:
         continue
-    
+
     cleaned_lines.append(line)
 
 # Write cleaned version

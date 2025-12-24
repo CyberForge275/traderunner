@@ -89,7 +89,5 @@ def build_trade_chart(trade_row: pd.Series, exec_bars: pd.DataFrame | None) -> g
         transition={"duration": 0},
         updatemenus=[],
     )
-    
+
     return fig
-
-

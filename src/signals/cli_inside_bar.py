@@ -194,14 +194,14 @@ def main(argv: List[str] | None = None) -> int:
             print(f"        This indicates the parquet file exists but contains no data.")
             failed_symbols.append(f"{symbol} (empty data)")
             continue
-        
+
         # Check for NaN values in critical columns
         nan_cols = []
         for col in ['open', 'high', 'low', 'close']:
             if col in ohlcv.columns and ohlcv[col].isna().any():
                 nan_count = ohlcv[col].isna().sum()
                 nan_cols.append(f"{col}({nan_count} NaN)")
-        
+
         if nan_cols:
             print(f"[ERROR] {symbol}: Data contains NaN values in OHLC columns")
             print(f"        Affected columns: {', '.join(nan_cols)}")
@@ -215,10 +215,10 @@ def main(argv: List[str] | None = None) -> int:
 
         for sig in signals:
             ts = pd.Timestamp(sig.timestamp).tz_convert(args.tz)
-            
+
             # Calculate session ID for grouping (still needed for deduplication)
             session_idx = _session_id(ts, sessions)
-            
+
             # NOTE: Session filtering is now handled by strategy.generate_signals()
             # via config.session_filter parameter. The old "if session_idx == 0: continue"
             # logic has been removed to avoid double-filtering.
@@ -342,24 +342,24 @@ def main(argv: List[str] | None = None) -> int:
     total_requested = len(symbols)
     total_failed = len(failed_symbols) + len(missing_symbols)
     total_processed = total_requested - total_failed
-    
+
     print(f"[OK] Signals → {output} (rows={len(result)})")
     print(f"[INFO] Processed {total_processed}/{total_requested} symbols")
-    
+
     if missing_symbols:
         print(f"[ERROR] {len(missing_symbols)} symbol(s) had missing data files:")
         for sym in missing_symbols[:5]:  # Show first 5
             print(f"        - {sym}")
         if len(missing_symbols) > 5:
             print(f"        ... and {len(missing_symbols) - 5} more")
-    
+
     if failed_symbols:
         print(f"[ERROR] {len(failed_symbols)} symbol(s) had invalid data:")
         for sym in failed_symbols[:5]:  # Show first 5
             print(f"        - {sym}")
         if len(failed_symbols) > 5:
             print(f"        ... and {len(failed_symbols) - 5} more")
-    
+
     # Exit codes:
     # 0 = Success (no errors)
     # 1 = All symbols missing/failed (complete failure)

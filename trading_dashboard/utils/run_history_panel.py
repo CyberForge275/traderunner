@@ -15,21 +15,21 @@ from trading_dashboard.utils.run_history_utils import (
 def build_run_history_panel(strategy_key: str):
     """
     Build run history panel for displaying strategy run history.
-    
+
     Args:
         strategy_key: Strategy identifier (e.g., "insidebar_intraday")
-        
+
     Returns:
         Dash component (dbc.Card) or empty list if no data
     """
     # Only show for InsideBar strategy (MVP scope)
     if strategy_key != "insidebar_intraday":
         return []
-    
+
     try:
         # Fetch run history
         runs = get_pre_paper_run_history(strategy_key, limit=10)
-        
+
         if not runs:
             # No runs yet
             return dbc.Card(
@@ -46,10 +46,10 @@ def build_run_history_panel(strategy_key: str):
                 ],
                 className="mt-3"
             )
-        
+
         # Format for table
         table_data = format_run_history_for_table(runs)
-        
+
         # Build panel
         return dbc.Card(
             [
@@ -93,7 +93,7 @@ def build_run_history_panel(strategy_key: str):
             ],
             className="mt-3"
         )
-    
+
     except Exception as e:
         # Error building panel - show error message
         return dbc.Card(

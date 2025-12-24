@@ -1,8 +1,8 @@
 # v2 Architecture - README
 
-> **📜 HISTORICAL/REFERENCE DOCUMENT**  
-> **Created**: November 2025  
-> **Status**: v2 architecture planning - partially implemented  
+> **📜 HISTORICAL/REFERENCE DOCUMENT**
+> **Created**: November 2025
+> **Status**: v2 architecture planning - partially implemented
 > **Branch**: `feature/v2-architecture`
 
 ## Overview
@@ -276,7 +276,7 @@ pip install pandera
 
 ---
 
-**Branch:** `feature/v2-architecture`  
-**Created:** 2025-11-27  
-**Status:** Development  
+**Branch:** `feature/v2-architecture`
+**Created:** 2025-11-27
+**Status:** Development
 **Target Merge:** TBD (after comprehensive testing)

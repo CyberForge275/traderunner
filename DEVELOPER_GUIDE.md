@@ -1,6 +1,6 @@
 # Developer Onboarding - droid-trading Ecosystem
 
-**Last Updated:** 2024-11-28  
+**Last Updated:** 2024-11-28
 **Quick Start Guide for Parallel Development**
 
 ---
@@ -54,7 +54,7 @@ pip install -r requirements.txt
 └── apps/                    # Streamlit dashboard
 ```
 
-**Current Branch:** `feature/v2-architecture`  
+**Current Branch:** `feature/v2-architecture`
 **Key Recent Changes:**
 - Added centralized `Org-Overview.md`
 - Test datasets in `data/samples/`
@@ -70,7 +70,7 @@ pip install -r requirements.txt
 └── systemd/                 # Service files
 ```
 
-**Current Branch:** `main`  
+**Current Branch:** `main`
 **Key Features:**
 - Order intent API with idempotency
 - WebSocket health monitoring
@@ -89,7 +89,7 @@ pip install -r requirements.txt
 └── scripts/                 # Test scripts
 ```
 
-**Current Branch:** `master`  
+**Current Branch:** `master`
 **Key Features:**
 - Provider-agnostic architecture
 - WebSocket real-time streaming
@@ -295,7 +295,7 @@ git checkout -b feature/your-cool-feature
 
 ---
 
-**GitHub Organization:** https://github.com/CyberForge275  
+**GitHub Organization:** https://github.com/CyberForge275
 **Repositories:**
 - https://github.com/CyberForge275/traderunner
 - https://github.com/CyberForge275/automatictrader-api

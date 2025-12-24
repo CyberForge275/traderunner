@@ -64,7 +64,7 @@ This runbook provides step-by-step procedures for responding to incidents during
    ```bash
    # Review open positions
    cat artifacts/state/positions.json
-   
+
    # Check daily P&L
    cat artifacts/state/daily_pnl.json
    ```
@@ -240,6 +240,6 @@ export TR_MODE=lab
 
 ---
 
-**Last Updated:** 2025-11-27  
-**Next Review:** 2026-02-27  
+**Last Updated:** 2025-11-27
+**Next Review:** 2026-02-27
 **Owner:** Trading Team

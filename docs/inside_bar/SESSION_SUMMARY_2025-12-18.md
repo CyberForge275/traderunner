@@ -1,7 +1,7 @@
 # InsideBar SSOT - Session Summary
 
-**Date:** 2025-12-18  
-**Duration:** ~6 hours  
+**Date:** 2025-12-18
+**Duration:** ~6 hours
 **Commits:** 3 (b813674, 4f8c93b, + local validation)
 
 ---
@@ -18,7 +18,7 @@
    - Entry mode switching
    - Max trades per session hard limit
 
-2. **Phase 3: Validity Calculator** (`validity.py`)  
+2. **Phase 3: Validity Calculator** (`validity.py`)
    - NEW MODULE: `src/trade/validity.py`
    - Critical fix: `session_end` from `valid_from` (not `signal_ts`)
    - Prevents zero-duration windows
@@ -84,7 +84,7 @@ window = df.loc[(df.index >= start) & (df.index <= end)]
 
 ### Documentation
 1. `docs/inside_bar/VALIDATION_CHECKPOINT_2025-12-18.md` - Comprehensive validation report
-2. `src/strategies/inside_bar/docs/INSIDE_BAR_SSOT.md` - Strategy spec  
+2. `src/strategies/inside_bar/docs/INSIDE_BAR_SSOT.md` - Strategy spec
 3. `.gemini/.../int_deploy_validation_pack.md` - AG deployment prompt
 
 ### Code
@@ -123,10 +123,10 @@ window = df.loc[(df.index >= start) & (df.index <= end)]
 
 ## Statistics
 
-**Files Modified:** 15+  
-**LOC Changed:** ~700+  
-**Tests Run:** 2 (pre/post Phase-5)  
-**Fill Rate:** 94.5% → 100%  
+**Files Modified:** 15+
+**LOC Changed:** ~700+
+**Tests Run:** 2 (pre/post Phase-5)
+**Fill Rate:** 94.5% → 100%
 **Zero-Duration:** 100% → 0%
 
 ---
@@ -158,5 +158,5 @@ cat .gemini/.../int_deploy_validation_pack.md
 
 ---
 
-**Session Complete:** 2025-12-18 19:25 CET  
+**Session Complete:** 2025-12-18 19:25 CET
 **Status:** ✅ Ready for INT deployment & validation

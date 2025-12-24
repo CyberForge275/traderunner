@@ -46,7 +46,7 @@ class LabStage(IntEnum):
 class StrategyVersion:
     """
     Represents an immutable Strategy Version.
-    
+
     Uniquely identified by: (strategy_key, impl_version, profile_key, profile_version)
     """
     id: Optional[int]
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS strategy_version (
     universe_key      TEXT,
     created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at        TEXT    NOT NULL DEFAULT (datetime('now')),
-    
+
     UNIQUE(strategy_key, impl_version, profile_key, profile_version)
 )
 """
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS strategy_run (
     error_message       TEXT,
     metrics_json        TEXT,
     tags                TEXT,
-    
+
     FOREIGN KEY(strategy_version_id) REFERENCES strategy_version(id)
 )
 """
@@ -142,29 +142,29 @@ STRATEGY_RUN_INDEXES = [
 class StrategyMetadataRepository:
     """
     Repository for Strategy Lifecycle metadata.
-    
+
     Provides CRUD operations for strategy_version and strategy_run tables.
     """
-    
+
     def __init__(self, db_path: Path):
         """
         Initialize repository with database path.
-        
+
         Args:
             db_path: Path to SQLite database (typically signals.db)
         """
         self.db_path = Path(db_path)
-    
+
     def _get_connection(self) -> sqlite3.Connection:
         """Get database connection with foreign keys enabled."""
         conn = sqlite3.connect(str(self.db_path))
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
-    
+
     def initialize_schema(self):
         """
         Create tables and indexes if they don't exist.
-        
+
         This is idempotent and safe to call multiple times.
         """
         conn = self._get_connection()
@@ -172,19 +172,19 @@ class StrategyMetadataRepository:
             # Create tables
             conn.execute(STRATEGY_VERSION_DDL)
             conn.execute(STRATEGY_RUN_DDL)
-            
+
             # Create indexes
             for index_ddl in STRATEGY_VERSION_INDEXES:
                 conn.execute(index_ddl)
             for index_ddl in STRATEGY_RUN_INDEXES:
                 conn.execute(index_ddl)
-            
+
             conn.commit()
         finally:
             conn.close()
-    
+
     # ===== StrategyVersion CRUD =====
-    
+
     def create_strategy_version(
         self,
         strategy_key: str,
@@ -200,7 +200,7 @@ class StrategyMetadataRepository:
     ) -> int:
         """
         Create a new Strategy Version.
-        
+
         Args:
             strategy_key: Strategy identifier (e.g., 'insidebar_intraday')
             impl_version: Implementation version number
@@ -212,16 +212,16 @@ class StrategyMetadataRepository:
             lifecycle_stage: Current lifecycle stage
             code_ref_type: Type of code reference ('git', 'tag', etc.)
             universe_key: Optional universe identifier
-            
+
         Returns:
             strategy_version_id (primary key)
-            
+
         Raises:
             sqlite3.IntegrityError: If (strategy_key, impl_version, profile_key, profile_version) already exists
         """
         config_json_str = json.dumps(config_json, sort_keys=True)
         config_hash = self._calculate_config_hash(config_json_str)
-        
+
         conn = self._get_connection()
         try:
             cursor = conn.execute("""
@@ -239,14 +239,14 @@ class StrategyMetadataRepository:
             return cursor.lastrowid
         finally:
             conn.close()
-    
+
     def get_strategy_version_by_id(self, version_id: int) -> Optional[StrategyVersion]:
         """
         Get Strategy Version by primary key.
-        
+
         Args:
             version_id: Primary key
-            
+
         Returns:
             StrategyVersion or None if not found
         """
@@ -262,7 +262,7 @@ class StrategyMetadataRepository:
             return None
         finally:
             conn.close()
-    
+
     def find_strategy_version(
         self,
         strategy_key: str,
@@ -272,21 +272,21 @@ class StrategyMetadataRepository:
     ) -> Optional[StrategyVersion]:
         """
         Find Strategy Version by unique identifier.
-        
+
         Args:
             strategy_key: Strategy identifier
             impl_version: Implementation version
             profile_key: Configuration profile name
             profile_version: Configuration profile version
-            
+
         Returns:
             StrategyVersion or None if not found
         """
         conn = self._get_connection()
         try:
             cursor = conn.execute("""
-                SELECT * FROM strategy_version 
-                WHERE strategy_key = ? 
+                SELECT * FROM strategy_version
+                WHERE strategy_key = ?
                   AND impl_version = ?
                   AND profile_key = ?
                   AND profile_version = ?
@@ -297,7 +297,7 @@ class StrategyMetadataRepository:
             return None
         finally:
             conn.close()
-    
+
     def update_lifecycle_stage(
         self,
         version_id: int,
@@ -305,26 +305,26 @@ class StrategyMetadataRepository:
     ):
         """
         Update lifecycle stage of a Strategy Version.
-        
+
         Args:
             version_id: Strategy version primary key
             new_stage: New lifecycle stage
-            
+
         Note: This should only progress forward (Explore → Backtest → ... → Live)
         """
         conn = self._get_connection()
         try:
             conn.execute("""
-                UPDATE strategy_version 
+                UPDATE strategy_version
                 SET lifecycle_stage = ?, updated_at = datetime('now')
                 WHERE id = ?
             """, (new_stage.value, version_id))
             conn.commit()
         finally:
             conn.close()
-    
+
     # ===== StrategyRun CRUD =====
-    
+
     def create_strategy_run(
         self,
         strategy_version_id: int,
@@ -336,7 +336,7 @@ class StrategyMetadataRepository:
     ) -> int:
         """
         Create a new Strategy Run.
-        
+
         Args:
             strategy_version_id: Foreign key to strategy_version
             lab_stage: Lab where this run executes
@@ -344,10 +344,10 @@ class StrategyMetadataRepository:
             environment: Environment name ('prod', 'dev', 'test')
             external_run_id: Optional external identifier (e.g., backtest run ID)
             tags: Optional JSON string with run tags
-            
+
         Returns:
             strategy_run_id (primary key)
-            
+
         Raises:
             sqlite3.IntegrityError: If strategy_version_id doesn't exist (FK constraint)
         """
@@ -366,7 +366,7 @@ class StrategyMetadataRepository:
             return cursor.lastrowid
         finally:
             conn.close()
-    
+
     def update_strategy_run_status(
         self,
         run_id: int,
@@ -377,7 +377,7 @@ class StrategyMetadataRepository:
     ):
         """
         Update Strategy Run status and completion information.
-        
+
         Args:
             run_id: Strategy run primary key
             status: New status ('running', 'completed', 'failed', 'aborted')
@@ -387,20 +387,20 @@ class StrategyMetadataRepository:
         """
         if ended_at is None and status in ('completed', 'failed', 'aborted'):
             ended_at = datetime.now().isoformat()
-        
+
         metrics_str = json.dumps(metrics_json) if metrics_json else None
-        
+
         conn = self._get_connection()
         try:
             conn.execute("""
-                UPDATE strategy_run 
+                UPDATE strategy_run
                 SET status = ?, ended_at = ?, error_message = ?, metrics_json = ?
                 WHERE id = ?
             """, (status, ended_at, error_message, metrics_str, run_id))
             conn.commit()
         finally:
             conn.close()
-    
+
     def get_runs_for_strategy_version(
         self,
         version_id: int,
@@ -408,11 +408,11 @@ class StrategyMetadataRepository:
     ) -> List[StrategyRun]:
         """
         Get all runs for a Strategy Version, optionally filtered by lab stage.
-        
+
         Args:
             version_id: Strategy version primary key
             lab_stage: Optional filter by lab stage
-            
+
         Returns:
             List of StrategyRun objects
         """
@@ -420,29 +420,29 @@ class StrategyMetadataRepository:
         try:
             if lab_stage is not None:
                 cursor = conn.execute("""
-                    SELECT * FROM strategy_run 
+                    SELECT * FROM strategy_run
                     WHERE strategy_version_id = ? AND lab_stage = ?
                     ORDER BY started_at DESC
                 """, (version_id, lab_stage.value))
             else:
                 cursor = conn.execute("""
-                    SELECT * FROM strategy_run 
+                    SELECT * FROM strategy_run
                     WHERE strategy_version_id = ?
                     ORDER BY started_at DESC
                 """, (version_id,))
-            
+
             rows = cursor.fetchall()
             return [self._row_to_strategy_run(row) for row in rows]
         finally:
             conn.close()
-    
+
     # ===== Helper Methods =====
-    
+
     def _calculate_config_hash(self, config_json_str: str) -> str:
         """Calculate SHA256 hash of configuration JSON (first 16 chars)."""
         import hashlib
         return hashlib.sha256(config_json_str.encode()).hexdigest()[:16]
-    
+
     def _row_to_strategy_version(self, row: tuple) -> StrategyVersion:
         """Convert database row to StrategyVersion dataclass."""
         return StrategyVersion(
@@ -461,7 +461,7 @@ class StrategyMetadataRepository:
             created_at=row[12],
             updated_at=row[13],
         )
-    
+
     def _row_to_strategy_run(self, row: tuple) -> StrategyRun:
         """Convert database row to StrategyRun dataclass."""
         return StrategyRun(
@@ -485,10 +485,10 @@ class StrategyMetadataRepository:
 def get_repository(db_path: Optional[Path] = None) -> StrategyMetadataRepository:
     """
     Get repository instance using default database path from Settings.
-    
+
     Args:
         db_path: Optional explicit database path (defaults to signals.db from Settings)
-        
+
     Returns:
         StrategyMetadataRepository instance
     """
@@ -496,7 +496,7 @@ def get_repository(db_path: Optional[Path] = None) -> StrategyMetadataRepository
         from src.core.settings import get_settings
         settings = get_settings()
         db_path = settings.signals_db_path
-    
+
     repo = StrategyMetadataRepository(db_path)
     repo.initialize_schema()  # Ensure tables exist
     return repo

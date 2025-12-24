@@ -14,7 +14,7 @@ def create_portfolio_card_large(portfolio: dict):
     pnl_pct = portfolio.get("daily_pnl_pct", 0)
     pnl_class = "pnl-positive" if pnl >= 0 else "pnl-negative"
     pnl_sign = "+" if pnl >= 0 else ""
-    
+
     return html.Div(
         className="dashboard-card",
         children=[
@@ -60,9 +60,9 @@ def create_positions_table(positions: list):
                 html.P("No open positions", className="text-muted", style={"padding": "20px"})
             ]
         )
-    
+
     df = pd.DataFrame(positions)
-    
+
     return html.Div(
         className="dashboard-card",
         children=[
@@ -111,7 +111,7 @@ def create_portfolio_layout():
     """Create the Portfolio tab layout."""
     portfolio = get_portfolio_summary()
     positions = portfolio.get("positions", [])
-    
+
     return html.Div([
         dbc.Row([
             dbc.Col([

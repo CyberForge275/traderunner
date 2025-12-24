@@ -48,21 +48,21 @@ stateDiagram-v2
     [*] --> CreateRunDir: Start
     CreateRunDir --> WriteRunMeta: create_run_dir()
     WriteRunMeta --> CoverageGate: write_run_meta() + manifest init
-    
+
     CoverageGate --> SLAGate: Coverage SUFFICIENT
     CoverageGate --> FailedPrecondition: GAP_DETECTED / FETCH_FAILED
-    
+
     SLAGate --> Execute: SLA passed
     SLAGate --> FailedPrecondition: SLA violated (FATAL)
-    
+
     Execute --> Success: Execution complete
     Execute --> Error: Unhandled exception
-    
+
     Success --> WriteArtifacts: write_run_result() + finalize_manifest()
     FailedPrecondition --> WriteArtifacts
     Error --> WriteError: write_error_stacktrace() + error_id
     WriteError --> WriteArtifacts
-    
+
     WriteArtifacts --> [*]: ALWAYS exists
 ```
 
@@ -220,7 +220,7 @@ Strategy versions control behavior and ensure reproducibility.
 
 - **impl_version**: Implementation version (code changes, bug fixes)
   - Example: `1.0.0` → `1.1.0` (bug fix in ATR calculation)
-  
+
 - **profile_version**: Configuration profile (parameter sets)
   - Example: `default` vs `aggressive` vs `conservative`
 

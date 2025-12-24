@@ -34,12 +34,12 @@ def api_service():
     env["AT_DB_PATH"] = str(API_DB_PATH)
     env["AT_BEARER_TOKEN"] = ""  # No auth for testing
     env["AT_LOG_LEVEL"] = "INFO"
-    
+
     # Clean up old test database
     if API_DB_PATH.exists():
         API_DB_PATH.unlink()
     API_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Start the API service
     api_process = subprocess.Popen(
         ["python", "-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "8888"],
@@ -48,7 +48,7 @@ def api_service():
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
-    
+
     # Wait for service to be ready
     max_wait = 10
     for i in range(max_wait):
@@ -62,9 +62,9 @@ def api_service():
     else:
         api_process.kill()
         pytest.fail("automatictrader-api failed to start within 10 seconds")
-    
+
     yield "http://localhost:8888"
-    
+
     # Cleanup
     api_process.terminate()
     api_process.wait(timeout=5)
@@ -76,7 +76,7 @@ def api_service():
 def test_signal_csv(tmp_path):
     """Create a test signal CSV file"""
     csv_path = tmp_path / "test_signals.csv"
-    
+
     # Create sample signals
     signals = pd.DataFrame([
         {
@@ -98,7 +98,7 @@ def test_signal_csv(tmp_path):
             "timestamp": "2024-12-01T10:05:00Z"
         }
     ])
-    
+
     signals.to_csv(csv_path, index=False)
     return csv_path
 
@@ -116,16 +116,16 @@ def test_signal_to_intent_flow(api_service, test_signal_csv):
     Test full signal → intent flow using paper_trading_adapter
     """
     from trade.paper_trading_adapter import PaperTradingAdapter
-    
+
     # Create adapter
     adapter = PaperTradingAdapter(api_url=api_service, timeout=5)
-    
+
     # Verify API is reachable
     assert adapter.health_check(), "API health check failed"
-    
+
     # Send signals
     results = adapter.send_signals_from_csv(test_signal_csv)
-    
+
     # Verify results
     assert "error" not in results
     assert results["total"] == 2
@@ -133,18 +133,18 @@ def test_signal_to_intent_flow(api_service, test_signal_csv):
     assert results["duplicates"] == 0
     assert results["errors"] == 0
     assert results["skipped"] == 0
-    
+
     # Verify intents in database
     conn = sqlite3.connect(str(API_DB_PATH))
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
+
     cursor.execute("SELECT * FROM order_intents ORDER BY created_at")
     intents = [dict(row) for row in cursor.fetchall()]
     conn.close()
-    
+
     assert len(intents) == 2
-    
+
     # Check first intent (AAPL)
     assert intents[0]["symbol"] == "AAPL"
     assert intents[0]["side"] == "BUY"
@@ -153,7 +153,7 @@ def test_signal_to_intent_flow(api_service, test_signal_csv):
     assert float(intents[0]["price"]) == 227.50
     assert intents[0]["status"] == "pending"
     assert intents[0]["client_tag"] == "test_strategy"
-    
+
     # Check second intent (MSFT)
     assert intents[1]["symbol"] == "MSFT"
     assert intents[1]["side"] == "SELL"
@@ -165,28 +165,28 @@ def test_idempotency(api_service, test_signal_csv):
     Test that sending the same signals twice doesn't create duplicates
     """
     from trade.paper_trading_adapter import PaperTradingAdapter
-    
+
     adapter = PaperTradingAdapter(api_url=api_service, timeout=5)
-    
+
     # Send signals first time
     results1 = adapter.send_signals_from_csv(test_signal_csv)
     assert results1["created"] == 2
-    
+
     # Send same signals again
     results2 = adapter.send_signals_from_csv(test_signal_csv)
-    
+
     # Should be marked as duplicates
     assert results2["total"] == 2
     assert results2["created"] == 0
     assert results2["duplicates"] == 2
-    
+
     # Verify only 2 intents in database
     conn = sqlite3.connect(str(API_DB_PATH))
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM order_intents")
     count = cursor.fetchone()[0]
     conn.close()
-    
+
     assert count == 2
 
 
@@ -195,16 +195,16 @@ def test_adapter_handles_api_unavailable(test_signal_csv):
     Test that adapter gracefully handles API unavailability
     """
     from trade.paper_trading_adapter import PaperTradingAdapter
-    
+
     # Point to non-existent API
     adapter = PaperTradingAdapter(api_url="http://localhost:9999", timeout=2)
-    
+
     # Health check should fail
     assert not adapter.health_check()
-    
+
     # Sending signals should handle errors gracefully
     results = adapter.send_signals_from_csv(test_signal_csv)
-    
+
     # Should track errors, not crash
     assert results["total"] == 2
     assert results["errors"] == 2
@@ -215,7 +215,7 @@ def test_invalid_signal_handling(api_service, tmp_path):
     Test handling of invalid signals (e.g., LMT without price)
     """
     from trade.paper_trading_adapter import PaperTradingAdapter
-    
+
     # Create signal with missing price for LMT order
     csv_path = tmp_path / "invalid_signals.csv"
     signals = pd.DataFrame([
@@ -230,10 +230,10 @@ def test_invalid_signal_handling(api_service, tmp_path):
         }
     ])
     signals.to_csv(csv_path, index=False)
-    
+
     adapter = PaperTradingAdapter(api_url=api_service, timeout=5)
     results = adapter.send_signals_from_csv(csv_path)
-    
+
     # Should be skipped
     assert results["total"] == 1
     assert results["skipped"] == 1
@@ -245,7 +245,7 @@ def test_batch_signal_processing(api_service, tmp_path):
     Test processing larger batch of signals
     """
     from trade.paper_trading_adapter import PaperTradingAdapter
-    
+
     # Create 20 signals
     csv_path = tmp_path / "batch_signals.csv"
     signals = []
@@ -259,21 +259,21 @@ def test_batch_signal_processing(api_service, tmp_path):
             "source": "batch_test",
             "timestamp": f"2024-12-01T{10 + i // 60:02d}:{i % 60:02d}:00Z"
         })
-    
+
     pd.DataFrame(signals).to_csv(csv_path, index=False)
-    
+
     adapter = PaperTradingAdapter(api_url=api_service, timeout=5)
     results = adapter.send_signals_from_csv(csv_path)
-    
+
     assert results["total"] == 20
     assert results["created"] == 20
     assert results["errors"] == 0
-    
+
     # Verify in database
     conn = sqlite3.connect(str(API_DB_PATH))
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM order_intents")
     count = cursor.fetchone()[0]
     conn.close()
-    
+
     assert count == 20

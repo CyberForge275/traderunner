@@ -12,15 +12,15 @@ from . import StrategyConfigPlugin
 
 class InsideBarConfigPlugin(StrategyConfigPlugin):
     """InsideBar strategy configuration with version management."""
-    
+
     @property
     def strategy_id(self) -> str:
         return "insidebar_intraday"
-    
+
     @property
     def display_name(self) -> str:
         return "Inside Bar"
-    
+
     def render_config_ui(self) -> List:
         """Render version management UI for InsideBar."""
         return [
@@ -40,7 +40,7 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
                 clearable=False,
                 style={"color": "#000", "marginBottom": "8px"},
             ),
-            
+
             # Configuration Parameters Section (collapsible)
             html.Details([
                 html.Summary(
@@ -73,15 +73,15 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
                         children="Pattern: v#.## (e.g., v1.01, v2.00)",
                         style={"fontSize": "0.75em", "color": "#888", "marginBottom": "8px"}
                     ),
-                    
+
                     html.Hr(style={"margin": "16px 0"}),
-                    
+
                     # Pattern Detection Parameters
                     html.H6(
                         "📊 Pattern Detection",
                         style={"marginTop": "8px", "marginBottom": "8px", "fontSize": "0.9em"}
                     ),
-                    
+
                     html.Label("ATR Period", style={"fontSize": "0.85em", "marginTop": "4px"}),
                     dcc.Input(
                         id="insidebar-atr-period",
@@ -92,8 +92,8 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
                         step=1,
                         style={"width": "100%", "marginBottom": "8px"}
                     ),
-                    
-                    html.Label("Min Mother Bar Size (ATR multiple)", 
+
+                    html.Label("Min Mother Bar Size (ATR multiple)",
                         style={"fontSize": "0.85em", "marginTop": "4px"}),
                     dcc.Input(
                         id="insidebar-min-mother-bar",
@@ -104,8 +104,8 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
                         step=0.1,
                         style={"width": "100%", "marginBottom": "8px"}
                     ),
-                    
-                    html.Label("Breakout Confirmation", 
+
+                    html.Label("Breakout Confirmation",
                         style={"fontSize": "0.85em", "marginTop": "4px"}),
                     dcc.Checklist(
                         id="insidebar-breakout-confirm",
@@ -113,15 +113,15 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
                         value=["true"],
                         style={"marginBottom": "8px"}
                     ),
-                    
+
                     html.Hr(style={"margin": "16px 0"}),
-                    
+
                     # Entry & Exit Parameters
                     html.H6(
                         "🎯 Entry & Exit",
                         style={"marginTop": "8px", "marginBottom": "8px", "fontSize": "0.9em"}
                     ),
-                    
+
                     html.Label("Risk/Reward Ratio", style={"fontSize": "0.85em", "marginTop": "4px"}),
                     dcc.Input(
                         id="insidebar-rrr",
@@ -132,15 +132,15 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
                         step=0.1,
                         style={"width": "100%", "marginBottom": "8px"}
                     ),
-                    
+
                     html.Hr(style={"margin": "16px 0"}),
-                    
+
                     # Live Trading Parameters
                     html.H6(
                         "⚙️ Live Trading",
                         style={"marginTop": "8px", "marginBottom": "8px", "fontSize": "0.9em"}
                     ),
-                    
+
                     html.Label("Lookback Candles", style={"fontSize": "0.85em", "marginTop": "4px"}),
                     dcc.Input(
                         id="insidebar-lookback-candles",
@@ -151,8 +151,8 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
                         step=1,
                         style={"width": "100%", "marginBottom": "8px"}
                     ),
-                    
-                    html.Label("Max Pattern Age (candles)", 
+
+                    html.Label("Max Pattern Age (candles)",
                         style={"fontSize": "0.85em", "marginTop": "4px"}),
                     dcc.Input(
                         id="insidebar-max-pattern-age",
@@ -163,16 +163,16 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
                         step=1,
                         style={"width": "100%", "marginBottom": "8px"}
                     ),
-                    
+
                     html.Hr(style={"margin": "16px 0"}),
-                    
+
                     # Backtesting Parameters
                     html.H6(
                         "🧪 Backtesting",
                         style={"marginTop": "8px", "marginBottom": "8px", "fontSize": "0.9em"}
                     ),
-                    
-                    html.Label("Execution Lag (candles)", 
+
+                    html.Label("Execution Lag (candles)",
                         style={"fontSize": "0.85em", "marginTop": "4px"}),
                     dcc.Input(
                         id="insidebar-execution-lag",
@@ -183,18 +183,18 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
                         step=1,
                         style={"width": "100%", "marginBottom": "8px"}
                     ),
-                    
+
                 ], style={"marginLeft": "15px", "marginTop": "8px"}),
             ], open=True),  # Expanded by default
         ]
-    
+
     def get_callbacks(self) -> List[Callable]:
         """Register version management callbacks."""
         return [
             self._register_version_loader,
             self._register_version_validator,
         ]
-    
+
     def _register_version_loader(self, app):
         """Callback to load available versions from registry."""
         @app.callback(
@@ -206,7 +206,7 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
             """Load versions when InsideBar is selected."""
             if strategy != self.strategy_id:
                 return [], None
-            
+
             try:
                 from trading_dashboard.utils.version_loader import get_strategy_versions
                 versions = get_strategy_versions(strategy)
@@ -217,9 +217,9 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
                     return simplified, simplified[0]["value"]
             except Exception as e:
                 print(f"Error loading versions: {e}")
-            
+
             return [], None
-    
+
     def _register_version_validator(self, app):
         """Callback to validate new version input pattern."""
         @app.callback(
@@ -230,13 +230,13 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
         def validate_version_pattern(new_version):
             """Validate version format in real-time."""
             base_style = {"fontSize": "0.75em", "marginBottom": "8px"}
-            
+
             if not new_version or not new_version.strip():
                 return (
                     "Pattern: v#.## (e.g., v1.01, v2.00)",
                     {**base_style, "color": "#888"}
                 )
-            
+
             # Pattern: v + number + dot + two-digit number
             pattern = r'^v\d+\.\d{2}$'
             if re.match(pattern, new_version.strip()):
@@ -249,7 +249,7 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
                     "❌ Invalid format. Use: v#.## (e.g., v1.01, v2.00)",
                     {**base_style, "color": "red"}
                 )
-    
+
     def extract_config_from_inputs(
         self,
         selected_version: str = None,
@@ -260,16 +260,16 @@ class InsideBarConfigPlugin(StrategyConfigPlugin):
         # Use new version if provided and valid, otherwise selected version
         version_to_use = None
         is_new = False
-        
+
         if new_version and new_version.strip():
             # Validate pattern
             if re.match(r'^v\d+\.\d{2}$', new_version.strip()):
                 version_to_use = new_version.strip()
                 is_new = True
-        
+
         if not version_to_use:
             version_to_use = selected_version
-        
+
         return {
             "strategy_version": version_to_use,
             "is_new_version": is_new

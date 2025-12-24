@@ -13,40 +13,40 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator
 class SignalOutputSpec(BaseModel):
     """
     Canonical signal output format for all strategies.
-    
+
     This contract ensures all signals contain:
     - Entry prices (long/short)
     - Stop loss levels
     - Take profit targets
     - Metadata for debugging and analysis
     """
-    
+
     # Required fields
     symbol: str = Field(..., description="Ticker symbol")
     timestamp: datetime = Field(..., description="Signal generation timestamp (UTC)")
     strategy: str = Field(..., description="Strategy name")
     strategy_version: str = Field(..., description="Strategy version (semver)")
-    
+
     # Entry signals (Optional - at least one should be set)
     long_entry: Optional[Decimal] = Field(None, description="Long entry price")
     short_entry: Optional[Decimal] = Field(None, description="Short entry price")
-    
+
     # Stop loss levels
     sl_long: Optional[Decimal] = Field(None, description="Stop loss for long position")
     sl_short: Optional[Decimal] = Field(None, description="Stop loss for short position")
-    
+
     # Take profit targets
     tp_long: Optional[Decimal] = Field(None, description="Take profit for long position")
     tp_short: Optional[Decimal] = Field(None, description="Take profit for short position")
-    
+
     # Signal metadata
     setup: Optional[str] = Field(None, description="Setup type (e.g., 'inside_bar', 'breakout')")
     score: Optional[float] = Field(None, ge=0.0, le=1.0, description="Confidence score (0.0-1.0)")
     score_components: Optional[Dict[str, float]] = Field(
-        None, 
+        None,
         description="Score breakdown (e.g., {'volatility': 0.8, 'volume': 0.9})"
     )
-    
+
     # Additional metadata
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
@@ -72,7 +72,7 @@ class SignalOutputSpec(BaseModel):
         if v is not None and not (0.0 <= v <= 1.0):
             raise ValueError("Score must be between 0.0 and 1.0")
         return v
-    
+
     def to_csv_row(self) -> Dict[str, Any]:
         """Convert to flat dictionary for CSV export."""
         return {
@@ -95,7 +95,7 @@ class SignalOutputSpec(BaseModel):
 SIGNAL_COLUMNS = [
     'Symbol',
     'long_entry',
-    'short_entry', 
+    'short_entry',
     'sl_long',
     'sl_short',
     'tp_long',

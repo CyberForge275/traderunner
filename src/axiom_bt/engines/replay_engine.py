@@ -130,7 +130,7 @@ def _derive_m1_dir(data_path: Path) -> Optional[Path]:
 def _resolve_symbol_path(symbol: str, m1_dir: Optional[Path], fallback_dir: Path) -> Tuple[Optional[Path], bool]:
     import logging
     logger = logging.getLogger(__name__)
-    
+
     if m1_dir is not None:
         candidate = m1_dir / f"{symbol}.parquet"
         if candidate.exists():
@@ -140,7 +140,7 @@ def _resolve_symbol_path(symbol: str, m1_dir: Optional[Path], fallback_dir: Path
     if fallback.exists():
         logger.debug(f"Resolved {symbol} → {fallback} (fallback data)")
         return fallback, False
-    
+
     logger.warning(f"No data file found for {symbol} (searched: {m1_dir}, {fallback_dir})")
     return None, False
 
@@ -156,14 +156,14 @@ def simulate_insidebar_from_orders(
 ) -> Dict[str, Any]:
     import logging
     logger = logging.getLogger(__name__)
-    
+
     orders = pd.read_csv(orders_csv)
-    
+
     # Enhanced datetime conversion with better error handling
     logger.info(f"Processing orders from {orders_csv}")
     logger.info(f"Orders shape: {orders.shape}")
     logger.info(f"Orders columns: {orders.columns.tolist()}")
-    
+
     # Convert datetime columns with explicit error handling
     for col in ["valid_from", "valid_to"]:
         if col in orders.columns:
@@ -182,7 +182,7 @@ def simulate_insidebar_from_orders(
                     f"Please ensure all values are valid datetime strings. "
                     f"Sample values: {orders[col].head().tolist()}"
                 ) from e
-    
+
     if orders.empty:
         empty = pd.DataFrame()
         return {
@@ -201,14 +201,14 @@ def simulate_insidebar_from_orders(
                 f"Missing required column '{column}' in orders file. "
                 f"Available columns: {orders.columns.tolist()}"
             )
-        
+
         if not pd.api.types.is_datetime64_any_dtype(orders[column]):
             logger.error(f"Column '{column}' is not datetime dtype: {orders[column].dtype}")
             raise TypeError(
                 f"Column '{column}' must be datetime type, got {orders[column].dtype}. "
                 f"This usually means datetime conversion failed silently."
             )
-        
+
         # Handle timezone
         if orders[column].dt.tz is None:
             logger.info(f"Localizing '{column}' to {tz}")
@@ -236,7 +236,7 @@ def simulate_insidebar_from_orders(
     if m1_dir is not None and m1_dir.is_file():
         logger.warning(f"data_path_m1 points to file instead of directory, using parent: {m1_dir} → {m1_dir.parent}")
         m1_dir = m1_dir.parent
-    
+
     if data_path.is_file():
         logger.warning(f"data_path points to file instead of directory, using parent: {data_path} → {data_path.parent}")
         data_path = data_path.parent
@@ -447,13 +447,13 @@ def simulate_daily_moc_from_orders(
 ) -> Dict[str, Any]:
     import logging
     logger = logging.getLogger(__name__)
-    
+
     orders = pd.read_csv(orders_csv)
-    
+
     # Enhanced datetime conversion with better error handling
     logger.info(f"Processing MOC orders from {orders_csv}")
     logger.info(f"Orders shape: {orders.shape}")
-    
+
     if "valid_from" in orders.columns:
         try:
             orders["valid_from"] = pd.to_datetime(orders["valid_from"], utc=True)
@@ -465,7 +465,7 @@ def simulate_daily_moc_from_orders(
                 f"Failed to convert 'valid_from' to datetime. "
                 f"Sample values: {orders['valid_from'].head().tolist()}"
             ) from e
-    
+
     if orders.empty:
         empty = pd.DataFrame()
         return {
@@ -481,7 +481,7 @@ def simulate_daily_moc_from_orders(
         raise TypeError(
             f"Column 'valid_from' must be datetime type, got {orders['valid_from'].dtype}"
         )
-    
+
     if orders["valid_from"].dt.tz is None:
         logger.info(f"Localizing 'valid_from' to {tz}")
         orders["valid_from"] = orders["valid_from"].dt.tz_localize(tz)

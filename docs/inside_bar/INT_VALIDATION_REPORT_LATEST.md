@@ -1,8 +1,8 @@
 # InsideBar SSOT - Final Validation Report
 
-**Date:** 2025-12-19 00:10 CET  
-**Server:** INT (192.168.178.55)  
-**Commit:** ec785f0 + pandas fix (eodhd_fetch.py)  
+**Date:** 2025-12-19 00:10 CET
+**Server:** INT (192.168.178.55)
+**Commit:** ec785f0 + pandas fix (eodhd_fetch.py)
 **Status:** ✅ **GO FOR PRODUCTION**
 
 ---
@@ -331,6 +331,6 @@ agg = {
 
 ---
 
-**Report Prepared:** 2025-12-19 00:10 CET  
-**Validation Lead:** Antigravity AI  
+**Report Prepared:** 2025-12-19 00:10 CET
+**Validation Lead:** Antigravity AI
 **Status:** ✅ **COMPLETE - APPROVED FOR PRODUCTION**

@@ -19,7 +19,7 @@ from src.strategies.metadata.schema import (
 
 class TestDataRequirements:
     """Test DataRequirements validation."""
-    
+
     def test_valid_data_requirements(self):
         """Valid data requirements should pass validation."""
         req = DataRequirements(
@@ -28,7 +28,7 @@ class TestDataRequirements:
             min_history_days=30,
         )
         req.validate()  # Should not raise
-    
+
     def test_empty_timeframes_fails(self):
         """Empty timeframes list should fail."""
         req = DataRequirements(
@@ -37,7 +37,7 @@ class TestDataRequirements:
         )
         with pytest.raises(AssertionError, match="At least one timeframe"):
             req.validate()
-    
+
     def test_invalid_timeframe_fails(self):
         """Invalid timeframe should fail."""
         req = DataRequirements(
@@ -46,7 +46,7 @@ class TestDataRequirements:
         )
         with pytest.raises(AssertionError, match="Invalid timeframe"):
             req.validate()
-    
+
     def test_negative_history_fails(self):
         """Negative min_history_days should fail."""
         req = DataRequirements(
@@ -59,7 +59,7 @@ class TestDataRequirements:
 
 class TestStrategyCapabilities:
     """Test StrategyCapabilities validation."""
-    
+
     def test_valid_capabilities(self):
         """Valid capabilities should pass."""
         cap = StrategyCapabilities(
@@ -68,7 +68,7 @@ class TestStrategyCapabilities:
             supports_pre_papertrade=True,
         )
         cap.validate()  # Should not raise
-    
+
     def test_no_trading_mode_fails(self):
         """At least one trading mode required."""
         cap = StrategyCapabilities(
@@ -78,7 +78,7 @@ class TestStrategyCapabilities:
         )
         with pytest.raises(AssertionError, match="at least one trading mode"):
             cap.validate()
-    
+
     def test_no_signal_type_fails(self):
         """At least one signal type required."""
         cap = StrategyCapabilities(
@@ -94,7 +94,7 @@ class TestStrategyCapabilities:
 
 class TestStrategyMetadata:
     """Test StrategyMetadata validation and serialization."""
-    
+
     @pytest.fixture
     def valid_metadata(self):
         """Create valid metadata for testing."""
@@ -118,12 +118,12 @@ class TestStrategyMetadata:
             signal_module_path="signals.cli_inside_bar",
             core_module_path="strategies.inside_bar.core",
         )
-    
+
     def test_valid_metadata_creation(self, valid_metadata):
         """Valid metadata should be created successfully."""
         assert valid_metadata.strategy_id == "inside_bar"
         assert valid_metadata.version == "2.0.0"
-    
+
     def test_invalid_strategy_id_fails(self):
         """Invalid strategy_id format should fail."""
         with pytest.raises(ValueError, match="Invalid strategy_id"):
@@ -147,7 +147,7 @@ class TestStrategyMetadata:
                 signal_module_path="test.signals",
                 core_module_path="test.core",
             )
-    
+
     def test_invalid_version_fails(self):
         """Invalid version format should fail."""
         with pytest.raises(ValueError, match="Invalid version"):
@@ -171,37 +171,37 @@ class TestStrategyMetadata:
                 signal_module_path="test.signals",
                 core_module_path="test.core",
             )
-    
+
     def test_serialization_round_trip(self, valid_metadata):
         """to_dict() and from_dict() should be reversible."""
         # Serialize
         data_dict = valid_metadata.to_dict()
-        
+
         # Deserialize
         restored = StrategyMetadata.from_dict(data_dict)
-        
+
         # Verify
         assert restored.strategy_id == valid_metadata.strategy_id
         assert restored.version == valid_metadata.version
         assert restored.capabilities.supports_backtest == valid_metadata.capabilities.supports_backtest
-    
+
     def test_environment_compatibility(self, valid_metadata):
         """is_compatible_with_environment() should work correctly."""
         # Supports pre-papertrade
         assert valid_metadata.is_compatible_with_environment(
             DeploymentEnvironment.PRE_PAPERTRADE_LAB
         )
-        
+
         # Supports live
         assert valid_metadata.is_compatible_with_environment(
             DeploymentEnvironment.LIVE_TRADING
         )
-        
+
         # All strategies support explore
         assert valid_metadata.is_compatible_with_environment(
             DeploymentEnvironment.EXPLORE_LAB
         )
-    
+
     def test_repr_format(self, valid_metadata):
         """__repr__() should be informative."""
         repr_str = repr(valid_metadata)
@@ -212,13 +212,13 @@ class TestStrategyMetadata:
 
 class TestDeploymentInfo:
     """Test DeploymentInfo dataclass."""
-    
+
     def test_default_deployment_info(self):
         """Default deployment info should work."""
         info = DeploymentInfo()
         assert info.deployment_status == DeploymentStatus.DEVELOPMENT
         assert info.deployed_environments == []
-    
+
     def test_production_deployment(self):
         """Production deployment info."""
         info = DeploymentInfo(
@@ -234,7 +234,7 @@ class TestDeploymentInfo:
 
 class TestEdgeCases:
     """Test edge cases and special scenarios."""
-    
+
     def test_minimal_metadata(self):
         """Metadata with only required fields."""
         metadata = StrategyMetadata(
@@ -258,7 +258,7 @@ class TestEdgeCases:
             core_module_path="test.core",
         )
         metadata.validate()  # Should not raise
-    
+
     def test_complex_metadata(self):
         """Metadata with all optional fields."""
         metadata = StrategyMetadata(

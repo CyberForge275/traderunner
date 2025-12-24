@@ -1,7 +1,7 @@
 # Inside Bar Strategy - Live Paper Trading Integration
 
-> **Last Updated**: 2025-12-05  
-> **Config Location**: `droid/shared-config/strategy_params.yaml`  
+> **Last Updated**: 2025-12-05
+> **Config Location**: `droid/shared-config/strategy_params.yaml`
 > **Current RRR**: 1.0 (matches backtest)
 
 ## Overview
@@ -65,9 +65,9 @@ MarketDataEvent:
   price = 227.35
   volume = 100
   ts = 2024-11-28T15:32:12Z
-  
+
     ↓ (CandleAggregator.on_event)
-    
+
 # Aggregator creates M5 candles
 Candle (M5):
   symbol = "AAPL"
@@ -91,14 +91,14 @@ class CandleAggregator:
         """Process tick → update candles"""
         for interval in self.intervals:  # ["M1", "M5", "M15"]
             await self._update_candle(symbol, interval, price, volume, timestamp)
-    
+
     async def _update_candle(self, symbol, interval, price, volume, timestamp_sec):
         """Creates/updates candle, triggers completion handlers"""
         # When candle period changes:
         if current candle timestamp != new candle timestamp:
             current.complete = True
             self.candle_history[symbol][interval].append(current)
-            
+
             # 🔥 TRIGGER COMPLETION HANDLERS
             for handler in self.completion_handlers:
                 await handler(current)  # ← Strategy listens here!
@@ -118,30 +118,30 @@ class InsideBarLiveDetector:
         self.aggregator = aggregator
         self.strategy = strategy
         self.candle_buffer = {}  # {symbol: deque([Candle])}
-        
+
         # Subscribe to M5 candle completions
         aggregator.subscribe_completion(self.on_candle_complete)
-    
+
     async def on_candle_complete(self, candle: Candle):
         """Called when M5 candle completes"""
         if candle.interval != "M5":
             return
-        
+
         symbol = candle.symbol
-        
+
         # Maintain rolling buffer (need 2+ candles to detect inside bar)
         if symbol not in self.candle_buffer:
             self.candle_buffer[symbol] = deque(maxlen=100)
-        
+
         self.candle_buffer[symbol].append(candle)
-        
+
         # Need at least 2 candles to check for inside bar
         if len(self.candle_buffer[symbol]) < 2:
             return
-        
+
         # Convert to DataFrame for strategy
         df = self._candles_to_dataframe(self.candle_buffer[symbol])
-        
+
         # Run inside bar detection
         signals = self.strategy.generate_signals(df, symbol, config={
             "atr_period": 14,
@@ -149,11 +149,11 @@ class InsideBarLiveDetector:
             "inside_bar_mode": "inclusive",
             "breakout_confirmation": True
         })
-        
+
         # Process signals
         for signal in signals:
             await self._handle_signal(signal)
-    
+
     def _candles_to_dataframe(self, candles: deque) -> pd.DataFrame:
         """Convert deque of Candle objects to DataFrame"""
         data = []
@@ -167,14 +167,14 @@ class InsideBarLiveDetector:
                 'volume': c.volume
             })
         return pd.DataFrame(data)
-    
+
     async def _handle_signal(self, signal: Signal):
         """Send signal to paper trading adapter"""
         # Signal contains:
         # - entry_price (mother bar high/low)
         # - stop_loss (mother bar low/high)
         # - take_profit (calculated from RRR)
-        
+
         logger.info(f"Signal generated: {signal.signal_type} {signal.symbol} @ {signal.entry_price}")
         # TODO: Send to automatictrader-api
 ```
@@ -237,10 +237,10 @@ From [`paper_trading_adapter.py`](file:///home/mirko/data/workspace/droid/trader
 ```python
 def send_signal_as_intent(self, signal_row: dict) -> dict:
     """Transform traderunner signal → automatictrader order intent"""
-    
+
     # Generate deterministic idempotency key (prevents duplicates)
     idem_key = self._generate_idempotency_key(signal_row)
-    
+
     intent = {
         "symbol": signal_row["symbol"].upper(),
         "side": signal_row["side"].upper(),  # BUY or SELL
@@ -249,7 +249,7 @@ def send_signal_as_intent(self, signal_row: dict) -> dict:
         "price": float(signal_row["price"]),  # Entry price
         "client_tag": "traderunner_inside_bar"
     }
-    
+
     # POST to automatictrader-api
     resp = requests.post(
         f"{self.api_url}/api/v1/orderintents",
@@ -280,11 +280,11 @@ class InsideBarLiveTradingSystem:
         self.strategy = InsideBarStrategy()
         self.detector = InsideBarLiveDetector(self.aggregator, self.strategy)
         self.adapter = PaperTradingAdapter(api_url="http://localhost:8080")
-    
+
     async def on_candle_complete(self, candle: Candle):
         """Triggered when M5 candle completes"""
         signals = await self.detector.check_for_signals(candle)
-        
+
         for signal in signals:
             # Convert Signal object to order intent
             order = {
@@ -296,7 +296,7 @@ class InsideBarLiveTradingSystem:
                 "timestamp": signal.timestamp,
                 "source": "inside_bar_live"
             }
-            
+
             # Send to automatictrader-api
             result = self.adapter.send_signal_as_intent(order)
             logger.info(f"Order intent sent: {result}")
@@ -327,16 +327,16 @@ class InsideBarLiveTradingSystem:
 def _process_ready_to_send_with_bracket(st: Storage) -> None:
     """Send main order + SL + TP as bracket order"""
     job = st.claim_ready_to_send()
-    
+
     from ib_insync import IB, Stock, LimitOrder, Order
-    
+
     ib = IB()
     ib.connect(IB_HOST, IB_PORT, clientId=IB_CLIENT_ID)
-    
+
     # Main entry order
     contract = Stock(job["symbol"], 'SMART', 'USD')
     ib.qualifyContracts(contract)
-    
+
     parent_order = LimitOrder(
         action=job["side"],  # BUY or SELL
         totalQuantity=job["quantity"],
@@ -344,7 +344,7 @@ def _process_ready_to_send_with_bracket(st: Storage) -> None:
     )
     parent_order.orderId = ib.client.getReqId()
     parent_order.transmit = False  # Don't transmit until bracket complete
-    
+
     # Stop Loss order (opposite side)
     stop_order = Order()
     stop_order.orderId = parent_order.orderId + 1
@@ -354,7 +354,7 @@ def _process_ready_to_send_with_bracket(st: Storage) -> None:
     stop_order.totalQuantity = job["quantity"]
     stop_order.parentId = parent_order.orderId
     stop_order.transmit = False
-    
+
     # Take Profit order (opposite side)
     profit_order = Order()
     profit_order.orderId = parent_order.orderId + 2
@@ -364,12 +364,12 @@ def _process_ready_to_send_with_bracket(st: Storage) -> None:
     profit_order.totalQuantity = job["quantity"]
     profit_order.parentId = parent_order.orderId
     profit_order.transmit = True  # Transmit entire bracket
-    
+
     # Submit bracket (all 3 orders)
     parent_trade = ib.placeOrder(contract, parent_order)
     stop_trade = ib.placeOrder(contract, stop_order)
     profit_trade = ib.placeOrder(contract, profit_order)
-    
+
     ib.disconnect()
 ```
 
@@ -410,40 +410,40 @@ intent = {
 ```python
 class LivePositionMonitor:
     """Monitors positions via WebSocket and triggers SL/TP locally"""
-    
+
     def __init__(self, aggregator: CandleAggregator):
         self.positions = {}  # {symbol: Position}
         self.aggregator = aggregator
-        
+
         # Subscribe to tick updates
         aggregator.subscribe_completion(self.on_tick)
-    
+
     async def on_tick(self, event: MarketDataEvent):
         """Check if SL or TP hit on every tick"""
         symbol = event.symbol
         price = event.price
-        
+
         if symbol not in self.positions:
             return
-        
+
         position = self.positions[symbol]
-        
+
         # Check Stop Loss
         if position.side == "LONG" and price <= position.stop_loss:
             await self._close_position(symbol, price, "STOP_LOSS")
         elif position.side == "SHORT" and price >= position.stop_loss:
             await self._close_position(symbol, price, "STOP_LOSS")
-        
+
         # Check Take Profit
         if position.side == "LONG" and price >= position.take_profit:
             await self._close_position(symbol, price, "TAKE_PROFIT")
         elif position.side == "SHORT" and price <= position.take_profit:
             await self._close_position(symbol, price, "TAKE_PROFIT")
-    
+
     async def _close_position(self, symbol: str, price: float, reason: str):
         """Submit market order to close position"""
         position = self.positions[symbol]
-        
+
         close_order = {
             "symbol": symbol,
             "side": "SELL" if position.side == "LONG" else "BUY",
@@ -451,10 +451,10 @@ class LivePositionMonitor:
             "order_type": "MKT",  # Market order for immediate exit
             "source": f"inside_bar_{reason.lower()}"
         }
-        
+
         adapter = PaperTradingAdapter()
         result = adapter.send_signal_as_intent(close_order)
-        
+
         logger.info(f"Position closed: {symbol} @ {price} ({reason})")
         del self.positions[symbol]
 ```
@@ -479,17 +479,17 @@ class HybridSLTPManager:
     def __init__(self):
         self.ib_bracket = True  # Always use IB bracket
         self.monitor_enabled = True  # Monitor for trailing
-    
+
     async def on_entry_filled(self, fill_event):
         """Called when entry order fills"""
         symbol = fill_event.symbol
-        
+
         # IB bracket already active (SL/TP set)
         # Now monitor for trailing opportunities
-        
+
         if self.monitor_enabled:
             await self.start_trailing_logic(symbol)
-    
+
     async def start_trailing_logic(self, symbol):
         """Adjust SL based on new inside bars (optional enhancement)"""
         # Example: If new inside bar forms in direction of trade,

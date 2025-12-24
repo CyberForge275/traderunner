@@ -50,13 +50,13 @@ def sample_intraday_df():
 def test_d1_window_slice_default_12m(sample_daily_df):
     """Test D1 window defaults to 12M (252 trading days)."""
     effective_date = sample_daily_df.index.max()
-    
+
     result = apply_d1_window(sample_daily_df, effective_date, window="12M")
-    
+
     # Should have 252 bars (or less if data < 252 days)
     assert len(result) <= 252
     assert len(result) == min(252, len(sample_daily_df))
-    
+
     # Should end at effective_date
     assert result.index.max() == effective_date
 
@@ -65,19 +65,19 @@ def test_effective_date_clamping(sample_daily_df):
     """Test that requested date beyond max clamps to max."""
     max_date = sample_daily_df.index.max()
     future_date = (max_date + timedelta(days=30)).date()
-    
+
     effective_date, reason = calculate_effective_date(future_date, sample_daily_df)
-    
+
     # Should clamp to max
     assert effective_date == max_date
     assert reason == "clamped_max"
-    
+
     # Test clamping to min
     min_date = sample_daily_df.index.min()
     past_date = (min_date - timedelta(days=30)).date()
-    
+
     effective_date, reason = calculate_effective_date(past_date, sample_daily_df)
-    
+
     assert effective_date == min_date
     assert reason == "clamped_min"
 
@@ -86,7 +86,7 @@ def test_effective_date_weekend_rolls_back(sample_daily_df):
     """Test that weekend/holiday rolls back to last trading day."""
     # Find a Friday in the data
     last_date = sample_daily_df.index.max()
-    
+
     # Add 2 days to get to weekend (assuming Friday -> Sunday)
     # Actually let's be more explicit: request a Saturday
     # Find the last Friday
@@ -95,12 +95,12 @@ def test_effective_date_weekend_rolls_back(sample_daily_df):
         if dt.dayofweek == 4:  # Friday
             friday = dt
             break
-    
+
     # Request Saturday (next day)
     saturday = (friday + timedelta(days=1)).date()
-    
+
     effective_date, reason = calculate_effective_date(saturday, sample_daily_df)
-    
+
     # Should roll back to Friday
     assert effective_date == friday
     assert reason == "rolled_back"
@@ -110,15 +110,15 @@ def test_backtesting_date_filter_intraday_exact_day(sample_intraday_df):
     """Test intraday exact-day filtering."""
     # Request Nov 20, 2024
     effective_date = pd.Timestamp("2024-11-20", tz="America/New_York")
-    
+
     result = apply_intraday_exact_day(sample_intraday_df, effective_date)
-    
+
     # Should have all 78 bars (full trading day)
     assert len(result) == 78
-    
+
     # All bars should be on Nov 20
     assert all(result.index.date == date(2024, 11, 20))
-    
+
     # First bar should be 9:30 AM
     assert result.index[0].time() == pd.Timestamp("09:30").time()
 
@@ -139,12 +139,12 @@ def test_backtesting_date_filter_intraday_missing_day_empty_state():
         "low": [99] * len(dates),
         "volume": [1000] * len(dates),
     }, index=dates)
-    
+
     # Request Nov 21 (not in data)
     effective_date = pd.Timestamp("2024-11-21", tz="America/New_York")
-    
+
     result = apply_intraday_exact_day(df, effective_date)
-    
+
     # Should be empty
     assert len(result) == 0
     assert result.empty
@@ -153,9 +153,9 @@ def test_backtesting_date_filter_intraday_missing_day_empty_state():
 def test_d1_window_all_shows_full_history(sample_daily_df):
     """Test window='All' shows all data up to effective_date."""
     effective_date = sample_daily_df.index.max()
-    
+
     result = apply_d1_window(sample_daily_df, effective_date, window="All")
-    
+
     # Should have all data
     assert len(result) == len(sample_daily_df)
     assert result.index.min() == sample_daily_df.index.min()
@@ -174,7 +174,7 @@ def test_window_bars_mapping():
 def test_calculate_effective_date_none_uses_latest(sample_daily_df):
     """Test that None requested_date uses latest available."""
     effective_date, reason = calculate_effective_date(None, sample_daily_df)
-    
+
     assert effective_date == sample_daily_df.index.max()
     assert reason == "default_latest"
 
@@ -195,12 +195,12 @@ def test_intraday_timezone_conversion():
         "low": [99] * 10,
         "volume": [1000] * 10,
     }, index=dates)
-    
+
     # Request Nov 20 in NY time
     effective_date = pd.Timestamp("2024-11-20", tz="America/New_York")
-    
+
     result = apply_intraday_exact_day(df, effective_date, market_tz="America/New_York")
-    
+
     # Should convert and filter
     assert len(result) == 10
     # Result should be in NY time

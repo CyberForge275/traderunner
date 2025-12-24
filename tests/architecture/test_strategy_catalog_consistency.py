@@ -53,5 +53,3 @@ def test_pre_papertrade_ui_strategies_exist_in_catalog():
         "Pre-PaperTrade strategies without STRATEGY_REGISTRY entry: "
         f"{missing}"
     )
-
-

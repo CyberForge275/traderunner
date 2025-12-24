@@ -42,25 +42,25 @@ echo "Step 3: Deploying to server via Git..."
 ssh $SERVER << EOF
     set -e
     cd $PROJECT_DIR
-    
+
     echo "📥 Pulling latest changes from GitHub..."
     git fetch origin
     git checkout $BRANCH
     git pull origin $BRANCH
-    
+
     echo "📊 Current commit:"
     git log -1 --oneline
-    
+
     echo "📦 Installing dependencies..."
     source .venv/bin/activate
     pip install -q -r requirements.txt
-    
+
     echo "♻️  Restarting service..."
     sudo systemctl restart $SERVICE
-    
+
     echo "⏳ Waiting for service to start..."
     sleep 3
-    
+
     echo "✅ Checking service status..."
     sudo systemctl is-active --quiet $SERVICE && echo "✅ Service running" || echo "❌ Service failed"
 EOF

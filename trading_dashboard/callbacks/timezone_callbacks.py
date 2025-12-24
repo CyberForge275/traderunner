@@ -6,7 +6,7 @@ from dash import Input, Output
 
 def register_timezone_callbacks(app):
     """Register callbacks for timezone button states."""
-    
+
     @app.callback(
         Output("tz-ny-btn", "outline"),
         Output("tz-ny-btn", "color"),
@@ -19,9 +19,9 @@ def register_timezone_callbacks(app):
     def toggle_timezone_buttons(ny_clicks, berlin_clicks):
         """Toggle timezone button states."""
         from dash import ctx
-        
+
         triggered_id = ctx.triggered_id if ctx.triggered else "tz-berlin-btn"
-        
+
         if triggered_id == "tz-ny-btn":
             # NY active (primary), Berlin outline (secondary)
             return False, "primary", True, "secondary"

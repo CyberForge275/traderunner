@@ -1,7 +1,7 @@
 # Pre-Market Checklist for Paper Trading
 
-**Date**: _________  
-**Market Open**: 9:30 ET / 15:30 CET  
+**Date**: _________
+**Market Open**: 9:30 ET / 15:30 CET
 **Market Close**: 16:00 ET / 22:00 CET
 
 ---
@@ -196,12 +196,12 @@ sqlite3 data/automatictrader.db "SELECT status, COUNT(*) FROM order_intents WHER
 
 ### Summary Report
 
-**Signals Generated**: _____  
-**Intents Created**: _____  
-**Orders Sent to IB**: _____  
-**Orders Filled**: _____  
-**Critical Errors**: _____  
-**Circuit Breaker Opens**: _____  
+**Signals Generated**: _____
+**Intents Created**: _____
+**Orders Sent to IB**: _____
+**Orders Filled**: _____
+**Critical Errors**: _____
+**Circuit Breaker Opens**: _____
 
 ### Issues Encountered
 

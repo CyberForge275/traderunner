@@ -621,7 +621,7 @@ def create_backtests_layout():
         className="dashboard-card",
         children=[
             html.H6("📊 New Backtest Configuration", style={"marginBottom": "15px"}),
-            
+
             # Strategy selector
             html.Label("Strategy", style={"fontWeight": "bold", "marginTop": "8px"}),
             dcc.Dropdown(
@@ -635,11 +635,11 @@ def create_backtests_layout():
                 clearable=False,
                 style={"color": "#000", "marginBottom": "8px"},
             ),
-            
+
             # Version selector (conditional - only for versioned strategies)
             html.Div(
             ),
-            
+
             # Run name input with timestamp prefix
             html.Label("Backtest Run Name", style={"fontWeight": "bold", "marginTop": "8px"}),
             html.Div([
@@ -664,7 +664,7 @@ def create_backtests_layout():
                     },
                 ),
             ], style={"display": "flex", "alignItems": "center"}),
-            
+
             # Symbols input with cached selector
             html.Label("Symbols (comma-separated)", style={"fontWeight": "bold", "marginTop": "8px"}),
             html.Div([
@@ -683,7 +683,7 @@ def create_backtests_layout():
                     style={"width": "100%", "marginBottom": "8px"},
                 ),
             ]),
-            
+
             # Timeframe selector
             html.Label("Timeframe", style={"fontWeight": "bold", "marginTop": "8px"}),
             dcc.Dropdown(
@@ -698,8 +698,8 @@ def create_backtests_layout():
                 clearable=False,
                 style={"color": "#000", "marginBottom": "8px"},
             ),
-            
-            
+
+
             # Date selection method (Streamlit-style)
             html.Label("Date Selection", style={"fontWeight": "bold", "marginTop": "8px"}),
             dcc.RadioItems(
@@ -711,7 +711,7 @@ def create_backtests_layout():
                 value="days_back",
                 style={"marginBottom": "8px"},
             ),
-            
+
             # Anchor date (for days back mode)
             html.Div(
                 id="anchor-date-container",
@@ -725,7 +725,7 @@ def create_backtests_layout():
                     ),
                 ],
             ),
-            
+
             # Days back (for days back mode)
             html.Div(
                 id="days-back-container",
@@ -742,7 +742,7 @@ def create_backtests_layout():
                     ),
                 ],
             ),
-            
+
             # Explicit date range (for explicit mode)
             html.Div(
                 id="explicit-range-container",
@@ -764,7 +764,7 @@ def create_backtests_layout():
                 ],
                 style={"display": "none"},  # Hidden by default
             ),
-            
+
             # Data window display
             html.Div(
                 id="data-window-display",
@@ -776,7 +776,7 @@ def create_backtests_layout():
                     "borderRadius": "4px",
                     "marginBottom": "8px"},
             ),
-            
+
             # Configuration parameters (collapsible)
             dbc.Accordion(
                 [
@@ -791,7 +791,7 @@ def create_backtests_layout():
                                 step=1000,
                                 style={"width": "100%", "marginBottom": "8px"},
                             ),
-                            
+
                             html.Label("Fees (bps)", style={"fontSize": "0.9em", "marginTop": "5px"}),
                             dcc.Input(
                                 id="config-fees",
@@ -801,7 +801,7 @@ def create_backtests_layout():
                                 step=0.1,
                                 style={"width": "100%", "marginBottom": "8px"},
                             ),
-                            
+
                             html.Label("Slippage (bps)", style={"fontSize": "0.9em", "marginTop": "5px"}),
                             dcc.Input(
                                 id="config-slippage",
@@ -811,7 +811,7 @@ def create_backtests_layout():
                                 step=0.1,
                                 style={"width": "100%", "marginBottom": "8px"},
                             ),
-                            
+
                             html.Label("Risk % per Trade", style={"fontSize": "0.9em", "marginTop": "5px"}),
                             dcc.Input(
                                 id="config-risk-pct",
@@ -828,7 +828,7 @@ def create_backtests_layout():
                 start_collapsed=True,
                 style={"marginBottom": "15px"},
             ),
-            
+
            # Run button
             dbc.Button(
                 "▶ Run Backtest",
@@ -837,7 +837,7 @@ def create_backtests_layout():
                 className="w-100",
                 style={"marginTop": "10px", "fontWeight": "bold"},
             ),
-            
+
             # Progress indicator
             html.Div(id="backtests-run-progress", style={"marginTop": "12px"}),
         ],
@@ -886,7 +886,7 @@ def create_backtests_layout():
             html.Div(id="backtests-detail"),
         ]
     )
-    
+
     # Hidden interval for auto-refresh when job completes
     refresh_interval = dcc.Interval(
         id="backtests-refresh-interval",

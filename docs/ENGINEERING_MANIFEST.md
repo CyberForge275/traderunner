@@ -2,7 +2,7 @@
 
 ## 0. Purpose & Scope
 
-This document defines how we design and implement code in the strategy framework (strategies, pipelines, UI integration, tests).  
+This document defines how we design and implement code in the strategy framework (strategies, pipelines, UI integration, tests).
 
 It is aimed at:
 
@@ -10,9 +10,9 @@ It is aimed at:
 - **Architects**: keeping the system extensible, robust, and clean.
 - **Reviewers**: consistent criteria for code review and “Definition of Done”.
 
-Language conventions:  
-- **MUST** = non-negotiable.  
-- **SHOULD** = recommended, devs need a strong reason to deviate.  
+Language conventions:
+- **MUST** = non-negotiable.
+- **SHOULD** = recommended, devs need a strong reason to deviate.
 - **MAY** = optional / context-dependent.
 
 ---
@@ -34,7 +34,7 @@ Language conventions:
 ### 1.2 Capabilities describe *what*, not *who*
 
 - Capability flags MUST describe **what a strategy needs or can do**, not which strategy it is.
-  - ✅ `requires_universe=True`  
+  - ✅ `requires_universe=True`
   - ❌ `is_rudometkin=True` (strategy-name flags are forbidden).
 - New capabilities MUST be documented by:
   - A new field on `StrategyMetadata`.
@@ -244,7 +244,7 @@ When adding a new strategy, the minimal “Definition of Done” is:
 
 Longer term, strategy pipelines SHOULD follow a simple plug-in convention:
 
-- `StrategyMetadata.pipeline_module: Optional[str]`  
+- `StrategyMetadata.pipeline_module: Optional[str]`
 - The named module SHOULD expose standardized hook functions:
   - `run_daily_scan(...)`
   - `run_backtest(...)`

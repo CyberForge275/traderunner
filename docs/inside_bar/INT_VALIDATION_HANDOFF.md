@@ -1,7 +1,7 @@
 # InsideBar SSOT - Final Validation Status
 
-**Date:** 2025-12-18 23:30 CET  
-**Commit:** ec785f0 (cleanup: remove pycache from src)  
+**Date:** 2025-12-18 23:30 CET
+**Commit:** ec785f0 (cleanup: remove pycache from src)
 **Status:** ⏸️ Paused - Ready for final smoke matrix execution
 
 ---
@@ -10,12 +10,12 @@
 
 ### Block A: Environment & Sanity ✅
 - **Python:** 3.10.12 verified
-- **axiom_bt:** Import successful  
+- **axiom_bt:** Import successful
 - **Pycache cleanup:** All .pyc files removed from src/
 - **V2 refs in Python files:** 0 (only docs mention remains)
 - **Commit:** ec785f0 created
 
-### Block B: Validation Scripts ✅  
+### Block B: Validation Scripts ✅
 - **validate_run_dir.py:** Created, compiles successfully
 - **No f-strings:** All using .format() or string concatenation
 - **Script status:** Ready to use
@@ -24,7 +24,7 @@
 
 ## ⏸️ PAUSED - Technical Blocker
 
-**Issue:** `run_backtest_full()` parameter mismatch  
+**Issue:** `run_backtest_full()` parameter mismatch
 **Error:** `missing 1 required positional argument: 'artifacts_root'`
 
 **Root Cause:** Function signature changed or documentation inconsistent
@@ -42,7 +42,7 @@
 **Required Runs:**
 
 1. **TSLA Baseline** (15:00-17:00)
-2. **TSLA Shifted** (15:30-16:30)  
+2. **TSLA Shifted** (15:30-16:30)
 3. **HOOD Baseline** (optional if time)
 
 **Command Template:**
@@ -149,7 +149,7 @@ done
 ## 📊 CURRENT EVIDENCE
 
 ### Existing Successful TSLA Run
-**ID:** INT_SMOKE_TSLA_PHASE5_20251218_194836  
+**ID:** INT_SMOKE_TSLA_PHASE5_20251218_194836
 **Evidence:**
 - Orders: 7
 - Zero-duration: 0 ✅
@@ -157,8 +157,8 @@ done
 - strategy_policy: Complete ✅
 
 ### V2 Cleanup
-**Source files:** 0 Python refs in src/ ✅  
-**Pycache:** Cleaned ✅  
+**Source files:** 0 Python refs in src/ ✅
+**Pycache:** Cleaned ✅
 **Commit:** ec785f0 ✅
 
 ### Validation Infrastructure
@@ -183,11 +183,11 @@ done
 
 ## 📁 DELIVERABLES READY
 
-✅ Environment verified (commit ec785f0)  
-✅ Scripts created (validate_run_dir.py)  
-✅ Existing evidence (INT_SMOKE run)  
-⏸️ New smoke runs (needs param fix)  
-⏸️ Validation reports (depends on runs)  
+✅ Environment verified (commit ec785f0)
+✅ Scripts created (validate_run_dir.py)
+✅ Existing evidence (INT_SMOKE run)
+⏸️ New smoke runs (needs param fix)
+⏸️ Validation reports (depends on runs)
 ⏸️ Final report (depends on validation)
 
 ---
@@ -195,7 +195,7 @@ done
 ## 🔍 TECHNICAL NOTES
 
 ### run_backtest_full Signature Issue
-**Problem:** Function expects `artifacts_root` parameter  
+**Problem:** Function expects `artifacts_root` parameter
 **Solution:** Add `artifacts_root=Path("artifacts/backtests")` to all calls
 
 **To verify signature:**
@@ -221,13 +221,13 @@ python -m axiom_bt.runner \
 
 ## 🏁 FINAL STATUS
 
-**Tonight's Achievement:** Infrastructure complete, ready for execution  
-**Tomorrow's Task:** 90 minutes to complete smoke matrix + validation + final report  
+**Tonight's Achievement:** Infrastructure complete, ready for execution
+**Tomorrow's Task:** 90 minutes to complete smoke matrix + validation + final report
 **Confidence:** High - all blockers identified with clear solutions
 
 **Recommendation:** ✅ Resume tomorrow morning, fresh start, clean execution
 
 ---
 
-**Report Created:** 2025-12-18 23:30 CET  
+**Report Created:** 2025-12-18 23:30 CET
 **Next Session:** Add `artifacts_root` parameter, execute smoke matrix, complete validation

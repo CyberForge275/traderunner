@@ -18,14 +18,14 @@ sleep 3
 # Check if service started successfully
 if systemctl is-active --quiet marketdata-stream; then
     echo "[$TIMESTAMP] ✅ marketdata-stream started successfully" >> $LOG_FILE
-    
+
     # Wait a moment for WebSocket connection
     sleep 5
-    
+
     # Check health endpoint
     HEALTH_STATUS=$(curl -s http://localhost:8090/health | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
     echo "[$TIMESTAMP] Health status: $HEALTH_STATUS" >> $LOG_FILE
-    
+
     # Check EODHD connection
     EODHD_CONNECTED=$(curl -s http://localhost:8090/health | grep -o '"connected":[^,]*' | cut -d':' -f2)
     echo "[$TIMESTAMP] EODHD connected: $EODHD_CONNECTED" >> $LOG_FILE

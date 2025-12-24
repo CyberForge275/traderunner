@@ -10,7 +10,7 @@ __all__ = [
     "create_watchlist",
     "create_watchlist_item",
     "create_patterns_panel",
-    "create_pattern_item", 
+    "create_pattern_item",
     "create_order_flow_panel",
     "create_order_item",
     "create_candlestick_chart",

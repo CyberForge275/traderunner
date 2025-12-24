@@ -56,7 +56,7 @@ Project Structure
     ├── test_components.py          # Unit tests for components
     └── test_callbacks.py           # Integration tests for callbacks
 Core Application
-[NEW] 
+[NEW]
 
 app.py
 Main Dash application entry point that:
@@ -83,7 +83,7 @@ app.layout = dbc.Container([
 if __name__ == '__main__':
     app.run_server(debug=True, host='127.0.0.1', port=9001)
 Configuration Layer
-[NEW] 
+[NEW]
 
 config/settings.py
 Application-wide configuration including:
@@ -95,7 +95,7 @@ Period choices (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, max)
 Port configuration
 Color scheme constants
 Layout Components
-[NEW] 
+[NEW]
 
 layouts/sidebar.py
 Creates the left sidebar containing:
@@ -120,7 +120,7 @@ sidebar = dbc.Col([
     dcc.Dropdown(id='period-dropdown', value='6mo', ...),
     dbc.Button("Run Backtest", id='run-button', ...)
 ], width=3)
-[NEW] 
+[NEW]
 
 layouts/main_content.py
 Main content area layout containing:
@@ -133,7 +133,7 @@ Trade distribution chart
 Trade log table section
 Loading spinner overlay
 UI Components
-[NEW] 
+[NEW]
 
 components/metrics_cards.py
 Creates 6 metric cards using dbc.Card:
@@ -158,7 +158,7 @@ def create_metric_card(label, value, color="primary"):
             html.H2(value, className="text-center")
         ])
     ], color=color, outline=True)
-[NEW] 
+[NEW]
 
 components/charts.py
 Chart creation functions using plotly.graph_objects:
@@ -178,7 +178,7 @@ create_trade_distribution(df)
 Histogram of trade returns
 Color-coded bins (green for wins, red for losses)
 Count on y-axis
-[NEW] 
+[NEW]
 
 components/trade_table.py
 Creates dash_table.DataTable for trade log:
@@ -191,7 +191,7 @@ Pagination (50 rows per page)
 Export to CSV
 Conditional formatting (green for profits, red for losses)
 Backend Logic
-[NEW] 
+[NEW]
 
 callbacks/backtest_callbacks.py
 Dash callback functions:
@@ -215,7 +215,7 @@ def run_backtest(n_clicks, strategy, symbol, interval, period):
     # Execute backtest
     # Process results
     # Return updated components
-[NEW] 
+[NEW]
 
 utils/backtest_engine.py
 Mock backtest engine that:
@@ -229,7 +229,7 @@ Drawdown DataFrame
 Trades DataFrame
 Alternative: If integrating with existing engine, this would be an API client module.
 
-[NEW] 
+[NEW]
 
 utils/data_processing.py
 Data transformation utilities:
@@ -239,7 +239,7 @@ Calculate derived metrics
 Transform DataFrames for chart consumption
 Validation functions
 Styling
-[NEW] 
+[NEW]
 
 assets/styles.css
 Custom CSS for:
@@ -259,7 +259,7 @@ Danger: #ef4444 (red)
 Background: #f3f4f6 (light gray)
 Text: #1f2937 (dark gray)
 Dependencies
-[NEW] 
+[NEW]
 
 requirements.txt
 dash==3.0.0

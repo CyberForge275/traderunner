@@ -1,7 +1,7 @@
 # Pandas Fix - 4-Command Report
 
-**Date:** 2025-12-19 00:00 CET  
-**Server:** INT (192.168.178.55)  
+**Date:** 2025-12-19 00:00 CET
+**Server:** INT (192.168.178.55)
 **Objective:** Fix pandas blocker + run smoke test
 
 ---
@@ -112,9 +112,9 @@ run_backtest_full(
 ### Output
 ```
 STATUS: RunStatus.ERROR
-[PANDAS_FIX_SMOKE_20251218_235402] Pipeline exception: 
+[PANDAS_FIX_SMOKE_20251218_235402] Pipeline exception:
   NDFrame.first() missing 1 required positional argument: 'offset'
-  
+
 File "/opt/trading/traderunner/src/axiom_bt/data/eodhd_fetch.py", line 221, in resample_m1
     resampled = df.resample(interval).agg(agg).dropna(how="any")
 ```
@@ -122,7 +122,7 @@ File "/opt/trading/traderunner/src/axiom_bt/data/eodhd_fetch.py", line 221, in r
 ### Artifacts Created
 ```
 run_meta.json   - 900 bytes
-run_steps.jsonl - 735 bytes  
+run_steps.jsonl - 735 bytes
 run_result.json - 311 bytes
 error_stacktrace.txt - 2.3K
 ```
@@ -262,5 +262,5 @@ cat .gitignore | grep eodhd
 
 ---
 
-**Report Generated:** 2025-12-19 00:00 CET  
+**Report Generated:** 2025-12-19 00:00 CET
 **Status:** Blocker persists - manual intervention required

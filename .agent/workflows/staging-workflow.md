@@ -120,8 +120,8 @@ sudo systemctl restart trading-dashboard-v2
 
 ## Current Status
 
-**Staging (Local)**: ✅ Running on http://localhost:9001  
-**Production (Debian)**: ✅ Running on http://192.168.178.55:9001  
+**Staging (Local)**: ✅ Running on http://localhost:9001
+**Production (Debian)**: ✅ Running on http://192.168.178.55:9001
 **Latest Commit**: `7fada89` (Bug fix: Future date validation)
 
 Both environments are now synchronized!
@@ -168,6 +168,6 @@ ssh mirko@192.168.178.55 "sudo journalctl -u trading-dashboard-v2 -n 50"
 
 ## Summary
 
-✅ **Local Laptop** = Your development and testing environment  
-✅ **Debian Server** = Production environment for live trading  
+✅ **Local Laptop** = Your development and testing environment
+✅ **Debian Server** = Production environment for live trading
 ✅ **Always**: Local → Test → Approve → Production

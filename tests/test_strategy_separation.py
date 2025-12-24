@@ -53,16 +53,16 @@ class TestPipelineRoutingLogic:
         """Pipeline should detect two-stage capability flag."""
         # This test verifies the capability is correctly set
         assert RUDOMETKIN_METADATA.supports_two_stage_pipeline is True
-        
+
         # The pipeline code should now check:
         # if pipeline.strategy.supports_two_stage_pipeline:
         #     from strategies.rudometkin_moc import pipeline as rudometkin_pipeline
         #     filtered_symbols = rudometkin_pipeline.run_daily_scan(pipeline, max_daily)
-        
+
     def test_single_stage_has_no_capability(self):
         """Single-stage strategies should not have two-stage capability."""
         assert INSIDE_BAR_METADATA.supports_two_stage_pipeline is False
-        
+
         # The pipeline should skip universe logic for these strategies
 
     def test_strategy_metadata_independence(self):
@@ -70,10 +70,10 @@ class TestPipelineRoutingLogic:
         # Verify changing one doesn't affect the other
         inside_bar_orig = INSIDE_BAR_METADATA.supports_two_stage_pipeline
         rudometkin_orig = RUDOMETKIN_METADATA.supports_two_stage_pipeline
-        
+
         assert inside_bar_orig is False
         assert rudometkin_orig is True
-        
+
         # They should remain independent (no shared mutable state)
         assert INSIDE_BAR_METADATA.supports_two_stage_pipeline != RUDOMETKIN_METADATA.supports_two_stage_pipeline
 
@@ -91,12 +91,12 @@ class TestStrategyIsolation:
         universe_path = RUDOMETKIN_METADATA.default_strategy_config["universe_path"]
         assert "rudometkin.parquet" in universe_path
 
-    def test_inside_bar_uses_provided_symbols_only(self): 
+    def test_inside_bar_uses_provided_symbols_only(self):
         """Inside Bar should work with any symbol list, no universe check."""
         # This is a conceptual test - Inside Bar doesn't filter by universe
         # The strategy itself doesn't have universe loading logic
         from strategies.inside_bar.strategy import InsideBarStrategy
-        
+
         strategy = InsideBarStrategy()
         # Strategy should not have universe-related methods
         assert not hasattr(strategy, '_get_universe_symbols')
@@ -105,7 +105,7 @@ class TestStrategyIsolation:
     def test_rudometkin_has_universe_methods(self):
         """Rudometkin should have universe filtering methods."""
         from strategies.rudometkin_moc.strategy import RudometkinMOCStrategy
-        
+
         strategy = RudometkinMOCStrategy()
         # Strategy should have universe-related methods
         assert hasattr(strategy, '_get_universe_symbols')

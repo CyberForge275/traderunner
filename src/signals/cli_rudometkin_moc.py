@@ -131,10 +131,10 @@ def main(argv: List[str] | None = None) -> int:
             ts = pd.Timestamp(sig.timestamp)
             if ts.tzinfo is None:
                 ts = ts.tz_localize(args.tz)
-            
+
             # Convert to UTC for contract validation
             ts_utc = ts.tz_convert("UTC")
-            
+
             # Determine entries based on signal type
             long_entry = None
             short_entry = None
@@ -142,7 +142,7 @@ def main(argv: List[str] | None = None) -> int:
             sl_short = None
             tp_long = None
             tp_short = None
-            
+
             if sig.signal_type.upper() == "LONG":
                 long_entry = sig.entry_price
                 sl_long = sig.stop_loss
@@ -155,7 +155,7 @@ def main(argv: List[str] | None = None) -> int:
             # Validate against SignalOutputSpec
             from axiom_bt.contracts.signal_schema import SignalOutputSpec
             from decimal import Decimal
-            
+
             spec = SignalOutputSpec(
                 symbol=symbol,
                 timestamp=ts_utc,

@@ -5,7 +5,7 @@ Dieses Dokument beschreibt die **Architekturtests** für das Traderunner-Ökosys
 
 Ziel der Architekturtests:
 
-- **Qualität vor Quantität**:  
+- **Qualität vor Quantität**:
   Lieber wenige, gezielte Guardrails als viele nutzlose Tests.
 - Schutz der wichtigsten **Invarianten** der Codebasis.
 - Unterstützung der Regeln aus `AI_CONTRIBUTION_GUIDE.md`.
@@ -32,4 +32,3 @@ Ausführung (Beispiel):
 ```bash
 cd traderunner
 python -m pytest tests/architecture -q
-

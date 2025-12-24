@@ -45,14 +45,14 @@ EODHD API Limitations:
     - Interval 1m: Maximum 120 days per request
     - Interval 5m: Maximum 600 days per request
     - No from/to parameters: Returns last 120 days automatically
-    
+
     For historical data beyond 120 days, use chunked fetching (fetch in
     120-day windows and merge results).
 
-API Documentation: 
+API Documentation:
     https://eodhd.com/financial-apis/intraday-historical-data-api
 
-Rate Limits: 
+Rate Limits:
     Varies by subscription (typically 100k requests/day)
 
 Environment Variables:
@@ -61,7 +61,7 @@ Environment Variables:
 Example Usage:
     >>> from axiom_bt.data.eodhd_fetch import fetch_intraday_1m_to_parquet
     >>> from pathlib import Path
-    >>> 
+    >>>
     >>> # Fetch TSLA data (gets all available ~120 days max)
     >>> path = fetch_intraday_1m_to_parquet(
     ...     symbol='TSLA',
@@ -85,13 +85,13 @@ def _read_token() -> Optional[str]:
     token = os.environ.get("EODHD_API_TOKEN")
     """
     Read EODHD API token from environment or config file.
-    
+
     Search order:
         1. EODHD_API_TOKEN environment variable
         2. ~/.config/ib_project/credentials.toml
         3. ~/.config/axiom_bt/credentials.toml
         4. ./configs/credentials.toml
-    
+
     Returns:
         str | None: API token if found, None otherwise
     """
@@ -114,18 +114,18 @@ def _standardize_ohlcv(df: pd.DataFrame, tz: str | None = None) -> pd.DataFrame:
     df = df.copy()
     """
     Standardize OHLCV DataFrame schema and timezone.
-    
+
     Transformations:
         1. Rename columns to canonical (Open, High, Low, Close, Volume)
         2. Parse timestamp to DatetimeIndex
         3. Localize to UTC if naive
         4. Convert to target timezone
         5. Sort by timestamp
-    
+
     Args:
         df: Raw DataFrame
         tz: Target timezone
-    
+
     Returns:
         pd.DataFrame: Standardized with tz-aware index
     """
@@ -238,14 +238,14 @@ def _request(url: str, params: dict) -> list:
     response = requests.get(url, params=params, timeout=30)
     """
     Make HTTP GET request to EODHD API with 30s timeout.
-    
+
     Args:
         url: API endpoint URL
         params: Query parameters (includes api_token)
-    
+
     Returns:
         list: JSON response array
-        
+
     Raises:
         requests.HTTPError: If status 4xx/5xx
         requests.Timeout: If exceeds 30s
@@ -267,16 +267,16 @@ def fetch_intraday_1m_to_parquet(
 ) -> Path:
     """
     Fetch 1-minute intraday OHLCV data from EODHD and save as parquet.
-    
+
     Behavior:
         - If start_date/end_date are None: Fetches last 120 days (EODHD default)
         - If start_date/end_date provided: Fetches exact range
         - Validates range ≤ 120 days (EODHD limit for 1m interval)
-    
+
     EODHD Limitation:
         - 1-minute interval: Maximum 120 days per request
         - Raises ValueError if requested range exceeds 120 days
-    
+
     Args:
         symbol: Stock ticker (e.g., 'TSLA', 'AAPL')
         exchange: Exchange code (e.g., 'US', 'NASDAQ')
@@ -287,30 +287,30 @@ def fetch_intraday_1m_to_parquet(
         use_sample: If True, load sample data instead of calling API (for testing)
         save_raw: If True, save unfiltered data to *_raw.parquet (default: True)
         filter_rth: If True, filter final output to RTH only 09:30-16:00 ET (default: True)
-    
+
     Returns:
         Path to saved parquet file (RTH-filtered if filter_rth=True, otherwise raw)
-    
+
     Raises:
         ValueError: If requested date range exceeds 120 days
         SystemExit: If no data returned from EODHD API
-    
+
     Notes:
         - Raw data saved to {symbol}_raw.parquet contains all hours (Pre+RTH+After)
         - Filtered data saved to {symbol}.parquet contains only RTH (09:30-16:00 ET)
         - M5/M15 aggregation should use RTH-filtered data for accurate signals
-    
+
     Examples:
         >>> # Default: Last 120 days
         >>> path = fetch_intraday_1m_to_parquet('TSLA', 'US')
-        
+
         >>> # Specific range (60 days, valid)
         >>> path = fetch_intraday_1m_to_parquet(
         ...     'HOOD', 'US',
         ...     start_date='2024-10-01',
         ...     end_date='2024-11-30'
         ... )
-        
+
         >>> # Invalid range (> 120 days) raises ValueError
         >>> path = fetch_intraday_1m_to_parquet(
         ...     'SPY', 'US',
@@ -336,16 +336,16 @@ def fetch_intraday_1m_to_parquet(
             "interval": "1m",
             "fmt": "json",
         }
-        
+
         # Add date range if specified
         if start_date and end_date:
             # Convert dates to UTC timestamps
             start_dt = pd.to_datetime(start_date).tz_localize("UTC")
             end_dt = pd.to_datetime(end_date).tz_localize("UTC") + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-            
+
             from_ts = int(start_dt.timestamp())
             to_ts = int(end_dt.timestamp())
-            
+
             # Validate 120-day limit
             range_days = (end_dt - start_dt).days
             if range_days > 120:
@@ -353,16 +353,16 @@ def fetch_intraday_1m_to_parquet(
                     f"Requested range ({range_days} days) exceeds EODHD limit of 120 days "
                     f"for 1-minute interval. Split request into chunks ≤ 120 days."
                 )
-            
+
             payload["from"] = from_ts
             payload["to"] = to_ts
         # else: No from/to → EODHD returns last 120 days by default
-        
+
         rows = _request(url, payload)
         if not rows:
             range_info = f"{start_date} to {end_date}" if start_date else "all available data"
             raise SystemExit(f"No data from EODHD for {symbol}.{exchange} ({range_info})")
-        
+
         df = pd.DataFrame(rows)
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s", utc=True).dt.tz_convert(tz)
 
@@ -378,11 +378,11 @@ def fetch_intraday_1m_to_parquet(
         raw_path = out_dir / f"{symbol}_raw.parquet"
         df.sort_index().to_parquet(raw_path)
         logger.info(f"[{symbol}] Saved raw data: {raw_path} ({len(df):,} rows, all hours)")
-    
+
     # Filter to RTH if requested
     if filter_rth:
         from axiom_bt.data.session_filter import filter_rth_session
-        
+
         # Filter to RTH (09:30-16:00 ET)
         df_rth = filter_rth_session(df, tz="America/New_York")
         logger.info(
@@ -390,12 +390,12 @@ def fetch_intraday_1m_to_parquet(
             f"({len(df_rth)/len(df)*100:.1f}% of raw data)"
         )
         df = df_rth
-    
+
     # Save final data (RTH-filtered or raw depending on filter_rth)
     path = out_dir / f"{symbol}.parquet"
     df.sort_index().to_parquet(path)
     logger.info(f"[{symbol}] Saved final data: {path} ({len(df):,} rows)")
-    
+
     return path
 
 

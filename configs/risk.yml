@@ -3,20 +3,20 @@
 # Position Sizing Defaults
 sizing:
   default_mode: "risk"  # fixed | pct_equity | risk
-  
+
   # Fixed mode settings
   fixed:
     default_qty: 1
-  
+
   # Percent of equity mode
   pct_equity:
     default_pos_pct: 10.0  # 10% of equity per position
-  
+
   # Risk-based mode
   risk:
     default_risk_pct: 1.0   # Risk 1% of equity per trade
     max_pos_pct: 20.0       # Cap position at 20% of equity
-  
+
   # Common settings
   min_qty: 1
   tick_size: 1
@@ -24,39 +24,39 @@ sizing:
 # Risk Guards (Kill Switches)
 guards:
   enabled: true
-  
+
   # Maximum daily loss (EUR)
   max_daily_loss: 1000
-  
+
   # Maximum drawdown from peak (EUR)
   max_drawdown: 1500
-  
+
   # Maximum gross exposure (EUR)
   max_gross_exposure: 50000
-  
+
   # Maximum quantity per symbol
   max_qty_per_symbol: 100
-  
+
   # Maximum consecutive losses before pause
   max_consecutive_losses: 5
-  
+
   # Slippage sanity check
   max_slippage_pct: 5.0
 
 # Kill Switch Actions
 kill_switch:
   enabled: true
-  
+
   triggers:
     - type: max_daily_loss
       threshold: 1000
-    
+
     - type: max_drawdown_from_peak
       threshold: 1500
-    
+
     - type: consecutive_losses
       threshold: 5
-  
+
   actions:
     cancel_all_orders: true
     close_all_positions: false  # Safety: don't auto-close
@@ -67,13 +67,13 @@ kill_switch:
 exposure:
   # Maximum number of concurrent positions
   max_open_positions: 10
-  
+
   # Maximum orders per minute (rate limit)
   max_orders_per_minute: 5
-  
+
   # Symbol blacklist (high volatility / excluded)
   blacklist_symbols: []
-  
+
   # Only trade during market hours
   trading_hours_only: true
 
@@ -81,7 +81,7 @@ exposure:
 broker:
   # Order submission timeout (seconds)
   order_timeout_seconds: 30
-  
+
   # Retry settings
   max_retries: 3
   retry_delay_seconds: 2

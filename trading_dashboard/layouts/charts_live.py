@@ -17,21 +17,21 @@ import os
 
 def create_charts_live_layout():
     """Create the Live Charts tab layout."""
-    
+
     # Get symbols from ENV (SSOT)
     symbols_env = os.getenv('EODHD_SYMBOLS', '')
     symbols = [s.strip().upper() for s in symbols_env.split(',') if s.strip()]
-    
+
     if not symbols:
         # Fallback for local development
         symbols = ['AAL', 'AAPL', 'TSLA']
-    
+
     return html.Div([
         # Header
         dbc.Row([
             dbc.Col([
                 html.H4("📊 Live Charts", style={"color": "#00d26a"}),
-                html.P("Real-time market data (WebSocket/SQLite)", 
+                html.P("Real-time market data (WebSocket/SQLite)",
                        className="text-muted", style={"fontSize": "0.9rem"}),
             ], width=8),
             dbc.Col([
@@ -42,7 +42,7 @@ def create_charts_live_layout():
                 ]),
             ], width=4, className="text-end"),
         ], className="mb-3"),
-        
+
         dbc.Row([
             # Sidebar
             dbc.Col([
@@ -53,7 +53,7 @@ def create_charts_live_layout():
                             html.Span("🔴", style={"fontSize": "1.2rem", "marginRight": "8px"}),
                             html.Strong("LIVE", style={"fontSize": "1.1rem", "color": "#00d26a"}),
                             html.Br(),
-                            html.Small("source: LIVE_SQLITE", 
+                            html.Small("source: LIVE_SQLITE",
                                      className="text-muted", style={"fontSize": "0.7rem"}),
                         ], style={
                             "padding": "10px",
@@ -62,9 +62,9 @@ def create_charts_live_layout():
                             "marginBottom": "15px",
                             "textAlign": "center"
                         }),
-                        
+
                         html.Hr(),
-                        
+
                         # Symbol Selector
                         html.H6("Symbol"),
                         dcc.Dropdown(
@@ -78,7 +78,7 @@ def create_charts_live_layout():
                             },
                             className="custom-dropdown mb-3"
                         ),
-                        
+
                         # Timeframe Buttons (M1/M5/M15 only)
                         html.H6("Timeframe", className="mt-3"),
                         dbc.ButtonGroup([
@@ -86,18 +86,18 @@ def create_charts_live_layout():
                             dbc.Button("M5", id="live-tf-m5", size="sm", active=True, color="primary"),
                             dbc.Button("M15", id="live-tf-m15", size="sm", outline=True, color="secondary"),
                         ], vertical=True, style={"width": "100%"}, className="mb-3"),
-                        
+
                         html.Hr(),
-                        
+
                         # Freshness Indicator
                         html.H6("📊 Data Freshness"),
                         html.Div(id="live-freshness-indicator", children=[
                             html.Div([
                                 html.Span("Last Update: ", style={"fontWeight": "bold", "fontSize": "0.75rem"}),
                                 html.Br(),
-                                html.Span("Checking...", id="live-freshness-text", 
+                                html.Span("Checking...", id="live-freshness-text",
                                         style={"fontSize": "0.75rem"}),
-                                html.Span(" ", id="live-freshness-badge", 
+                                html.Span(" ", id="live-freshness-badge",
                                         style={"marginLeft": "5px", "fontSize": "1.2rem"})
                             ]),
                         ]),
@@ -106,25 +106,25 @@ def create_charts_live_layout():
                             className="text-muted",
                             style={"fontSize": "0.7rem", "marginTop": "10px"}
                         ),
-                        
+
                         html.Hr(),
-                        
+
                         # Info
                         html.Div([
                             html.H6("ℹ️ Live Data Info", style={"fontSize": "0.85rem"}),
-                            html.P("• All sessions included", 
+                            html.P("• All sessions included",
                                   className="text-muted", style={"fontSize": "0.75rem", "margin": "0"}),
-                            html.P("• 30-day retention", 
+                            html.P("• 30-day retention",
                                   className="text-muted", style={"fontSize": "0.75rem", "margin": "0"}),
-                            html.P("• Up to 50 symbols", 
+                            html.P("• Up to 50 symbols",
                                   className="text-muted", style={"fontSize": "0.75rem", "margin": "0"}),
-                            html.P("• Real-time WebSocket feed", 
+                            html.P("• Real-time WebSocket feed",
                                   className="text-muted", style={"fontSize": "0.75rem", "margin": "0"}),
                         ], style={"marginTop": "15px"}),
                     ])
                 ])
             ], width=2),
-            
+
             # Chart Area
             dbc.Col([
                 dcc.Loading(

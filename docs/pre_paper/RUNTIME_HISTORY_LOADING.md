@@ -107,7 +107,7 @@ Execute     (logged)
     inserted_at INTEGER NOT NULL,  -- Unix timestamp
     PRIMARY KEY (symbol, tf, ts)
   );
-  
+
   CREATE INDEX idx_bars_range ON bars(symbol, tf, ts);
   ```
 
@@ -164,7 +164,7 @@ class DateRange:
     """Timestamp range for gaps."""
     start: pd.Timestamp
     end: pd.Timestamp
-    
+
     def to_dict(self):
         return {
             "start": self.start.isoformat(),
@@ -175,32 +175,32 @@ class DateRange:
 class HistoryCheckResult:
     """
     Result of runtime history check.
-    
+
     Strategy execution is ONLY allowed if status == SUFFICIENT.
     """
     status: HistoryStatus
     symbol: str
     tf: str
     base_tf_used: str  # For history calculation
-    
+
     # Required window (from manifest params)
     required_start_ts: pd.Timestamp  # market_tz
     required_end_ts: pd.Timestamp    # market_tz
-    
+
     # Cached window (from pre_paper_cache.db)
     cached_start_ts: Optional[pd.Timestamp]
     cached_end_ts: Optional[pd.Timestamp]
-    
+
     # Gaps (if any)
     gaps: List[DateRange]
-    
+
     # Backfill status
     fetch_attempted: bool
     fetch_success: bool
-    
+
     # Degradation reason
     reason: Optional[str]
-    
+
     def to_dict(self):
         return {
             "status": self.status.value,
@@ -233,7 +233,7 @@ def ensure_history(
 ) -> HistoryCheckResult:
     """
     Ensure runtime history is sufficient for strategy execution.
-    
+
     Workflow:
     1. Check pre_paper_cache.db for required window
     2. If complete → SUFFICIENT
@@ -241,7 +241,7 @@ def ensure_history(
        - If auto_backfill=True: fetch missing ranges
        - Else: DEGRADED
     4. Return HistoryCheckResult
-    
+
     Args:
         symbol: Stock symbol
         tf: Target timeframe (M5/M15)
@@ -251,7 +251,7 @@ def ensure_history(
         cache_db_path: Path to pre_paper_cache.db
         historical_provider: Provider for backfilling
         auto_backfill: Enable automatic backfill
-    
+
     Returns:
         HistoryCheckResult with status
     """
@@ -266,13 +266,13 @@ from typing import Protocol
 class HistoricalProvider(Protocol):
     """
     Protocol for fetching historical data.
-    
+
     Implementations can use:
     - EODHD API
     - Backtest parquet (read-only)
     - Other providers
     """
-    
+
     def fetch_bars(
         self,
         symbol: str,
@@ -282,7 +282,7 @@ class HistoricalProvider(Protocol):
     ) -> pd.DataFrame:
         """
         Fetch bars for given range.
-        
+
         Returns:
             DataFrame with OHLCV data (timezone-aware index)
         """
@@ -342,10 +342,10 @@ def on_bar_received(bar: dict):
         ohlcv=bar["ohlcv"],
         source="websocket"
     )
-    
+
     # Re-check history status
     history_result = ensure_history(...)
-    
+
     if history_result.status == HistoryStatus.SUFFICIENT:
         # Window now complete → enable strategy
         logger.info("Window complete, enabling strategy")
@@ -361,18 +361,18 @@ def run_strategy(symbol: str, tf: str):
     """Run strategy (ONLY if history is SUFFICIENT)."""
     # Check history FIRST
     history_result = ensure_history(...)
-    
+
     if history_result.status != HistoryStatus.SUFFICIENT:
         # STRICT: No signals when history insufficient
         logger.warning(f"NO-SIGNALS: {history_result.reason}")
         return []  # Empty signals
-    
+
     # Load series from cache
     df = cache.get_bars(symbol, tf, required_start_ts, required_end_ts)
-    
+
     # Execute strategy
     signals = strategy.detect_patterns(df)
-    
+
     return signals
 ```
 
@@ -456,21 +456,21 @@ import os
 def test_golden_atom_app_m5_inside_bar(tmp_path):
     """Golden Atom test with promotion policy."""
     result = minimal_backtest_with_gates(...)
-    
+
     # Check if data unavailable
     if result.status == RunStatus.FAILED_PRECONDITION and \
        result.reason == FailureReason.DATA_COVERAGE_GAP:
-        
+
         # Promotion mode: FAIL explicitly
         if os.getenv("REQUIRE_GOLDEN_DATA") == "1":
             pytest.fail(
                 "Golden data missing (promotion blocked). "
                 f"Expected APP M5 data for range: {result.details.get('gap')}"
             )
-        
+
         # Dev mode: SKIP
         pytest.skip(f"APP M5 data not available: {result.details.get('gap')}")
-    
+
     # Data available: normal assertions
     assert result.status == RunStatus.SUCCESS
     # ...

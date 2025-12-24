@@ -75,4 +75,3 @@ def test_daily_store_load_window_with_lookback(tmp_path: Path) -> None:
     # target timezone.
     dates = sorted(window["timestamp"].dt.date.unique())
     assert len(dates) >= 3
-

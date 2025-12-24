@@ -42,8 +42,8 @@ Delete sections that are not applicable, but keep the checklists.
 ---
 
 ## 3) Root Cause
-**Kurz und technisch**: Warum ist es passiert?  
-- File/Function: `<path>#Lx-Ly`  
+**Kurz und technisch**: Warum ist es passiert?
+- File/Function: `<path>#Lx-Ly`
 - Mechanismus: …
 
 ---

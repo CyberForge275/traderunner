@@ -104,7 +104,7 @@ http://debian-server-ip:9090  # Prometheus
 
 ### 1. Login
 
-**URL**: http://localhost:3000  
+**URL**: http://localhost:3000
 **Default credentials**: `admin` / `admin`
 
 You'll be prompted to change the password on first login.
@@ -212,7 +212,7 @@ curl -X POST http://localhost:9090/-/reload
    ```bash
    # Test from inside Prometheus container
    docker exec trading-prometheus ping host.docker.internal
-   
+
    # If fails, update prometheus.yml to use server IP:
    # - targets: ['192.168.1.100:8080']  # Your Debian IP
    ```
@@ -374,7 +374,7 @@ groups:
     rules:
       - record: job:order_intent_processing_rate:5m
         expr: rate(order_intents_created_total[5m])
-      
+
       - record: job:order_intent_error_rate:5m
         expr: rate(order_intents_error_total[5m]) / rate(order_intents_created_total[5m])
 ```

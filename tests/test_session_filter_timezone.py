@@ -21,12 +21,12 @@ from strategies.inside_bar.core import InsideBarCore, RawSignal
 def test_session_filter_respects_configured_timezone():
     """
     Regression test: Session filter must use configured timezone, not default.
-    
+
     Scenario:
     - Market TZ: America/New_York
     - Session window: 15:00-17:00 (NY afternoon)
     - Signal timestamp: 2025-12-17 09:35:00-05:00 (NY morning)
-    
+
     Expected: Signal is OUTSIDE session (09:35 < 15:00 in same TZ)
     Bug behavior: Signal would be IN session (if converted to Berlin, 09:35 EST = 15:35 CET)
     """
@@ -38,9 +38,9 @@ def test_session_filter_respects_configured_timezone():
         min_mother_bar_size=0.5,
         risk_reward_ratio=2.0,
     )
-    
+
     core = InsideBarCore(config)
-    
+
     # Create mock OHLC data with morning pattern
     # Mother bar at 09:30, inside bar at 09:35
     df = pd.DataFrame({
@@ -50,10 +50,10 @@ def test_session_filter_respects_configured_timezone():
         'low':  [120.5, 120.8, 120.7, 120.6, 120.9, 121.0, 121.1, 121.2, 121.3, 121.4],   # Inside bar at idx 1
         'close': [121.5, 120.95, 120.75, 120.65, 121.3, 121.5, 121.6, 121.7, 121.8, 121.9],
     })
-    
+
     # Process data - this applies session filter
     signals = core.process_data(df, symbol='TEST')
-    
+
     # CRITICAL ASSERTION:
     # Session filter is 15:00-17:00 NY time
     # All timestamps in df are 09:30-10:15 NY time (morning)
@@ -68,12 +68,12 @@ def test_session_filter_respects_configured_timezone():
 def test_session_filter_allows_signals_in_correct_timezone():
     """
     Positive test: Signals within session window should pass filter.
-    
+
     Scenario:
     - Market TZ: America/New_York
     - Session window: 10:00-11:00 (NY morning)
     - Pattern forms at 10:05, breakout at 10:10
-    
+
     Expected: Signal passes filter (in window)
     """
     config = InsideBarConfig(
@@ -83,9 +83,9 @@ def test_session_filter_allows_signals_in_correct_timezone():
         min_mother_bar_size=0.0,  # Disable size filter for test
         risk_reward_ratio=2.0,
     )
-    
+
     core = InsideBarCore(config)
-    
+
     # Create pattern within session window
     # Mother bar at 10:00, inside bar at 10:05, breakout at 10:10
     df = pd.DataFrame({
@@ -95,15 +95,15 @@ def test_session_filter_allows_signals_in_correct_timezone():
         'low':   [119.5, 120.2, 120.1, 120.8, 121.0],  # Mother=119.5, Inside=120.2
         'close': [120.5, 120.4, 120.3, 121.3, 121.8],
     })
-    
+
     signals = core.process_data(df, symbol='TEST')
-    
+
     # Should have at least 1 signal (breakout at 10:10 is in session 10:00-11:00)
     assert len(signals) >= 1, (
         f"Expected at least 1 signal (breakout in 10:00-11:00 session), "
         f"but got {len(signals)}"
     )
-    
+
     # Verify signal timestamp is within session
     for sig in signals:
         ts = pd.to_datetime(sig.timestamp).tz_convert('America/New_York')
@@ -117,8 +117,8 @@ if __name__ == "__main__":
     # Run tests directly
     test_session_filter_respects_configured_timezone()
     print("✓ test_session_filter_respects_configured_timezone PASSED")
-    
+
     test_session_filter_allows_signals_in_correct_timezone()
     print("✓ test_session_filter_allows_signals_in_correct_timezone PASSED")
-    
+
     print("\nAll regression tests PASSED!")

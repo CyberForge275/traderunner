@@ -222,7 +222,7 @@ def _render_insidebar_parameters(selected_meta) -> dict:
             )
         with col2:
             st.info("Parameters currently fixed to canonical spec; UI overrides coming soon.")
-    
+
     # NEW: Session Filter UI
     with st.expander("Session Filtering", expanded=False):
         st.markdown("**Filter signals to specific trading hours**")
@@ -237,12 +237,12 @@ def _render_insidebar_parameters(selected_meta) -> dict:
             ),
             key="insidebar_session_filter"
         )
-        
+
         if session_input.strip():
             st.success(f"✓ Filtering enabled: {session_input}")
         else:
             st.info("ℹ️ No session filtering (signals at all times)")
-    
+
     # Store in session state for callback access
     st.session_state['session_filter_input'] = session_input
 
@@ -337,7 +337,7 @@ def _render_rudometkin_parameters() -> dict:
                 format="%.1f",
             )
             rk_config["atr40_ratio_bounds"] = {"min": atr40_min / 100.0, "max": atr40_max / 100.0}
-            
+
             atr2_bounds = rk_config.get("atr2_ratio_bounds", {"min": 0.01, "max": 0.20})
             atr2_min = st.number_input(
                 "ATR2/Close Min %",
@@ -386,7 +386,7 @@ def _render_rudometkin_parameters() -> dict:
                      "Higher values increase chance of intraday signals but require fetching more data. "
                      "Recommended: 20-30 for active trading strategies."
             )
-            
+
             # Warning for low values
             if rk_config["max_daily_signals"] < 15:
                 st.warning(
@@ -556,7 +556,7 @@ with st.sidebar:
 
     st.divider()
     st.header("3. Run Settings")
-    
+
     use_sample = st.checkbox("Use synthetic data", value=False)
     force_refresh = st.checkbox("Force refresh data", value=False)
 
@@ -713,12 +713,12 @@ with st.sidebar:
                 "initial_cash": float(initial_cash),
                 "risk_pct": float(risk_pct_value),
             }
-            
+
             # Apply strategy-specific configuration
             if selected_meta.name == RUDOMETKIN_METADATA.name:
                 # Get config from session state (set in the RK config section above)
                 rk_config = st.session_state.get("rk_config", {})
-                
+
                 # Strategy-specific params
                 config_payload["strategy_config"] = {
                     "entry_stretch1": rk_config.get("entry_stretch1", 0.035),
@@ -736,22 +736,22 @@ with st.sidebar:
                     "crsi_streak_rsi": rk_config.get("crsi_streak_rsi", 2),
                     "crsi_rank_period": rk_config.get("crsi_rank_period", 100),
                 }
-                
+
                 # Pipeline-level setting
                 config_payload["max_daily_signals"] = rk_config.get("max_daily_signals", 10)
-                
+
                 # Universe path
                 if rudometkin_universe_path:
                     rudometkin_path_clean = rudometkin_universe_path.strip()
                     if rudometkin_path_clean:
                         config_payload["strategy_config"]["universe_path"] = rudometkin_path_clean
-            
+
             elif selected_meta.name in [INSIDE_BAR_METADATA.name, "insidebar_intraday_v2"]:
                 # InsideBar strategies - use defaults from metadata
                 # Future: Add configurable parameters here
                 if selected_meta.default_strategy_config:
                     config_payload["strategy_config"] = dict(selected_meta.default_strategy_config)
-                
+
                 # NEW: Process session filter from UI input
                 session_filter_input = st.session_state.get('session_filter_input', '').strip()
                 if session_filter_input:
@@ -759,20 +759,20 @@ with st.sidebar:
                         from src.strategies.inside_bar.config import SessionFilter
                         session_strings = [s.strip() for s in session_filter_input.split(",") if s.strip()]
                         session_filter = SessionFilter.from_strings(session_strings)
-                        
+
                         # Add to strategy config
                         # CRITICAL: Convert back to list of strings for YAML serialization
                         # YAML can't serialize SessionFilter objects, so we store as strings
                         if "strategy_config" not in config_payload:
                             config_payload["strategy_config"] = {}
                         config_payload["strategy_config"]["session_filter"] = session_filter.to_strings()
-                        
+
                         st.info(f"✓ Session filter applied: {session_filter_input}")
                     except Exception as e:
                         st.error(f"❌ Invalid session filter format: {e}")
                         st.caption("Format: HH:MM-HH:MM or HH:MM-HH:MM,HH:MM-HH:MM (e.g., 15:00-16:00,16:00-17:00)")
                         st.stop()
-            
+
             config_path_for_run = None
 
         manual_mode = config_mode == "Manual"
@@ -788,7 +788,7 @@ with st.sidebar:
                     st.metric("Requires Universe", "Yes" if selected_meta.requires_universe else "No")
                 with col3:
                     st.metric("Two-Stage Pipeline", "Yes" if selected_meta.supports_two_stage_pipeline else "No")
-                
+
                 st.markdown("### Execution Plan")
                 symbol_set_preview = sorted(list(set(symbol_preview) | set(universe_symbols)))
                 config_summary = {
@@ -802,15 +802,15 @@ with st.sidebar:
                     "initial_cash": config_payload.get("initial_cash"),
                     "risk_pct": config_payload.get("risk_pct"),
                 }
-                
+
                 if selected_meta.requires_universe and rudometkin_universe_path:
                     config_summary["universe_path"] = rudometkin_universe_path
-                
+
                 if selected_meta.supports_two_stage_pipeline and "max_daily_signals" in config_payload:
                     config_summary["max_daily_signals"] = config_payload["max_daily_signals"]
-                
+
                 st.json(config_summary)
-                
+
                 st.markdown("### Full Configuration Payload")
                 st.json(config_payload)
 

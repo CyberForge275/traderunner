@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 class ManifestWriter:
     """
     Writes run manifest for Backtest-Atom.
-    
+
     Manifest contains:
     1. Identity (run_id, timestamp, commit, market_tz)
     2. Strategy Version (impl_version, profile_version)
@@ -41,7 +41,7 @@ class ManifestWriter:
     5. Gate Results (coverage + SLA)
     6. Result (status, reason, artifacts)
     """
-    
+
     def __init__(self, run_dir: Path):
         """
         Args:
@@ -50,7 +50,7 @@ class ManifestWriter:
         self.run_dir = Path(run_dir)
         self.manifest_path = self.run_dir / "run_manifest.json"
         self.manifest: Dict[str, Any] = {}
-    
+
     def write_initial_manifest(
         self,
         run_id: str,
@@ -68,13 +68,13 @@ class ManifestWriter:
     ):
         """
         Write initial manifest after run_meta.json.
-        
+
         Contains all input context except gate results.
         """
         try:
             # Get git commit hash
             commit_hash = self._get_git_commit()
-            
+
             self.manifest = {
                 # 1. Identity
                 "identity": {
@@ -83,17 +83,17 @@ class ManifestWriter:
                     "commit_hash": commit_hash,
                     "market_tz": "America/New_York"  # IMMUTABLE
                 },
-                
+
                 # 2. Strategy Version (Backtest-Atom SSOT)
                 "strategy": {
                     "key": strategy_key,
                     "impl_version": impl_version,
                     "profile_version": profile_version
                 },
-                
+
                 # 3. Params (exact config from run)
                 "params": params,
-                
+
                 # 4. Data Spec
                 "data": {
                     "symbol": symbol,
@@ -109,13 +109,13 @@ class ManifestWriter:
                         "intraday_source_paths": intraday_paths or []
                     }
                 },
-                
+
                 # 5. Gate Results (filled during execution)
                 "gates": {
                     "coverage": None,
                     "sla": None
                 },
-                
+
                 # 6. Result (filled at end)
                 "result": {
                     "run_status": None,
@@ -125,19 +125,19 @@ class ManifestWriter:
                     "artifacts_index": []
                 }
             }
-            
+
             # Write initial version
             self._write_manifest()
             logger.info(f"Wrote initial manifest: {self.manifest_path}")
-        
+
         except Exception as e:
             logger.error(f"Failed to write initial manifest: {e}", exc_info=True)
             # Do not raise - manifest writing failures should not crash run
-    
+
     def update_coverage_gate(self, coverage_result):
         """
         Update manifest with coverage gate results.
-        
+
         Args:
             coverage_result: CoverageCheckResult DTO
         """
@@ -146,11 +146,11 @@ class ManifestWriter:
             self._write_manifest()
         except Exception as e:
             logger.error(f"Failed to update coverage gate in manifest: {e}")
-    
+
     def update_sla_gate(self, sla_result):
         """
         Update manifest with SLA gate results.
-        
+
         Args:
             sla_result: SLAResult DTO
         """
@@ -159,11 +159,11 @@ class ManifestWriter:
             self._write_manifest()
         except Exception as e:
             logger.error(f"Failed to update SLA gate in manifest: {e}")
-    
+
     def update_effective_range(self, start_ts: str, end_ts: str):
         """
         Update effective data range (actual data used).
-        
+
         Args:
             start_ts: Start timestamp ISO format with TZ
             end_ts: End timestamp ISO format with TZ
@@ -176,7 +176,7 @@ class ManifestWriter:
             self._write_manifest()
         except Exception as e:
             logger.error(f"Failed to update effective range in manifest: {e}")
-    
+
     def finalize_manifest(
         self,
         run_result: RunResult,
@@ -184,7 +184,7 @@ class ManifestWriter:
     ):
         """
         Finalize manifest at end (called with run_result.json).
-        
+
         Args:
             run_result: RunResult DTO
             artifacts_produced: List of artifact file names produced
@@ -198,20 +198,20 @@ class ManifestWriter:
                 "error_id": run_result.error_id,
                 "artifacts_index": artifacts_produced or []
             }
-            
+
             # Write final version
             self._write_manifest()
             logger.info(f"Finalized manifest: {self.manifest_path}")
-        
+
         except Exception as e:
             logger.error(f"Failed to finalize manifest: {e}", exc_info=True)
             # Do not raise - manifest finalization must not crash run_result writing
-    
+
     def _write_manifest(self):
         """Write manifest to file (internal helper)."""
         with open(self.manifest_path, 'w') as f:
             json.dump(self.manifest, f, indent=2, sort_keys=True)  # sort_keys for diff-friendly
-    
+
     def _get_git_commit(self) -> Optional[str]:
         """Get current git commit hash."""
         try:

@@ -29,10 +29,10 @@ Architecture:
                                                   ↓
                                               M5/M15 parquet
 
-API Documentation: 
+API Documentation:
     https://eodhd.com/financial-apis/intraday-historical-data-api
 
-Rate Limits: 
+Rate Limits:
     Varies by subscription (typically 100k requests/day)
 
 Environment Variables:
@@ -41,7 +41,7 @@ Environment Variables:
 Example Usage:
     >>> from axiom_bt.data.eodhd_fetch import fetch_intraday_1m_to_parquet
     >>> from pathlib import Path
-    >>> 
+    >>>
     >>> # Fetch TSLA data (gets all available ~60 days)
     >>> path = fetch_intraday_1m_to_parquet(
     ...     symbol='TSLA',

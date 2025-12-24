@@ -1,15 +1,15 @@
 # Run Analysis: 251219_001729_TSLA_SMOKE2
 
-**Date:** 2025-12-19 00:25 CET  
-**Run ID:** 251219_001729_TSLA_SMOKE2  
+**Date:** 2025-12-19 00:25 CET
+**Run ID:** 251219_001729_TSLA_SMOKE2
 **Issue:** 38 signals generated but 0 orders created
 
 ---
 
 ## Problem Statement
 
-**Observed:** Pre-checks passed, 38 signals detected, but 0 orders in output  
-**Expected:** Signals should convert to orders  
+**Observed:** Pre-checks passed, 38 signals detected, but 0 orders in output
+**Expected:** Signals should convert to orders
 **Status:** RunStatus.SUCCESS (no crash) but no trading activity
 
 ---
@@ -35,9 +35,9 @@ Step 4: signal_detection - COMPLETED
   signals_count: 38 ✅
   orders_count: 0   ❌
 
-Step 5: data_sanity - COMPLETED  
+Step 5: data_sanity - COMPLETED
   rows: 5148 (40 days of M5 data)
-  
+
 Step 6: warmup_check - COMPLETED
   required_warmup_bars: 14
   available_bars_before_start: 12
@@ -78,7 +78,7 @@ The diagnostics show:
 }
 ```
 
-**Explanation:**  
+**Explanation:**
 - Session filter is applied DURING SIGNAL GENERATION, not data loading
 - Having `enabled: false` in `data_sanity` is expected
 - Sessions are enforced in `src/strategies/inside_bar/core.py` state machine
@@ -102,9 +102,9 @@ Only header - **NO DATA ROWS**
 
 **Critical Discovery:**
 
-**Data timezone:** America/New_York  
-**Session timezone:** Europe/Berlin  
-**Validity calculation:** Uses session_end in Berlin time  
+**Data timezone:** America/New_York
+**Session timezone:** Europe/Berlin
+**Validity calculation:** Uses session_end in Berlin time
 **Date range:** 2025-11-07 to 2025-12-17 (FUTURE DATES!)
 
 **The Problem:**
@@ -200,18 +200,18 @@ session_end = ???  # May fail to calculate or become naive
 ## Source Code References
 
 ### 1. Signal Detection (works)
-**File:** `src/strategies/inside_bar/core.py`  
-**Method:** `generate_signals()`  
+**File:** `src/strategies/inside_bar/core.py`
+**Method:** `generate_signals()`
 **Result:** 38 signals ✅
 
 ### 2. Validity Calculation (suspect)
-**File:** `src/trade/validity.py`  
-**Method:** `calculate_validity_window()`  
+**File:** `src/trade/validity.py`
+**Method:** `calculate_validity_window()`
 **Issue:** Likely producing `valid_to <= valid_from` for all signals
 
 ### 3. Order Filtering (active)
-**File:** `src/trade/orders_builder.py`  
-**Lines:** ~125-135  
+**File:** `src/trade/orders_builder.py`
+**Lines:** ~125-135
 **Code:**
 ```python
 # Filter invalid validity windows
@@ -311,5 +311,5 @@ Expected result:
 
 ---
 
-**Analysis Generated:** 2025-12-19 00:25 CET  
+**Analysis Generated:** 2025-12-19 00:25 CET
 **Status:** Root cause identified - validity calculation issue with future dates

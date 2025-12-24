@@ -20,27 +20,27 @@ def main():
     print("Pre-PaperTrade Manual Test")
     print("=" * 60)
     print()
-    
+
     # Configuration
     replay_date = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d')
     symbols = ['HOOD', 'PLTR', 'APP', 'INTC', 'TSLA', 'NVDA', 'MU', 'AVGO', 'LRCX', 'WBD']
-    
+
     print(f"Replay Date: {replay_date}")
     print(f"Symbols ({len(symbols)}): {', '.join(symbols)}")
     print(f"Strategy: insidebar_intraday")
     print(f"Timeframe: M5")
     print()
-    
+
     # Create adapter with progress callback
     def progress_callback(msg):
         print(f"  {msg}")
-    
+
     adapter = create_adapter(progress_callback=progress_callback)
-    
+
     # Execute replay
     print("Starting replay...")
     print()
-    
+
     try:
         result = adapter.execute_strategy(
             strategy='insidebar_intraday',
@@ -49,7 +49,7 @@ def main():
             timeframe='M5',
             replay_date=replay_date
         )
-        
+
         print()
         print("=" * 60)
         print("Result:")
@@ -57,7 +57,7 @@ def main():
         print(f"  Message: {result.get('message', 'N/A')}")
         print(f"  Signals Generated: {result.get('signals_generated', 0)}")
         print("=" * 60)
-        
+
         if result.get('status') == 'success':
             print()
             print("✅ Test completed successfully!")
@@ -77,7 +77,7 @@ def main():
             print()
             print("❌ Test failed!")
             print(f"   Error: {result.get('message', 'Unknown error')}")
-            
+
     except Exception as e:
         print()
         print(f"❌ Error: {e}")

@@ -24,27 +24,27 @@ Wenn eine Regel kollidiert: **die strengere Regel gewinnt**.
 
 ## 2. Grundprinzipien
 
-1. **Verstehen vor Ändern**  
+1. **Verstehen vor Ändern**
    Bevor Code geändert wird:
    - Datei vollständig lesen (nicht nur Diff-Ausschnitt).
    - Nach referenzierten Funktionen, Mappings, Enums, Configs suchen.
    - Invarianten identifizieren (z. B. „jeder `tf-*` Button braucht ein Mapping“).
 
-2. **Single Source of Truth respektieren**  
+2. **Single Source of Truth respektieren**
    - Strategien, Timeframes, Pfade, Konfigurationen haben **genau einen** Ursprung.
    - Keine Duplikate in UI, Tests oder Helpers anlegen.
    - Neue Stellen müssen auf bestehende Quellen aufbauen – nicht umgekehrt.
 
-3. **Minimaler, gezielter Diff**  
+3. **Minimaler, gezielter Diff**
    - Nur das ändern, was für den Fix wirklich nötig ist.
    - Kein unaufgefordertes Refactoring, kein massives Umformatieren ganzer Dateien.
 
-4. **Keine neuen „Abkürzungen“**  
+4. **Keine neuen „Abkürzungen“**
    - Kein Hard-Coding von Pfaden, Credentials, Magic Strings.
    - Keine Strategy-Logik im UI-Layer.
    - Keine neuen globalen States ohne explizite Begründung.
 
-5. **Tests zuerst denken, dann Code**  
+5. **Tests zuerst denken, dann Code**
    - Was soll nach der Änderung garantiert sein?
    - Wie lässt sich das in einem Test ausdrücken?
    - Danach erst Code anfassen.
@@ -164,7 +164,7 @@ Für neue Features gilt zusätzlich:
 
 ### 5.1 Layers & Boundaries
 
-- Core/Engine/Strategies:  
+- Core/Engine/Strategies:
   - keine UI-Abhängigkeiten (Plotly, Dash, Streamlit etc.).
 - Dashboard (`trading_dashboard`):
   - UI-Layout, User-Interaktion, Orchestrierung.
@@ -248,4 +248,3 @@ Nach echten „Findings“ (Fehlern, die durch AI-Änderungen entstanden sind):
 - ggf. neue Regel/Invariante ergänzen oder präzisieren.
 
 Ziel: Mit jedem Vorfall wird der Guide ein Stück „bulletproof-er“.
-

@@ -6,7 +6,7 @@
 
 ```bash
 /opt/trading/marketdata-stream/data/signals.db           ✅ EXISTS
-/opt/trading/automatictrader-api/data/automatictrader.db ✅ EXISTS  
+/opt/trading/automatictrader-api/data/automatictrader.db ✅ EXISTS
 /opt/trading/traderunner/artifacts/backtests/            ✅ EXISTS
 /opt/trading/traderunner/src/replay/                     ✅ DEPLOYED
 ```

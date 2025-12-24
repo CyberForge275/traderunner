@@ -9,7 +9,7 @@ import dash_bootstrap_components as dbc
 
 def register_live_data_callback(app):
     """Register callback to display live data symbols as clickable badges."""
-    
+
     @app.callback(
         Output("live-data-dot", "className"),
         Output("live-data-text", "children"),
@@ -20,19 +20,19 @@ def register_live_data_callback(app):
     def update_live_data_status(n_intervals):
         """Update live data indicator and clickable symbol badges."""
         from ..repositories.candles import check_live_data_availability
-        
+
         # Check if any live data is available (returns dict)
         availability = check_live_data_availability()
-        
+
         if availability.get('available', False):
             live_class = "status-dot online"
             symbols_list = availability.get('symbols', [])
             symbol_count = availability.get('symbol_count', 0)
             timeframes = availability.get('timeframes', [])
-            
+
             live_text = f"Live ({symbol_count} symbols)"
             live_count = f"Timeframes: {', '.join(timeframes)}"
-            
+
             # Create clickable badges for each symbol
             symbol_badges = [
                 dbc.Button(
@@ -59,5 +59,5 @@ def register_live_data_callback(app):
             live_text = "No live data"
             live_count = ""
             live_symbols_display = None
-        
+
         return live_class, live_text, live_count, live_symbols_display

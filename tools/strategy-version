@@ -31,19 +31,19 @@ class StrategyVersionManager:
         self.runs_dir = self.strategy_dir / "runs"
         self.results_dir = self.strategy_dir / "results"
         self.db_path = self.strategy_dir / "registry.db"
-        
+
         if not self.db_path.exists():
             print(f"❌ Registry not found: {self.db_path}")
             print(f"Run: python tools/init_registry.py")
             sys.exit(1)
-    
+
     def list_versions(self):
         """List all versions with summary."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         cursor.execute("""
-            SELECT 
+            SELECT
                 v.version,
                 v.created_at,
                 v.status,
@@ -54,35 +54,35 @@ class StrategyVersionManager:
             GROUP BY v.version
             ORDER BY v.created_at DESC
         """)
-        
+
         versions = cursor.fetchall()
         conn.close()
-        
+
         if not versions:
             print("No versions found")
             return
-        
+
         print(f"\n{'Version':<10} {'Created':<12} {'Status':<15} {'Lab Stage':<20} {'Runs':<6}")
         print("-" * 70)
-        
+
         for version, created_at, status, lab_stage, run_count in versions:
             created = datetime.fromisoformat(created_at).strftime("%Y-%m-%d")
             lab = lab_stage or "-"
             print(f"v{version:<9} {created:<12} {status:<15} {lab:<20} {run_count:<6}")
-    
+
     def show_version(self, version: str):
         """Show detailed version information."""
         version_file = self.versions_dir / f"v{version}.yaml"
-        
+
         if not version_file.exists():
             print(f"❌ Version v{version} not found")
             return
-        
+
         with open(version_file, 'r') as f:
             config = yaml.safe_load(f)
-        
+
         print(f"\n═══ Version v{version} ═══\n")
-        
+
         # Metadata
         meta = config.get('version_meta', {})
         print(f"Created: {meta.get('created_at', 'Unknown')}")
@@ -91,13 +91,13 @@ class StrategyVersionManager:
         if meta.get('parent_version'):
             print(f"Parent: v{meta['parent_version']}")
         print(f"Config Hash: {meta.get('config_hash', 'Unknown')}")
-        
+
         # Parameters
         print(f"\n📋 Parameters:")
         params = config.get('parameters', {})
         for key, value in params.items():
             print(f"  {key}: {value}")
-        
+
         # Changes
         if 'changes_from_parent' in config:
             print(f"\n🔧 Changes:")
@@ -106,12 +106,12 @@ class StrategyVersionManager:
                     print(f"  - {change.get('note', change.get('reason', str(change)))}")
                 else:
                     print(f"  - {change}")
-        
+
         # Notes
         if 'notes' in config:
             print(f"\n📝 Notes:")
             print(f"  {config['notes'].strip()}")
-        
+
         # Backtest runs
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -124,7 +124,7 @@ class StrategyVersionManager:
         """, (version,))
         runs = cursor.fetchall()
         conn.close()
-        
+
         if runs:
             print(f"\n📊 Recent Backtest Runs:")
             for run_id, started, status, trades, win_rate, sharpe in runs:
@@ -132,7 +132,7 @@ class StrategyVersionManager:
                 wr = f"{win_rate*100:.1f}%" if win_rate else "N/A"
                 sh = f"{sharpe:.2f}" if sharpe else "N/A"
                 print(f"  {run_id}: {started_fmt} | {status} | Trades: {trades or 0} | WR: {wr} | Sharpe: {sh}")
-    
+
     def create_version(
         self,
         from_version: str,
@@ -146,10 +146,10 @@ class StrategyVersionManager:
         if not parent_file.exists():
             print(f"❌ Parent version v{from_version} not found")
             return
-        
+
         with open(parent_file, 'r') as f:
             parent_config = yaml.safe_load(f)
-        
+
         # Suggest next version if not provided
         if not new_version:
             new_version = self._suggest_next_version(from_version)
@@ -158,7 +158,7 @@ class StrategyVersionManager:
                 return
             elif response not in ['', 'y']:
                 new_version = input("Enter version number (e.g., 2.00): ").strip()
-        
+
         # Create new config
         new_config = parent_config.copy()
         new_config['version_meta'] = {
@@ -170,7 +170,7 @@ class StrategyVersionManager:
             'config_hash': '',  # Will be calculated
             'status': 'draft'
         }
-        
+
         # Apply parameter changes
         changes = []
         if params_to_change:
@@ -182,26 +182,26 @@ class StrategyVersionManager:
                     'old': old_value,
                     'new': new_value
                 })
-        
+
         new_config['changes_from_parent'] = changes
         new_config['notes'] = notes or f"Incremented from v{from_version}"
-        
+
         # Save new version
         new_file = self.versions_dir / f"v{new_version}.yaml"
         with open(new_file, 'w') as f:
             yaml.dump(new_config, f, default_flow_style=False, sort_keys=False)
-        
+
         # Calculate hash
         config_hash = self._calculate_hash(new_file)
         new_config['version_meta']['config_hash'] = config_hash
         with open(new_file, 'w') as f:
             yaml.dump(new_config, f, default_flow_style=False, sort_keys=False)
-        
+
         # Register in database
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO versions 
+            INSERT INTO versions
             (version, created_at, config_hash, config_path, status, created_by)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (
@@ -212,7 +212,7 @@ class StrategyVersionManager:
             'draft',
             'mirko'
         ))
-        
+
         cursor.execute("""
             INSERT INTO version_history
             (from_version, to_version, change_type, changed_params, created_by)
@@ -224,50 +224,50 @@ class StrategyVersionManager:
             json.dumps(changes),
             'mirko'
         ))
-        
+
         conn.commit()
         conn.close()
-        
+
         print(f"✅ Created version v{new_version}")
         print(f"   File: {new_file}")
         print(f"   Hash: {config_hash}")
-    
+
     def diff_versions(self, version1: str, version2: str):
         """Show differences between two versions."""
         v1_file = self.versions_dir / f"v{version1}.yaml"
         v2_file = self.versions_dir / f"v{version2}.yaml"
-        
+
         if not v1_file.exists() or not v2_file.exists():
             print(f"❌ One or both versions not found")
             return
-        
+
         with open(v1_file, 'r') as f:
             v1_config = yaml.safe_load(f)
         with open(v2_file, 'r') as f:
             v2_config = yaml.safe_load(f)
-        
+
         v1_params = v1_config.get('parameters', {})
         v2_params = v2_config.get('parameters', {})
-        
+
         print(f"\n═══ Comparing v{version1} → v{version2} ═══\n")
-        
+
         all_keys = set(v1_params.keys()) | set(v2_params.keys())
-        
+
         changes_found = False
         for key in sorted(all_keys):
             v1_val = v1_params.get(key)
             v2_val = v2_params.get(key)
-            
+
             if v1_val != v2_val:
                 changes_found = True
                 print(f"  {key}:")
                 print(f"    v{version1}: {v1_val}")
                 print(f"    v{version2}: {v2_val}")
                 print()
-        
+
         if not changes_found:
             print("  No parameter changes")
-    
+
     def _suggest_next_version(self, current: str) -> str:
         """Suggest next version number."""
         parts = current.split('.')
@@ -278,7 +278,7 @@ class StrategyVersionManager:
                 return f"{int(major)+1}.00"
             return f"{major}.{new_minor:02d}"
         return f"{int(current)}.01"
-    
+
     def _is_minor_update(self, old: str, new: str) -> bool:
         """Check if version change is minor increment."""
         old_parts = old.split('.')
@@ -286,7 +286,7 @@ class StrategyVersionManager:
         if len(old_parts) == 2 and len(new_parts) == 2:
             return old_parts[0] == new_parts[0]
         return False
-    
+
     def _calculate_hash(self, file_path: Path) -> str:
         """Calculate config file hash."""
         with open(file_path, 'r') as f:
@@ -304,25 +304,25 @@ def main():
     parser.add_argument('--set', dest='params', action='append', help="Set parameter (key=value)")
     parser.add_argument('--notes', help="Version notes")
     parser.add_argument('version2', nargs='?', help="Second version for diff")
-    
+
     args = parser.parse_args()
-    
+
     mgr = StrategyVersionManager(args.strategy)
-    
+
     if args.command == 'list':
         mgr.list_versions()
-    
+
     elif args.command == 'show':
         if not args.version:
             print("❌ Version required")
             return
         mgr.show_version(args.version)
-    
+
     elif args.command == 'create':
         if not args.from_version:
             print("❌ --from required")
             return
-        
+
         params_to_change = {}
         if args.params:
             for param in args.params:
@@ -333,20 +333,20 @@ def main():
                 except ValueError:
                     pass
                 params_to_change[key] = value
-        
+
         mgr.create_version(
             args.from_version,
             args.version,
             params_to_change,
             args.notes or ""
         )
-    
+
     elif args.command == 'diff':
         if not args.version or not args.version2:
             print("❌ Two versions required")
             return
         mgr.diff_versions(args.version, args.version2)
-    
+
     elif args.command == 'deploy':
         print("Deploy command not yet implemented")
 

@@ -4,7 +4,7 @@ Validation Checkpoint Runner for InsideBar SSOT
 
 Runs TSLA 10-day backtest and validates:
 - Fills > 0
-- Session compliance (15-17 Berlin)  
+- Session compliance (15-17 Berlin)
 - First-IB-per-session semantics
 """
 import sys
@@ -70,13 +70,13 @@ try:
         costs={"fees_bps": 0.0, "slippage_bps": 0.0},
         debug_trace=True,  # Enable tracing for validation
     )
-    
+
     print(f"✅ Backtest completed")
     print(f"   Run ID: {result.run_id}")
     print(f"   Status: {result.status}")
     print(f"   Run Path: {result.run_path}")
     print()
-    
+
     # Save run info for validation script
     import json
     validation_info = {
@@ -88,14 +88,14 @@ try:
         "strategy": strategy_key,
         "timeframe": timeframe,
     }
-    
+
     with open("/tmp/validation_run_info.json", "w") as f:
         json.dump(validation_info, f, indent=2)
-    
+
     print(f"✅ Run info saved to /tmp/validation_run_info.json")
     print()
     print(f"Next: Run validation analysis on {result.run_path}")
-    
+
 except Exception as e:
     print(f"❌ Backtest failed: {e}")
     import traceback

@@ -37,7 +37,7 @@ class DateRange:
     """Date range with timezone-aware timestamps."""
     start: pd.Timestamp
     end: pd.Timestamp
-    
+
     def __str__(self):
         return f"{self.start.date()} → {self.end.date()}"
 
@@ -46,7 +46,7 @@ class DateRange:
 class CoverageCheckResult:
     """
     Result of coverage check.
-    
+
     ALWAYS returned (never raises), even on errors.
     """
     status: CoverageStatus
@@ -56,7 +56,7 @@ class CoverageCheckResult:
     fetch_attempted: bool = False
     fetch_success: bool = False
     error_message: Optional[str] = None
-    
+
     def to_dict(self):
         """Convert to dict for serialization."""
         return {
@@ -89,10 +89,10 @@ def check_coverage(
 ) -> CoverageCheckResult:
     """
     Check if local intraday data covers requested range.
-    
+
     ⚠️ CRITICAL: auto_fetch=False by default (fail-fast policy)
     Auto-fetch only via explicit flag/config.
-    
+
     Args:
         symbol: Stock symbol
         timeframe: M1, M5, M15
@@ -100,10 +100,10 @@ def check_coverage(
         lookback_days: Lookback in calendar days
         market_tz: Market timezone (default: America/New_York)
         auto_fetch: If True, attempt to fetch missing data (DEFAULT FALSE)
-    
+
     Returns:
         CoverageCheckResult (always, never raises)
-    
+
     Logic:
     1. Load cached parquet metadata (fast - PyArrow)
     2. Calculate requested_start from lookback_days
@@ -127,11 +127,11 @@ def check_coverage(
             requested_range=requested_range,
             cached_range=requested_range,  # Fake cached range to satisfy caller
         )
-    
+
     try:
         from trading_dashboard.utils.parquet_meta_reader import read_parquet_metadata_fast
         from axiom_bt.fs import DATA_M1, DATA_M5, DATA_M15
-        
+
         # Get parquet path
         path_map = {
             'M1': DATA_M1,
@@ -149,17 +149,17 @@ def check_coverage(
                 cached_range=None,
                 error_message=f"Unknown timeframe: {timeframe}"
             )
-        
+
         parquet_path = data_dir / f"{symbol}.parquet"
-        
+
         # Fast metadata read (O(1), no DataFrame load)
         logger.debug(f"Checking coverage for {symbol} {timeframe} (path={parquet_path})")
         meta = read_parquet_metadata_fast(parquet_path)
-        
+
         # Calculate requested range
         requested_start = _calculate_start_date(requested_end, lookback_days, market_tz)
         requested_range = DateRange(start=requested_start, end=requested_end)
-        
+
         if not meta.exists:
             logger.warning(f"Coverage gap: {symbol} {timeframe} parquet not found")
             return CoverageCheckResult(
@@ -168,22 +168,22 @@ def check_coverage(
                 cached_range=None,
                 gap=requested_range
             )
-        
+
         cached_range = DateRange(start=meta.first_ts, end=meta.last_ts) if meta.first_ts else None
-        
+
         # CRITICAL FIX: EODHD delivers only TRADING DAYS
         # Weekend/holiday gaps at range boundaries are EXPECTED, not errors
         # Allow up to 4 calendar days difference (weekend + holiday buffer)
         MAX_BOUNDARY_GAP_DAYS = 4
-        
+
         if cached_range:
             start_gap_days = (cached_range.start - requested_start).days
             end_gap_days = (requested_end - cached_range.end).days
-            
+
             # Check if gaps are within acceptable boundary tolerance
             start_ok = start_gap_days <= MAX_BOUNDARY_GAP_DAYS
             end_ok = end_gap_days <= MAX_BOUNDARY_GAP_DAYS
-            
+
             if start_ok and end_ok:
                 logger.info(f"Coverage sufficient: {symbol} {timeframe} {cached_range} (boundary gaps: start={start_gap_days}d, end={end_gap_days}d)")
                 return CoverageCheckResult(
@@ -194,11 +194,11 @@ def check_coverage(
             else:
                 logger.warning(f"Coverage gap: start_gap={start_gap_days}d (ok={start_ok}), end_gap={end_gap_days}d (ok={end_ok})")
 
-        
+
         # Gap detected
         gap = _calculate_gap(requested_range, cached_range)
         logger.warning(f"Coverage gap detected: {symbol} {timeframe} gap={gap}")
-        
+
         if not auto_fetch:
             # Fail-fast (default policy)
             logger.info(f"auto_fetch=False, returning GAP_DETECTED")
@@ -208,12 +208,12 @@ def check_coverage(
                 cached_range=cached_range,
                 gap=gap
             )
-        
+
         # Auto-fetch enabled (explicit flag)
         logger.info(f"auto_fetch=True, attempting to fetch missing data")
         try:
             _fetch_missing_range(symbol, timeframe, gap, market_tz)
-            
+
             # Verify after fetch
             meta_after = read_parquet_metadata_fast(parquet_path)
             if meta_after.first_ts <= requested_start and meta_after.last_ts >= requested_end:
@@ -247,7 +247,7 @@ def check_coverage(
                 fetch_success=False,
                 error_message=str(fetch_error)
             )
-    
+
     except Exception as e:
         logger.error(f"Coverage check failed: {e}", exc_info=True)
         return CoverageCheckResult(
@@ -268,7 +268,7 @@ def _calculate_start_date(
 ) -> pd.Timestamp:
     """
     Calculate start date by going back N calendar days.
-    
+
     Note: Uses calendar days, not trading days (conservative approach).
     """
     start = end - pd.Timedelta(days=lookback_days)
@@ -285,15 +285,15 @@ def _calculate_gap(
     """Calculate missing data range."""
     if not cached:
         return requested
-    
+
     # Gap at end (most common)
     if cached.end < requested.end:
         return DateRange(start=cached.end, end=requested.end)
-    
+
     # Gap at start
     elif cached.start > requested.start:
         return DateRange(start=requested.start, end=cached.start)
-    
+
     return None
 
 
@@ -305,14 +305,14 @@ def _fetch_missing_range(
 ):
     """
     Fetch missing data range via EODHD.
-    
+
     Raises on fetch failure.
     """
     from axiom_bt.cli_data import fetch_intraday_1m_to_parquet, resample_m1
     from axiom_bt.fs import DATA_M1, DATA_M5, DATA_M15
-    
+
     logger.info(f"Fetching {symbol} M1 for gap {gap}")
-    
+
     # Fetch M1 base data
     fetch_intraday_1m_to_parquet(
         symbol,
@@ -322,10 +322,10 @@ def _fetch_missing_range(
         output_dir=DATA_M1,
         tz=tz
     )
-    
+
     # Resample if needed
     m1_path = DATA_M1 / f"{symbol}.parquet"
-    
+
     if tf == "M5":
         logger.info(f"Resampling {symbol} M1 → M5")
         resample_m1(m1_path, DATA_M5, interval="5min", tz=tz)

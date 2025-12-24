@@ -181,6 +181,6 @@ TR_MODE=live make deploy
 
 ---
 
-**Last Updated:** 2025-11-27  
-**Template Version:** 1.0  
+**Last Updated:** 2025-11-27
+**Template Version:** 1.0
 **Owner:** Trading Team

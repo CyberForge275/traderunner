@@ -1,7 +1,7 @@
 # EODHD Data Pipeline - Fetch, Gap Detection, and Aggregation
 
-**Last Updated:** 2025-12-20  
-**Author:** Trading System  
+**Last Updated:** 2025-12-20
+**Author:** Trading System
 **Status:** Production Ready ✅
 
 ---
@@ -247,7 +247,7 @@ Total: 100,617 rows (24-hour data)
 
 ### Implementation
 
-**Function:** `filter_rth_session()`  
+**Function:** `filter_rth_session()`
 **Location:** `src/axiom_bt/data/session_filter.py`
 
 ```python
@@ -259,17 +259,17 @@ def filter_rth_session(
 ) -> pd.DataFrame:
     """
     Filter DataFrame to RTH only.
-    
+
     - Converts timestamps to target timezone
     - Filters to time range [09:30, 16:00)
     - Returns filtered copy
     """
     # Convert to target timezone
     ts_tz = df.index.tz_convert(tz)
-    
+
     # Filter to RTH window
     mask = (ts_tz.time >= time(9, 30)) & (ts_tz.time < time(16, 0))
-    
+
     return df[mask].copy()
 ```
 
@@ -352,7 +352,7 @@ M15 (2,730 rows)
 
 ### Aggregation Function
 
-**Function:** `resample_m1()`  
+**Function:** `resample_m1()`
 **Location:** `src/axiom_bt/data/eodhd_fetch.py`
 
 ```python
@@ -364,7 +364,7 @@ def resample_m1(
 ) -> Path:
     """
     Resample 1-minute bars to higher timeframe.
-    
+
     OHLCV aggregation:
     - Open: first
     - High: max
@@ -450,10 +450,10 @@ def fetch_intraday_1m_to_parquet(
 ) -> Path:
     """
     Fetch 1-minute intraday data from EODHD.
-    
+
     Returns:
         Path to final parquet file (RTH-filtered if filter_rth=True)
-        
+
     Files Created:
         - {symbol}_raw.parquet if save_raw=True
         - {symbol}.parquet (filtered if filter_rth=True)
@@ -473,7 +473,7 @@ def check_local_m1_coverage(
 ) -> dict:
     """
     Check M1 data coverage and identify precise gaps.
-    
+
     Returns:
         {
             "available_days": int,
@@ -506,13 +506,13 @@ def filter_rth_session(
 ) -> pd.DataFrame:
     """
     Filter DataFrame to Regular Trading Hours only.
-    
+
     Args:
         df: DataFrame with DatetimeIndex or 'timestamp' column
         tz: Timezone for session (default: America/New_York)
         rth_start: RTH start time HH:MM
         rth_end: RTH end time HH:MM (exclusive)
-    
+
     Returns:
         Filtered DataFrame containing only RTH data
     """
@@ -614,7 +614,7 @@ print(f"Filtered: {len(df_rth):,} rows")
 
 ### Issue: "No gaps but data looks incomplete"
 
-**Cause:** Timezone shift bug (pre-fix)  
+**Cause:** Timezone shift bug (pre-fix)
 **Solution:** Code now uses UTC for date calculations
 
 ```python
@@ -625,7 +625,7 @@ print(result['earliest_data'], result['latest_data'])
 
 ### Issue: "Duplicate timestamps after merge"
 
-**Cause:** `.drop_duplicates()` not called  
+**Cause:** `.drop_duplicates()` not called
 **Solution:** Already implemented in merge logic
 
 ```python
@@ -635,7 +635,7 @@ merged = merged.sort_index().drop_duplicates()  # ← Critical!
 
 ### Issue: "M5/M15 still have Pre/After-Market data"
 
-**Cause:** Aggregated before RTH filtering was implemented  
+**Cause:** Aggregated before RTH filtering was implemented
 **Solution:** Regenerate from RTH M1 data
 
 ```python
@@ -652,7 +652,7 @@ resample_m1(
 
 ### Issue: "EODHD API timeout"
 
-**Cause:** API slow or network issues  
+**Cause:** API slow or network issues
 **Solution:** Retry or use existing data
 
 ```python
@@ -662,7 +662,7 @@ store.ensure(spec, force=False)  # Won't re-fetch if data exists
 
 ### Issue: "ValueError: Range exceeds 120 days"
 
-**Cause:** EODHD limit for 1-minute data is 120 days  
+**Cause:** EODHD limit for 1-minute data is 120 days
 **Solution:** Gap detection automatically chunks requests
 
 ```python
@@ -734,5 +734,5 @@ TOTAL:                ~13s for 20-day gap
 
 ---
 
-**Status:** Production Ready ✅  
+**Status:** Production Ready ✅
 **Last Verified:** 2025-12-20 via Dashboard UI backtest (TSLA 148 days, M5 timeframe)

@@ -22,16 +22,16 @@ DB_PATH = API_DIR / "data" / "automatictrader.db"
 
 class StatusHandler(SimpleHTTPRequestHandler):
     """Custom HTTP handler for status dashboard"""
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(DASHBOARD_DIR), **kwargs)
-    
+
     def do_GET(self):
         if self.path == '/api/status':
             self.send_status_json()
         else:
             super().do_GET()
-    
+
     def send_status_json(self):
         """Send JSON status data"""
         try:
@@ -43,7 +43,7 @@ class StatusHandler(SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps(status).encode())
         except Exception as e:
             self.send_error(500, f"Error getting status: {str(e)}")
-    
+
     def get_system_status(self):
         """Collect system status information"""
         return {
@@ -53,7 +53,7 @@ class StatusHandler(SimpleHTTPRequestHandler):
             'sanity': self.get_sanity_results(),
             'logs': self.get_logs()
         }
-    
+
     def check_api_status(self):
         """Check if API is running"""
         try:
@@ -63,7 +63,7 @@ class StatusHandler(SimpleHTTPRequestHandler):
                 text=True
             )
             running = result.returncode == 0
-            
+
             # Get mode from .env
             mode = "unknown"
             env_file = API_DIR / ".env"
@@ -72,7 +72,7 @@ class StatusHandler(SimpleHTTPRequestHandler):
                     for line in f:
                         if line.startswith('AT_WORKER_MODE'):
                             mode = line.split('=')[1].strip().strip('"')
-            
+
             return {
                 'running': running,
                 'mode': mode,
@@ -80,7 +80,7 @@ class StatusHandler(SimpleHTTPRequestHandler):
             }
         except Exception as e:
             return {'running': False, 'mode': 'error', 'error': str(e)}
-    
+
     def check_worker_status(self):
         """Check if worker is running"""
         try:
@@ -92,7 +92,7 @@ class StatusHandler(SimpleHTTPRequestHandler):
             return {'running': result.returncode == 0}
         except Exception as e:
             return {'running': False, 'error': str(e)}
-    
+
     def check_database_status(self):
         """Check database status"""
         try:
@@ -101,21 +101,21 @@ class StatusHandler(SimpleHTTPRequestHandler):
                     'initialized': False,
                     'intent_count': 0
                 }
-            
+
             conn = sqlite3.connect(str(DB_PATH))
             cursor = conn.cursor()
-            
+
             # Check if tables exist
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='order_intents'")
             table_exists = cursor.fetchone() is not None
-            
+
             intent_count = 0
             if table_exists:
                 cursor.execute("SELECT COUNT(*) FROM order_intents")
                 intent_count = cursor.fetchone()[0]
-            
+
             conn.close()
-            
+
             return {
                 'initialized': table_exists,
                 'intent_count': intent_count
@@ -126,14 +126,14 @@ class StatusHandler(SimpleHTTPRequestHandler):
                 'intent_count': 0,
                 'error': str(e)
             }
-    
+
     def get_sanity_results(self):
         """Get latest sanity check results"""
         try:
             sanity_script = RUNNER_DIR / "scripts" / "sanity_check.sh"
             if not sanity_script.exists():
                 return {'passed': 0, 'warnings': 0, 'failed': 0}
-            
+
             # Run sanity check
             result = subprocess.run(
                 [str(sanity_script)],
@@ -141,13 +141,13 @@ class StatusHandler(SimpleHTTPRequestHandler):
                 text=True,
                 cwd=str(RUNNER_DIR / "scripts")
             )
-            
+
             # Parse output for summary
             output = result.stdout
             passed = 0
             warnings = 0
             failed = 0
-            
+
             for line in output.split('\n'):
                 if 'Passed:' in line:
                     passed = int(line.split(':')[1].strip())
@@ -155,7 +155,7 @@ class StatusHandler(SimpleHTTPRequestHandler):
                     warnings = int(line.split(':')[1].strip())
                 elif 'Failed:' in line:
                     failed = int(line.split(':')[1].strip())
-            
+
             return {
                 'passed': passed,
                 'warnings': warnings,
@@ -168,14 +168,14 @@ class StatusHandler(SimpleHTTPRequestHandler):
                 'failed': 0,
                 'error': str(e)
             }
-    
+
     def get_logs(self):
         """Get recent logs from API and Worker using journalctl"""
         try:
             api_log = ""
             worker_log = ""
             errors = []
-            
+
             # Get API logs from journalctl
             try:
                 result = subprocess.run(
@@ -185,7 +185,7 @@ class StatusHandler(SimpleHTTPRequestHandler):
                     timeout=5
                 )
                 api_log = result.stdout
-                
+
                 # Extract errors
                 for line in api_log.split('\n'):
                     if 'ERROR' in line or 'error' in line.lower() or 'failed' in line.lower():
@@ -196,7 +196,7 @@ class StatusHandler(SimpleHTTPRequestHandler):
                             errors.append(line.strip())
             except Exception as e:
                 api_log = f"Error reading API logs: {str(e)}"
-            
+
             # Get Worker logs from journalctl
             try:
                 result = subprocess.run(
@@ -206,7 +206,7 @@ class StatusHandler(SimpleHTTPRequestHandler):
                     timeout=5
                 )
                 worker_log = result.stdout
-                
+
                 # Extract errors
                 for line in worker_log.split('\n'):
                     if 'ERROR' in line or 'error' in line.lower() or 'failed' in line.lower():
@@ -216,7 +216,7 @@ class StatusHandler(SimpleHTTPRequestHandler):
                             errors.append(line.strip())
             except Exception as e:
                 worker_log = f"Error reading Worker logs: {str(e)}"
-            
+
             return {
                 'api_log': api_log.strip() if api_log else None,
                 'worker_log': worker_log.strip() if worker_log else None,
@@ -228,7 +228,7 @@ class StatusHandler(SimpleHTTPRequestHandler):
                 'worker_log': None,
                 'errors': [f'Error reading logs: {str(e)}']
             }
-    
+
     def log_message(self, format, *args):
         """Override to customize logging"""
         print(f"[{self.log_date_time_string()}] {format % args}")
@@ -237,10 +237,10 @@ class StatusHandler(SimpleHTTPRequestHandler):
 def main():
     """Start the status dashboard server"""
     os.chdir(DASHBOARD_DIR)
-    
+
     server_address = ('', PORT)
     httpd = HTTPServer(server_address, StatusHandler)
-    
+
     print("=" * 50)
     print("Trading System Status Dashboard")
     print("=" * 50)
@@ -248,11 +248,11 @@ def main():
     print(f"Access at: http://192.168.178.55:{PORT}")
     print("Press Ctrl+C to stop")
     print("=" * 50)
-    
+
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\nShutting down...") 
+        print("\nShutting down...")
         httpd.shutdown()
 
 

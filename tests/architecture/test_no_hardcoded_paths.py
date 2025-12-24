@@ -50,4 +50,3 @@ def test_no_hardcoded_paths_in_core_and_services():
         "Move these into settings/config:\n"
         + "\n".join(f"- {file}: {pattern}" for file, pattern in offending)
     )
-

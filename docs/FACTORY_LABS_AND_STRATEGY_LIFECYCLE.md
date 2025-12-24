@@ -20,14 +20,14 @@ and for how Strategy versions must be handled in code and tooling
 
 We distinguish five stages:
 
-1. **Explore Lab**  
+1. **Explore Lab**
    - Purpose: First-time exploration and translation of ideas into Python.
    - Typical sources: Pine scripts, community code, RealTest scripts, ad-hoc prototypes.
    - Strategy state: **Draft** (experimental, mutable).
    - Guarantees: None. The goal is to find out whether the idea can be
      expressed as a viable Python strategy at all.
 
-2. **Backtest Lab**  
+2. **Backtest Lab**
    - Purpose: Turn a draft into a **proper strategy implementation** with
      full backtesting.
    - Requirements:
@@ -38,7 +38,7 @@ We distinguish five stages:
      - A **Strategy Version** that has passed minimum backtest quality gates
        (performance, stability, robustness).
 
-3. **Pre-Papertrading Lab**  
+3. **Pre-Papertrading Lab**
    - Purpose: Run the exact Strategy Version from Backtest Lab on
      live-like data (replay, websockets) and generate real-time paper signals.
    - Characteristics:
@@ -48,7 +48,7 @@ We distinguish five stages:
        - data → signals → order intents → APIs.
    - Duration: e.g. 1–2 weeks per version.
 
-4. **Papertrading Lab**  
+4. **Papertrading Lab**
    - Purpose: Run the same Strategy Version on a real broker
      (e.g. Interactive Brokers Paper/Demo account).
    - Characteristics:
@@ -59,7 +59,7 @@ We distinguish five stages:
        - slippage / fills,
        - operational robustness.
 
-5. **Real Money Trading Room**  
+5. **Real Money Trading Room**
    - Purpose: Run the Strategy Version with real money.
    - Characteristics:
      - Strategy Version is fully frozen and traceable.
@@ -279,4 +279,3 @@ When an AI proposes or modifies strategy code:
    - bump `impl_version` or profile version,
    - add/update tests,
    - and be treated as a new Strategy Version that must go through the Labs again.
-

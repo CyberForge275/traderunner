@@ -22,18 +22,18 @@ def get_pre_paper_run_history(
 ) -> List[Dict]:
     """
     Get run history for a strategy in Pre-PaperTrading Lab.
-    
+
     Fetches the last N runs for the currently valid Pre-Paper version
     of the specified strategy.
-    
+
     Args:
         strategy_key: Strategy identifier (e.g., "insidebar_intraday")
         limit: Maximum number of runs to return (default: 10)
-        
+
     Returns:
         List of run dictionaries with UI-friendly formatting.
         Empty list if no version or no runs exist.
-        
+
     Example:
         [
             {
@@ -50,23 +50,23 @@ def get_pre_paper_run_history(
         ]
     """
     repo = get_repository()
-    
+
     try:
         # Resolve current Pre-Paper version
         version = resolve_pre_paper_version(strategy_key)
     except ValueError:
         # No valid version exists - return empty history
         return []
-    
+
     # Fetch runs for this version (Pre-Paper only)
     runs = repo.get_runs_for_strategy_version(
         version_id=version.id,
         lab_stage=LabStage.PRE_PAPERTRADE
     )
-    
+
     # Limit results
     runs = runs[:limit]
-    
+
     # Format for UI
     formatted_runs = []
     for run in runs:
@@ -78,7 +78,7 @@ def get_pre_paper_run_history(
             "status": run.status,
             "environment": run.environment,
         }
-        
+
         # Extract metrics from metrics_json
         if run.metrics_json:
             try:
@@ -91,7 +91,7 @@ def get_pre_paper_run_history(
         else:
             formatted_run["signals"] = None
             formatted_run["symbols_requested"] = None
-        
+
         # Extract symbols from tags
         if run.tags:
             try:
@@ -105,7 +105,7 @@ def get_pre_paper_run_history(
                 formatted_run["symbols"] = "N/A"
         else:
             formatted_run["symbols"] = "N/A"
-        
+
         # Calculate duration if both timestamps available
         if run.started_at and run.ended_at:
             try:
@@ -114,39 +114,39 @@ def get_pre_paper_run_history(
                     start = datetime.fromisoformat(run.started_at.replace('Z', '+00:00'))
                 else:
                     start = run.started_at
-                
+
                 if isinstance(run.ended_at, str):
                     end = datetime.fromisoformat(run.ended_at.replace('Z', '+00:00'))
                 else:
                     end = run.ended_at
-                
+
                 duration = (end - start).total_seconds()
                 formatted_run["duration_seconds"] = round(duration, 2)
             except (ValueError, AttributeError):
                 formatted_run["duration_seconds"] = None
         else:
             formatted_run["duration_seconds"] = None
-        
+
         formatted_runs.append(formatted_run)
-    
+
     return formatted_runs
 
 
 def format_run_history_for_table(runs: List[Dict]) -> List[Dict]:
     """
     Format run history for Dash DataTable display.
-    
+
     Converts run dictionaries to table-friendly format with
     human-readable strings.
-    
+
     Args:
         runs: List of run dictionaries from get_pre_paper_run_history()
-        
+
     Returns:
         List of dictionaries suitable for dash_table.DataTable
     """
     table_data = []
-    
+
     for run in runs:
         # Format datetime to readable string
         if run.get("started_at"):
@@ -160,7 +160,7 @@ def format_run_history_for_table(runs: List[Dict]) -> List[Dict]:
                 date_str = str(run["started_at"])
         else:
             date_str = "N/A"
-        
+
         # Status badge formatting
         status_raw = run.get("status", "N/A")
         if status_raw == "completed":
@@ -171,7 +171,7 @@ def format_run_history_for_table(runs: List[Dict]) -> List[Dict]:
             status_display = "🔄 Running"
         else:
             status_display = status_raw.capitalize() if status_raw != "N/A" else "N/A"
-        
+
         table_row = {
             "Run ID": run["run_id"],
             "Date/Time": date_str,
@@ -181,7 +181,7 @@ def format_run_history_for_table(runs: List[Dict]) -> List[Dict]:
             "Symbols": run.get("symbols", "N/A"),
             "Duration": f"{run['duration_seconds']}s" if run.get("duration_seconds") is not None else "N/A"
         }
-        
+
         table_data.append(table_row)
-    
+
     return table_data

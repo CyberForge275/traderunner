@@ -4,7 +4,7 @@
 
 1. ✅ Backup created
 2. ✅ Code synced to server (marketdata-stream + automatictrader-api)
-3. ✅ Virtual environments created  
+3. ✅ Virtual environments created
 4. ✅ All dependencies installed (fastapi, uvicorn, psutil, etc.)
 5. ✅ Services stopped
 

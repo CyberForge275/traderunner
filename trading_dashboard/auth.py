@@ -35,11 +35,11 @@ def requires_auth(f):
 
 def add_auth_to_app(app: dash.Dash):
     """Add authentication to all routes of a Dash app."""
-    
+
     @app.server.before_request
     def before_request():
         auth = request.authorization
         if not auth or not check_auth(auth.username, auth.password):
             return authenticate()
-    
+
     return app

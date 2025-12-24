@@ -1,6 +1,6 @@
 # Automatic Signal Generation - Deployment Summary
 
-> **Last Updated**: 2025-12-05  
+> **Last Updated**: 2025-12-05
 > **Config**: Loaded from `droid/shared-config/strategy_params.yaml`
 
 ## 🎯 What Was Implemented
@@ -58,18 +58,18 @@ inside_bar_detector = InsideBarDetector(buffer_size=200)
 ```python
 async def on_candle_complete(candle: Candle):
     # ... persist candle ...
-    
+
     # 🔥 AUTO-GENERATE SIGNALS on M5 candles
     if candle.interval == "M5":
         # Get candle history
         candles = data_store.get_candles(symbol, "M5", limit=200)
-        
+
         # Convert to DataFrame
         df = pd.DataFrame(candles)
-        
+
         # Detect inside bar patterns
         signals = await inside_bar_detector.detect_patterns(df, symbol, "M5")
-        
+
         # Write signals to database
         for signal in signals:
             signal_id = signal_writer.write_signal(signal)

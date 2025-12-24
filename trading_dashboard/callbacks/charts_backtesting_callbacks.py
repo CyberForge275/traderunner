@@ -44,10 +44,10 @@ logger = logging.getLogger(__name__)
 
 def register_charts_backtesting_callbacks(app):
     """Register all callbacks for Backtesting Charts tab."""
-    
+
     # Initialize resolver (replaces IntradayStore)
     resolver = BacktestingTimeframeResolver()
-    
+
     @app.callback(
         Output("bt-candlestick-chart", "figure"),
         [
@@ -73,13 +73,13 @@ def register_charts_backtesting_callbacks(app):
     ):
         """
         Update backtesting chart with data from Parquet.
-        
+
         CRITICAL: Timezone toggle changes DISPLAY only, not data filtering.
         """
         # Determine active timeframe
         ctx = callback_context
         timeframe_str = "M5"  # Default
-        
+
         if ctx.triggered:
             button_id = ctx.triggered[0]['prop_id'].split('.')[0]
             if button_id == 'bt-tf-m1':
@@ -92,14 +92,14 @@ def register_charts_backtesting_callbacks(app):
                 timeframe_str = "H1"
             elif button_id == 'bt-tf-d1':
                 timeframe_str = "D1"
-        
+
         # Determine display timezone
         display_tz = "America/New_York"  # Default
         if ctx.triggered:
             button_id = ctx.triggered[0]['prop_id'].split('.')[0]
             if button_id == 'bt-tz-berlin-btn':
                 display_tz = "Europe/Berlin"
-        
+
         # Validate inputs
         if not symbol:
             empty_fig = go.Figure()
@@ -110,15 +110,15 @@ def register_charts_backtesting_callbacks(app):
                 font=dict(size=16, color="orange")
             )
             return empty_fig
-        
+
         try:
             # === LOAD DATA VIA RESOLVER ===
             # Resolver routes: M1/M5/M15→IntradayStore, D1→Universe, H1→Resample
             df = resolver.load(symbol, timeframe=timeframe_str, tz="America/New_York")
-            
+
             # Track initial row count
             rows_before = len(df)
-            
+
             if df.empty:
                 # === EMPTY STATE WITH CLEAR MESSAGE ===
                 empty_fig = go.Figure()
@@ -129,23 +129,23 @@ def register_charts_backtesting_callbacks(app):
                     x=0.5, y=0.5, showarrow=False,
                     font=dict(size=16)
                 )
-                
+
                 logger.warning(
                     f"source=BACKTEST_PARQUET symbol={symbol} tf={timeframe_str} "
                     f"reason=NO_ROWS rows=0"
                 )
-                
+
                 return empty_fig
-            
+
             # === APPLY DATE FILTERING (P0.2) ===
             # Convert selected_date string to date object if provided
             requested_date = None
             if selected_date:
                 requested_date = pd.to_datetime(selected_date).date()
-            
+
             # Calculate effective date (with clamping/rollback)
             effective_date, date_reason = calculate_effective_date(requested_date, df)
-            
+
             # Apply timeframe-specific filtering
             date_filter_mode = "NONE"
             if timeframe_str == "D1":
@@ -160,7 +160,7 @@ def register_charts_backtesting_callbacks(app):
                 else:
                     # No date filter - show recent data (last N days)
                     date_filter_mode = "INTRADAY_RECENT"
-            
+
             # Check if filtering removed all data
             if df.empty:
                 empty_fig = go.Figure()
@@ -172,7 +172,7 @@ def register_charts_backtesting_callbacks(app):
                     font=dict(size=16)
                 )
                 return empty_fig
-            
+
             # === USE HELPER FOR ALL TRANSFORMATIONS ===
             # Note: ref_date=None here because we already applied date filtering above
             df_processed, meta = preprocess_for_chart(
@@ -182,14 +182,14 @@ def register_charts_backtesting_callbacks(app):
                 display_tz=display_tz,
                 market_tz="America/New_York"
             )
-            
+
             # === BUILD AND LOG COMPREHENSIVE CHART METADATA ===
             # Determine data path based on timeframe
             if timeframe_str == "D1":
                 data_path = "data/universe/stocks_data.parquet"
             else:
                 data_path = f"artifacts/data_{timeframe_str.lower()}/{symbol}.parquet"
-            
+
             chart_meta = build_chart_meta(
                 source="BACKTEST_PARQUET",
                 symbol=symbol,
@@ -208,9 +208,9 @@ def register_charts_backtesting_callbacks(app):
                 session_flags={"pre": "pre" in (session_toggles or []), "after": "after" in (session_toggles or [])},
                 data_path=data_path,
             )
-            
+
             log_chart_meta(chart_meta)
-            
+
             if len(df_processed) == 0:
                 # Empty after preprocessing
                 empty_fig = go.Figure()
@@ -222,38 +222,38 @@ def register_charts_backtesting_callbacks(app):
                     font=dict(size=16)
                 )
                 return empty_fig
-            
+
             # === BUILD CHART ===
             # For D1 (EOD data), use 'all' session mode since daily bars don't have intraday timestamps
             # For intraday (M1/M5/M15/H1), use 'rth' to filter regular trading hours
             session_mode = "all" if timeframe_str == "D1" else "rth"
-            
+
             # Calculate uirevision for persistent zoom
             # Zoom resets only when these change: symbol, tf, effective_date, window, display_tz, sessions
             session_hash = f"{session_toggles or []}"
             uirevision = f"{symbol}|{timeframe_str}|{effective_date.date() if effective_date else 'none'}|{window if timeframe_str == 'D1' else 'na'}|{display_tz}|{session_hash}"
-            
+
             config = PriceChartConfig(
                 title=f"{symbol} {timeframe_str} - Backtesting",
                 show_volume=True,
                 session_mode=session_mode,  # Critical: D1 must use 'all' to avoid empty charts
                 show_rangeslider=(timeframe_str == "D1"),  # Rangeslider only for D1
             )
-            
+
             fig = build_price_chart(df_processed, indicators=[], config=config)
-            
+
             # Apply uirevision and dragmode to layout
             fig.update_layout(
                 uirevision=uirevision,  # Persistent zoom state
                 dragmode='zoom',  # Default interaction mode
             )
-            
+
             return fig
-            
+
         except Exception as e:
             # Generate error_id for correlation
             error_id = generate_error_id()
-            
+
             # Build minimal chart_meta for error context
             error_meta = build_chart_meta(
                 source="BACKTEST_PARQUET",
@@ -273,10 +273,10 @@ def register_charts_backtesting_callbacks(app):
                 session_flags={},
                 data_path="unknown",
             )
-            
+
             # Log error with full context
             log_chart_error(error_id, e, error_meta)
-            
+
             # Show user-friendly error with error_id for correlation
             error_fig = go.Figure()
             error_fig.add_annotation(
@@ -287,10 +287,10 @@ def register_charts_backtesting_callbacks(app):
                 x=0.5, y=0.5, showarrow=False,
                 font=dict(size=16, color="red")
             )
-            
+
             return error_fig
-    
-    
+
+
     @app.callback(
         [
             Output("bt-tf-m1", "active"),
@@ -312,9 +312,9 @@ def register_charts_backtesting_callbacks(app):
         ctx = callback_context
         if not ctx.triggered:
             return False, True, False, False, False  # M5 default
-        
+
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-        
+
         return (
             button_id == 'bt-tf-m1',
             button_id == 'bt-tf-m5',
@@ -322,8 +322,8 @@ def register_charts_backtesting_callbacks(app):
             button_id == 'bt-tf-h1',
             button_id == 'bt-tf-d1',
         )
-    
-    
+
+
     @app.callback(
         [
             Output("bt-tz-ny-btn", "active"),
@@ -341,15 +341,15 @@ def register_charts_backtesting_callbacks(app):
         ctx = callback_context
         if not ctx.triggered:
             return True, False, False, True  # NY default
-        
+
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-        
+
         if button_id == 'bt-tz-ny-btn':
             return True, False, False, True
         else:
             return False, True, True, False
-    
-    
+
+
     @app.callback(
         Output("bt-availability-box", "children"),
         [
@@ -360,26 +360,26 @@ def register_charts_backtesting_callbacks(app):
     def update_availability_display(symbol, refresh_clicks):
         """
         Update data availability display for selected symbol.
-        
+
         Thin callback - delegates to service layer.
         """
         from trading_dashboard.services.data_availability_service import (
             get_availability,
             format_availability_for_ui
         )
-        
+
         if not symbol:
             return html.Div(
                 "Select symbol",
                 className="text-muted",
                 style={"textAlign": "center", "padding": "20px 0"}
             )
-        
+
         # Check if refresh button was clicked
         ctx = callback_context
-        force_refresh = (ctx.triggered and 
+        force_refresh = (ctx.triggered and
                         ctx.triggered[0]['prop_id'] == 'bt-availability-refresh.n_clicks')
-        
+
         # Delegate to service layer
         try:
             result = get_availability(symbol, force_refresh=force_refresh)

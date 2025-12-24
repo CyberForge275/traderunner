@@ -66,7 +66,7 @@ class DailyStore:
             # Contract expects TitleCase columns, but we use lowercase internally
             # Create a view with TitleCase columns for validation
             validation_view = df.rename(columns={
-                "open": "Open", "high": "High", "low": "Low", 
+                "open": "Open", "high": "High", "low": "Low",
                 "close": "Close", "volume": "Volume"
             })
             DailyFrameSpec.assert_valid(validation_view)

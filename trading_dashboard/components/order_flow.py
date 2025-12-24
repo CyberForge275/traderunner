@@ -13,7 +13,7 @@ def create_order_item(row: dict):
     price = row.get("price", 0.0)
     status = row.get("status", "pending")
     created_at = row.get("created_at", "")
-    
+
     status_map = {
         "pending": ("⏳", "status-detected"),
         "planned": ("📋", "status-triggered"),
@@ -23,9 +23,9 @@ def create_order_item(row: dict):
         "error": ("❌", "status-error"),
         "rejected": ("🚫", "status-error")
     }
-    
+
     icon, status_class = status_map.get(status.lower(), ("❓", "status-detected"))
-    
+
     return html.Div(
         className="order-flow-item",
         children=[
@@ -48,7 +48,7 @@ def create_order_flow_panel(orders_df: pd.DataFrame):
         items = [html.P("No orders today", className="text-muted", style={"padding": "20px"})]
     else:
         items = [create_order_item(row) for _, row in orders_df.head(10).iterrows()]
-    
+
     return html.Div(
         className="dashboard-card",
         children=[

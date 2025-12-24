@@ -11,7 +11,7 @@
 
 ### Rudometkin MOC Strategy (`src/strategies/rudometkin_moc/docs/`)
 - ✅ `README.md` - Strategy overview (placeholder)
-- ✅ `rudometkin_moc_strategy.md` - Strategy description  
+- ✅ `rudometkin_moc_strategy.md` - Strategy description
 - ✅ `rudometkin_moc_long_short_translation.md` - Translation document
 - ✅ `rudometkin_moc_long_short.rts.txt` - RTS file
 - ✅ `code_review_rudometkin.md` - Code review
@@ -68,7 +68,7 @@ These files are NOT strategy-specific and remain in the main docs folder:
 - `runbooks/incident_response.md`
 - `runbooks/promotion_checklist.md`
 
-### Reference Material  
+### Reference Material
 - `QUICK_REFERENCE.md`
 - `Screenshot_TWS_*.png` (IB TWS screenshots)
 - `ext_flow.jpg`, `screen1.png`, `backtest_dashboard_stream.png`

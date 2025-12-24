@@ -29,26 +29,26 @@ def main():
     print("=" * 60)
     print("Strategy Lifecycle Metadata Tables - Schema Initialization")
     print("=" * 60)
-    
+
     # Get database path from Settings
     settings = get_settings()
     db_path = settings.signals_db_path
-    
+
     print(f"\nDatabase: {db_path}")
-    
+
     if not db_path.exists():
         print(f"\n⚠️  Database does not exist yet: {db_path}")
         print("   It will be created when first accessed.")
-    
+
     # Initialize schema
     print("\n📋 Creating tables and indexes...")
     repo = get_repository(db_path)
-    
+
     print("   ✅ strategy_version table")
     print("   ✅ strategy_run table")
     print("   ✅ Indexes created")
     print("   ✅ Foreign key constraints enabled")
-    
+
     print("\n" + "=" * 60)
     print("✅ Schema initialization complete!")
     print("=" * 60)

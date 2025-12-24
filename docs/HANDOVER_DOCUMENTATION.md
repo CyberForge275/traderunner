@@ -1,7 +1,7 @@
 % Rudometkin MOC Strategy – Technical Handover
 
-> **📜 HISTORICAL DOCUMENT**  
-> **Date**: November 2025  
+> **📜 HISTORICAL DOCUMENT**
+> **Date**: November 2025
 > **Context**: Initial Rudometkin MOC strategy handover documentation
 
 > Key focus: new minute‑data logic, two‑stage pipeline, and manifest‑compliant design

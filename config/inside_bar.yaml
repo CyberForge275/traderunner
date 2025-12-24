@@ -13,36 +13,36 @@ metadata:
 
 parameters:
   # === Core Parameters (affect signal generation) ===
-  
+
   # ATR calculation period
   atr_period: 14
-  
+
   # Risk/Reward ratio for take-profit calculation
   # TP = Entry + (Risk * risk_reward_ratio)
   risk_reward_ratio: 2.0
-  
+
   # Minimum mother bar size as multiple of ATR
   # Set to 0 to disable filtering
   min_mother_bar_size: 0.5
-  
+
   # Require close beyond mother bar for breakout confirmation
   # true = conservative (use close price)
   # false = aggressive (use high/low)
   breakout_confirmation: true
-  
+
   # Inside bar detection mode
   # "inclusive" = current bar can touch mother bar levels
   # "strict" = current bar must be strictly inside
   inside_bar_mode: inclusive
-  
+
   # === Live Trading Parameters (ignored in backtest) ===
-  
+
   # Number of recent candles to consider
   lookback_candles: 50
-  
+
   # Maximum age of pattern before invalidation (in candles)
   max_pattern_age_candles: 12
-  
+
   # Maximum price deviation from pattern (in ATR multiples)
   max_deviation_atr: 3.0
 
@@ -51,7 +51,7 @@ backtesting:
   # 0 = enter on breakout candle close
   # 1 = enter on next candle open
   execution_lag: 0
-  
+
   # Session filtering (optional)
   session_filter:
     enabled: false
@@ -61,6 +61,6 @@ backtesting:
 live_trading:
   # Signal deduplication enabled
   deduplication: true
-  
+
   # Pattern cache reset frequency
   reset_frequency: daily

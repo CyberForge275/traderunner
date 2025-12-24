@@ -1,15 +1,15 @@
 # InsideBar SSOT - Deployment Confirmation
 
-**Date:** 2025-12-19 00:10 CET  
-**Server:** INT (192.168.178.55)  
+**Date:** 2025-12-19 00:10 CET
+**Server:** INT (192.168.178.55)
 **Status:** ✅ **DEPLOYED**
 
 ---
 
 ## Deployment Summary
 
-**Action:** Merge & Deploy InsideBar SSOT + Pandas Fix  
-**Status:** ✅ COMPLETE  
+**Action:** Merge & Deploy InsideBar SSOT + Pandas Fix
+**Status:** ✅ COMPLETE
 **Validation:** PASSED (RunStatus.SUCCESS)
 
 ---
@@ -21,7 +21,7 @@
 fix(pandas): make OHLCV resample agg pandas-2.x safe
 
 - Replace string aggregators "first"/"last" with lambda callables
-- Use .iloc[0]/.iloc[-1] for first/last row access  
+- Use .iloc[0]/.iloc[-1] for first/last row access
 - Add empty guard to prevent IndexError
 - Pandas 1.x and 2.x compatible
 - Unblocks entire backtest pipeline
@@ -29,7 +29,7 @@ fix(pandas): make OHLCV resample agg pandas-2.x safe
 Tested: FINAL_VALID_TSLA_20251219_000440 - RunStatus.SUCCESS
 ```
 
-**File:** `src/axiom_bt/data/eodhd_fetch.py`  
+**File:** `src/axiom_bt/data/eodhd_fetch.py`
 **Lines Changed:** 7 (214-220)
 
 ### 2. Previous Commits (Already on INT)
@@ -122,8 +122,8 @@ git checkout 3b962c2  # Pre-SSOT state
 - AG_4C_HOOD_ONEBAR_20251218_234113
 - INT_SMOKE_TSLA_PHASE5_20251218_194836
 
-**Deployment Date:** 2025-12-19 00:10 CET  
-**Deployed By:** Antigravity AI  
+**Deployment Date:** 2025-12-19 00:10 CET
+**Deployed By:** Antigravity AI
 **Approved By:** User confirmation
 
 ---
@@ -132,11 +132,11 @@ git checkout 3b962c2  # Pre-SSOT state
 
 ✅ **DEPLOYMENT CONFIRMED**
 
-**InsideBar SSOT:** Live on INT  
-**Pandas Fix:** Applied and tested  
-**Status:** Production operational  
+**InsideBar SSOT:** Live on INT
+**Pandas Fix:** Applied and tested
+**Status:** Production operational
 
-**Confidence:** HIGH (95%)  
+**Confidence:** HIGH (95%)
 **Risk Level:** LOW (all validation passed)
 
 ---

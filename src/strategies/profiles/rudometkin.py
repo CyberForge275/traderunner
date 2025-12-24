@@ -22,7 +22,7 @@ RUDOMETKIN_MOC_PROFILE = StrategyMetadata(
     display_name="Rudometkin Market-on-Close",
     version="1.0.0",
     description="Mean reversion strategy trading at market close using universe file",
-    
+
     # Capabilities
     capabilities=StrategyCapabilities(
         supports_live_trading=False,  # Not yet migrated to live
@@ -38,7 +38,7 @@ RUDOMETKIN_MOC_PROFILE = StrategyMetadata(
         supports_position_sizing=True,
         supports_portfolio_mode=True,  # Trades multiple symbols
     ),
-    
+
     # Data Requirements
     data_requirements=DataRequirements(
         required_timeframes=["M5"],  # Still uses M5 data
@@ -49,7 +49,7 @@ RUDOMETKIN_MOC_PROFILE = StrategyMetadata(
         requires_market_data_db=True,
         requires_signals_db=False,
     ),
-    
+
     # Configuration
     config_class_path="strategies.rudometkin_moc.config.RudometkinConfig",
     default_parameters={
@@ -63,14 +63,14 @@ RUDOMETKIN_MOC_PROFILE = StrategyMetadata(
         },
         "required": ["universe_path"],
     },
-    
+
     # Runtime Paths
     signal_module_path="signals.cli_rudometkin_moc",
     core_module_path="strategies.rudometkin_moc.core",
-    
+
     # Dependencies
     required_indicators=[],  # Add specific indicators if needed
-    
+
     # Deployment
     deployment_info=DeploymentInfo(
         deployed_environments=[
@@ -85,7 +85,7 @@ RUDOMETKIN_MOC_PROFILE = StrategyMetadata(
             "Backtest works, live trading not yet implemented."
         ),
     ),
-    
+
     # Metadata
     created_by="migration_from_streamlit_state",
     documentation_url=None,

@@ -19,16 +19,16 @@ os.environ.setdefault("PYTHONPATH", str(SRC))
 
 class BacktestService:
     """Manages background backtest execution using threading.
-    
+
     This service allows running backtests without blocking the Dash UI.
     Jobs are tracked in memory with status updates.
     """
-    
+
     def __init__(self):
         self.running_jobs: Dict[str, Dict] = {}  # job_id -> job metadata
         self.completed_jobs: Dict[str, Dict] = {}
         self._lock = threading.Lock()
-        
+
     def start_backtest(
         self,
         run_name: str,
@@ -40,7 +40,7 @@ class BacktestService:
         config_params: Optional[Dict] = None
     ) -> str:
         """Start a backtest in background thread.
-        
+
         Args:
             run_name: Name for the backtest run
             strategy: Strategy identifier (e.g., "inside_bar")
@@ -49,13 +49,13 @@ class BacktestService:
             start_date: Start date for backtest (ISO format YYYY-MM-DD)
             end_date: End date for backtest (ISO format YYYY-MM-DD)
             config_params: Optional additional configuration
-            
+
         Returns:
             job_id: Unique identifier for tracking this job
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         job_id = f"{run_name}_{timestamp}"
-        
+
         with self._lock:
             self.running_jobs[job_id] = {
                 "status": "running",
@@ -68,7 +68,7 @@ class BacktestService:
                 "started_at": datetime.now().isoformat(),
                 "progress": "Initializing...",
             }
-        
+
         # Start background thread
         thread = threading.Thread(
             target=self._run_pipeline,
@@ -76,9 +76,9 @@ class BacktestService:
             daemon=True
         )
         thread.start()
-        
+
         return job_id
-    
+
     def _run_pipeline(
         self,
         job_id: str,
@@ -91,7 +91,7 @@ class BacktestService:
         config_params: Optional[Dict]
     ):
         """Execute pipeline in background thread.
-        
+
         This method runs the full backtest pipeline:
         1. Fetch intraday data
         2. Generate signals
@@ -101,31 +101,31 @@ class BacktestService:
         try:
             # Update progress
             self._update_job_progress(job_id, "Loading pipeline configuration...")
-            
+
             # CRITICAL: Use Phase 1-5 pipeline by DEFAULT (legacy only if explicitly enabled)
             # To use old pipeline: Set USE_LEGACY_PIPELINE=1 (NOT RECOMMENDED)
             use_legacy =os.getenv("USE_LEGACY_PIPELINE", "0") == "1"
-            
+
             if use_legacy:
                 # OLD path (DEPRECATED - only for emergency rollback)
                 from .pipeline_adapter import create_adapter
-                
+
                 def update_progress(msg: str):
                     self._update_job_progress(job_id, msg)
-                
+
                 adapter = create_adapter(progress_callback=update_progress)
                 print("⚠️  WARNING: Using LEGACY pipeline adapter (signals.cli_inside_bar subprocess)")
             else:
                 # NEW path (DEFAULT) - Phase 1-5 robust pipeline
                 from .new_pipeline_adapter import create_new_adapter
-                
+
                 # Create adapter with progress callback
                 def update_progress(msg: str):
                     self._update_job_progress(job_id, msg)
-                
+
                 adapter = create_new_adapter(progress_callback=update_progress)
 
-            
+
             # Execute backtest
             result = adapter.execute_backtest(
                 run_name=run_name,
@@ -136,13 +136,13 @@ class BacktestService:
                 end_date=end_date,
                 config_params=config_params
             )
-            
+
             # Handle results from new pipeline adapter (Phase 1-5)
             if result.get("status") == "failed_precondition":
                 # NOT an error - gates blocked execution (expected)
                 reason = result.get("reason", "unknown")
                 details = result.get("details", "")
-                
+
                 with self._lock:
                     job_data = self.running_jobs.pop(job_id, {})
                     self.completed_jobs[job_id] = {
@@ -154,12 +154,12 @@ class BacktestService:
                         "progress": f"Gates blocked: {reason}",
                     }
                 return
-            
+
             elif result.get("status") == "error":
                 # Deterministic error with error_id
                 error_id = result.get("error_id", "UNKNOWN")
                 details = result.get("details", "")
-                
+
                 with self._lock:
                     job_data = self.running_jobs.pop(job_id, {})
                     self.completed_jobs[job_id] = {
@@ -171,7 +171,7 @@ class BacktestService:
                         "progress": f"Error (ID: {error_id})",
                     }
                 return
-            
+
             # Check OLD adapter result format (legacy)
             if result.get("status") == "failed":
                 # If pipeline failed, try to extract more details from run_log.json
@@ -190,12 +190,12 @@ class BacktestService:
                                 break
                 except Exception as log_err:
                     print(f"Could not extract command output from run_log: {log_err}")
-                
+
                 error_msg = result.get('error', 'Unknown error')
                 # Enhance error message with command output if available
                 if command_output:
                     error_msg = f"{error_msg}\n\nCommand Output:\n{command_output}"
-                
+
                 with self._lock:
                     job_data = self.running_jobs.pop(job_id, {})
                     self.completed_jobs[job_id] = {
@@ -208,9 +208,9 @@ class BacktestService:
                         "progress": f"Error: {result.get('error', 'Unknown error')}",
                     }
                 return # Exit early as the job has failed and been recorded
-            
+
             effective_run_name = result["run_name"]
-            
+
             # Success
             with self._lock:
                 job_data = self.running_jobs.pop(job_id, {})
@@ -221,20 +221,20 @@ class BacktestService:
                     "ended_at": datetime.now().isoformat(),
                     "progress": "Backtest completed successfully",
                 }
-                
+
         except Exception as e:
             # Error - capture full traceback
             import traceback
             error_msg = f"{type(e).__name__}: {str(e)}"
             full_traceback = traceback.format_exc()
-            
+
             # Log to console for debugging
             print(f"\n{'='*60}")
             print(f"BACKTEST ERROR - Job ID: {job_id}")
             print(f"{'='*60}")
             print(full_traceback)
             print(f"{'='*60}\n")
-            
+
             with self._lock:
                 job_data = self.running_jobs.pop(job_id, {})
                 self.completed_jobs[job_id] = {
@@ -245,19 +245,19 @@ class BacktestService:
                     "ended_at": datetime.now().isoformat(),
                     "progress": f"Error: {error_msg}",
                 }
-    
+
     def _update_job_progress(self, job_id: str, progress: str):
         """Update progress message for a running job."""
         with self._lock:
             if job_id in self.running_jobs:
                 self.running_jobs[job_id]["progress"] = progress
-    
+
     def get_job_status(self, job_id: str) -> Dict:
         """Get current status of a backtest job.
-        
+
         Args:
             job_id: Job identifier
-            
+
         Returns:
             Job status dictionary with keys: status, progress, etc.
         """
@@ -267,10 +267,10 @@ class BacktestService:
             elif job_id in self.completed_jobs:
                 return dict(self.completed_jobs[job_id])
             return {"status": "not_found"}
-    
+
     def get_all_jobs(self) -> Dict[str, Dict]:
         """Get status of all jobs (running + completed).
-        
+
         Returns:
             Dictionary mapping job_id to job status
         """
@@ -279,7 +279,7 @@ class BacktestService:
             all_jobs.update(self.running_jobs)
             all_jobs.update(self.completed_jobs)
             return all_jobs
-    
+
     def clear_completed_jobs(self):
         """Clear completed jobs from memory."""
         with self._lock:
@@ -292,7 +292,7 @@ _backtest_service: Optional[BacktestService] = None
 
 def get_backtest_service() -> BacktestService:
     """Get the global BacktestService instance (singleton pattern).
-    
+
     Returns:
         BacktestService instance
     """

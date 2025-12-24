@@ -19,7 +19,7 @@ Executive Summary
 - Display Time: Europe/Berlin für UI/Reporting. Reine Präsentation, keine Trading-Logik.
 - No-naive-datetime: Alle internen Timestamps sind tz-aware. Naive Werte werden abgelehnt oder sofort lokalisiert mit expliziter TZ.
 - Persistenz-Regeln:
-  - Empfehlung: Persistiere Zeitachsen in UTC + `meta.market_tz`, `meta.display_tz`. 
+  - Empfehlung: Persistiere Zeitachsen in UTC + `meta.market_tz`, `meta.display_tz`.
   - Wenn Market-Zeit persistiert wird, MUSS `meta.market_tz` beigefügt werden; keine gemischten Achsen.
   - Artifacts (csv/json) sollen UTC-Stempel tragen, plus Meta (market_tz, display_tz) im Manifest/diagnostics.
 
@@ -60,7 +60,7 @@ Executive Summary
 - RequestedEndSpec
   - fields: raw (str|date|ts), interpretation ("market_date" default), tz (market_tz), resolved_utc (Timestamp)
   - rule: date-only → interpretiere als market calendar date end-of-day (session close) → konvertiere zu UTC.
-  - example: raw="2025-12-17", market_tz=America/New_York → resolved_utc = 2025-12-18T03:59:59Z (bei 16:00 NY). 
+  - example: raw="2025-12-17", market_tz=America/New_York → resolved_utc = 2025-12-18T03:59:59Z (bei 16:00 NY).
 
 
 4) Zentraler Zeit-Service (axiom_bt/time/)
@@ -83,7 +83,7 @@ Modul-API (Signaturen skizziert):
   - garantiert valid_to > valid_from; wirft ValueError sonst.
 
 - bar_timestamp_semantics(bar_ts: pd.Timestamp, bar_spec: BarSpec) -> pd.Timestamp
-  - definiert: Signals/Orders verwenden bar-close (label=right/closed=right). 
+  - definiert: Signals/Orders verwenden bar-close (label=right/closed=right).
 
 - handle_dst(ts: pd.Timestamp, tz: str, how: Literal["raise","fold_forward"] = "raise") -> pd.Timestamp
   - validiert/ent-ambiguiert.

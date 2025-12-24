@@ -20,7 +20,7 @@ def _get_strategy_options():
             return options
     except Exception as e:
         print(f"Error loading strategy versions: {e}")
-    
+
     # Fallback to basic strategy list (no versions)
     return [
         {
@@ -41,11 +41,11 @@ def _get_strategy_options():
 def create_pre_papertrade_layout():
     """
     Create the Pre-PaperTrade Lab tab layout.
-    
+
     Left pane: Mode selection, strategy configuration, run controls
     Right pane: Signals output, statistics, and history
     """
-    
+
     return dbc.Container(
         [
             dbc.Row(
@@ -58,7 +58,7 @@ def create_pre_papertrade_layout():
                                 "Run strategies live during market hours or replay past sessions with Time Machine.",
                                 className="text-muted mb-4",
                             ),
-                            
+
                             # Mode Selection
                             dbc.Card(
                                 [
@@ -89,7 +89,7 @@ def create_pre_papertrade_layout():
                                 ],
                                 className="mb-3",
                             ),
-                            
+
                             # Time Machine Configuration (only visible in replay mode)
                             html.Div(
                                 id="time-machine-container",
@@ -118,7 +118,7 @@ def create_pre_papertrade_layout():
                                 ],
                                 style={"display": "none"},  # Hidden by default (live mode)
                             ),
-                            
+
                             # Strategy Configuration
                             dbc.Card(
                                 [
@@ -139,9 +139,9 @@ def create_pre_papertrade_layout():
                                                 className="text-muted mb-3 d-block",
                                                 children="Inside Bar Intraday - Pattern breakout strategy"
                                             ),
-                                            
+
                                             html.Hr(),
-                                            
+
                                             # Symbols
                                             dbc.Label("Symbols (comma-separated):"),
                                             dbc.Input(
@@ -151,7 +151,7 @@ def create_pre_papertrade_layout():
                                                 value="",
                                                 className="mb-3",
                                             ),
-                                            
+
                                             # Timeframe
                                             dbc.Label("Timeframe:"),
                                             dcc.Dropdown(
@@ -168,9 +168,9 @@ def create_pre_papertrade_layout():
                                                 clearable=False,
                                                 className="mb-3",
                                             ),
-                                            
+
                                             html.Hr(),
-                                            
+
                                             # NEW: Session Filter Input
                                             dbc.Label("Session Hours (optional):", className="fw-bold"),
                                             dbc.Input(
@@ -187,9 +187,9 @@ def create_pre_papertrade_layout():
                                                 color="secondary",
                                                 className="mb-3"
                                             ),
-                                            
+
                                             html.Hr(),
-                                            
+
                                             # Strategy Parameters (for now, static - Phase 3 will make dynamic)
                                             html.Div(
                                                 id="strategy-parameters-container",
@@ -206,7 +206,7 @@ def create_pre_papertrade_layout():
                                 ],
                                 className="mb-3",
                             ),
-                            
+
                             # NEW: Past Runs Selector
                             dbc.Card(
                                 [
@@ -230,7 +230,7 @@ def create_pre_papertrade_layout():
                                 ],
                                 className="mb-3",
                             ),
-                            
+
                             # Run Controls
                             dbc.Card(
                                 [
@@ -258,7 +258,7 @@ def create_pre_papertrade_layout():
                         ],
                         md=4,
                     ),
-                    
+
                     # Right Column: Results and Output
                     dbc.Col(
                         [
@@ -269,7 +269,7 @@ def create_pre_papertrade_layout():
                                 color="info",
                                 className="mb-3",
                             ),
-                            
+
                             # Statistics Cards
                             dbc.Row(
                                 [
@@ -318,7 +318,7 @@ def create_pre_papertrade_layout():
                                 ],
                                 className="mb-3",
                             ),
-                            
+
                             # Signals Table
                             dbc.Card(
                                 [
@@ -360,7 +360,7 @@ def create_pre_papertrade_layout():
                                     ),
                                 ],
                             ),
-                            
+
                             # NEW: Run History Panel (InsideBar Pre-Paper only)
                             html.Div(
                                 id="run-history-container",
@@ -372,7 +372,7 @@ def create_pre_papertrade_layout():
                     ),
                 ],
             ),
-            
+
             # Hidden stores
             dcc.Store(id="pre-papertrade-job-status", data={"status": "idle"}),
             dcc.Interval(id="pre-papertrade-interval", interval=2000, disabled=True),

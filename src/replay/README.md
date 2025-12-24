@@ -129,7 +129,7 @@ python src/replay/time_machine.py \
 
 **Check:**
 - `sqlite_bridge.py` is running
-- `automatictrader-worker` is running  
+- `automatictrader-worker` is running
 - Database permissions correct
 
 ### Want to clear all test signals
@@ -163,10 +163,10 @@ python src/replay/time_machine.py --rollback  # Undo
 
 ## Success Criteria
 
-✅ **Signals appear in signals.db**  
-✅ **sqlite_bridge detects them**  
-✅ **Order intents created in trading.db**  
-✅ **Dashboard shows activity**  
+✅ **Signals appear in signals.db**
+✅ **sqlite_bridge detects them**
+✅ **Order intents created in trading.db**
+✅ **Dashboard shows activity**
 ✅ **Worker logs show processing**
 
 ## Tips

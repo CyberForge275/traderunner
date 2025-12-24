@@ -10,50 +10,50 @@ version_meta:
   change_type: "initial"
   config_hash: ""  # Will be calculated
   status: "production"
-  
+
 changes_from_parent:
   - note: "Initial version from production config"
     reason: "Baseline configuration with RRR=2.0 from successful backtests"
 
 parameters:
   # === Core Parameters (affect signal generation) ===
-  
+
   # ATR calculation period
   atr_period: 14
-  
+
   # Risk/Reward ratio for take-profit calculation
   # TP = Entry + (Risk * risk_reward_ratio)
   risk_reward_ratio: 2.0
-  
+
   # Minimum mother bar size as multiple of ATR
   # Set to 0 to disable filtering
   min_mother_bar_size: 0.5
-  
+
   # Require close beyond mother bar for breakout confirmation
   # true = conservative (use close price)
   # false = aggressive (use high/low)
   breakout_confirmation: true
-  
+
   # Inside bar detection mode
   # "inclusive" = current bar can touch mother bar levels
   # "strict" = current bar must be strictly inside
   inside_bar_mode: inclusive
-  
+
   # === Live Trading Parameters ===
-  
+
   # Number of recent candles to consider
   lookback_candles: 50
-  
+
   # Maximum age of pattern before invalidation (in candles)
   max_pattern_age_candles: 12
-  
+
   # Maximum price deviation from pattern (in ATR multiples)
   max_deviation_atr: 3.0
 
 backtesting:
   # Execution lag in number of candles
   execution_lag: 0
-  
+
   # Session filtering (optional)
   session_filter:
     enabled: false
@@ -63,7 +63,7 @@ backtesting:
 live_trading:
   # Signal deduplication enabled
   deduplication: true
-  
+
   # Pattern cache reset frequency
   reset_frequency: daily
 
@@ -73,5 +73,5 @@ notes: |
   - RRR = 2.0 showing better profit factor
   - ATR period = 14 for volatility measurement
   - Inclusive inside bar mode for more signals
-  
+
   Lab status: Ready for Pre-PaperTrading

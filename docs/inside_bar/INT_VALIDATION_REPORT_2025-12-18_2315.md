@@ -1,15 +1,15 @@
-# InsideBar SSOT - INT Validation Report  
-**Date:** 2025-12-18 23:15 CET  
-**Commit:** 4f8c93b6cb40d1c68589702c7e16438d26305b7c  
+# InsideBar SSOT - INT Validation Report
+**Date:** 2025-12-18 23:15 CET
+**Commit:** 4f8c93b6cb40d1c68589702c7e16438d26305b7c
 **Branch:** feature/enterprise-metadata-ssot (detached HEAD on INT)
 
 ---
 
 ## Executive Summary
 
-**Status:** ⚠️ **PARTIAL COMPLETION**  
-**Deployment:** ✅ Complete (commit 4f8c93b on INT)  
-**Validation:** ⏸️ In Progress (script syntax issues)  
+**Status:** ⚠️ **PARTIAL COMPLETION**
+**Deployment:** ✅ Complete (commit 4f8c93b on INT)
+**Validation:** ⏸️ In Progress (script syntax issues)
 **Overall:** Implementation functional, validation framework created, full execution pending
 
 ---
@@ -54,7 +54,7 @@ Status: Clean working directory
 - Dashboard service active
 
 ### 2. Validation Scripts Created ✅
-**Location:**  
+**Location:**
 - `/opt/trading/traderunner/scripts/validate_run_dir.py`
 - `/opt/trading/traderunner/scripts/run_insidebar_smoke_matrix.py`
 
@@ -181,7 +181,7 @@ print(f\"  {r[\\\"type\\\"]}: {r[\\\"run_id\\\"]}\")
    ```bash
    # Find exact locations
    grep -rn "inside_bar_v2\|insidebar_intraday_v2" src/
-   
+
    # Manual cleanup required
    # Expected: 0 refs in src/ (docs/ OK)
    ```
@@ -195,7 +195,7 @@ print(f\"  {r[\\\"type\\\"]}: {r[\\\"run_id\\\"]}\")
    ```python
    # TSLA with narrower sessions
    session_windows = ["15:00-15:30", "15:30-16:00"]
-   
+
    # Expected: Orders only in new windows
    # May have fewer orders (acceptable)
    ```
@@ -266,30 +266,30 @@ done
 ## Current Validation Status by Check
 
 ### Check A: Repo Sanity
-**Status:** ❌ FAIL  
-**Found:** 9 v2 refs in src/  
-**Required:** 0 refs  
+**Status:** ❌ FAIL
+**Found:** 9 v2 refs in src/
+**Required:** 0 refs
 **Action:** Manual cleanup
 
 ### Check B: Zero-Duration Prevention
-**Status:** ✅ PASS  
+**Status:** ✅ PASS
 **Evidence:**
 - TSLA run: 7 orders, 0 with `valid_to <= valid_from`
 - Log: "Filtered 3 orders with invalid validity"
 - Phase 5 filtering confirmed working
 
 ### Check C: Session Compliance
-**Status:** ⏸️ PENDING  
-**Reason:** Validation script syntax error  
+**Status:** ⏸️ PENDING
+**Reason:** Validation script syntax error
 **Next:** Fix script, re-run on TSLA baseline
 
 ### Check D: First-IB Semantics
-**Status:** ⏸️ PENDING  
-**Reason:** Validation script syntax error  
+**Status:** ⏸️ PENDING
+**Reason:** Validation script syntax error
 **Next:** Fix script, check max 1/session, max 2/day
 
 ### Check E: Diagnostics Policy
-**Status:** ✅ PASS  
+**Status:** ✅ PASS
 **Evidence:** strategy_policy block present with all required fields
 ```
 ✅ session_timezone
@@ -304,8 +304,8 @@ done
 ```
 
 ### Check F: Session-End Adjustment
-**Status:** ⏸️ PENDING  
-**Reason:** Adjusted run not executed  
+**Status:** ⏸️ PENDING
+**Reason:** Adjusted run not executed
 **Next:** Run TSLA with narrow sessions, compare results
 
 ---
@@ -321,7 +321,7 @@ done
 
 ## Next Session Plan
 
-**Duration:** ~1-2 hours  
+**Duration:** ~1-2 hours
 **Prerequisites:** Fix validation scripts locally
 
 **Sequence:**
@@ -365,10 +365,10 @@ done
 - Script fixes + re-execution tomorrow
 - Full 6-check PASS achievable in 1-2 hours
 
-**Recommendation:** ✅ **APPROVE for continuation**  
+**Recommendation:** ✅ **APPROVE for continuation**
 Implementation is sound, validation infrastructure in place, minor fixes needed.
 
 ---
 
-**Report Generated:** 2025-12-18 23:15 CET  
+**Report Generated:** 2025-12-18 23:15 CET
 **Next Update:** After smoke matrix completion

@@ -9,10 +9,10 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Deploy to Debian Server
       uses: appleboy/ssh-action@master
       with:
@@ -22,7 +22,7 @@ jobs:
         script: |
           cd /opt/trading/traderunner
           bash scripts/deploy.sh
-    
+
     - name: Verify deployment
       uses: appleboy/ssh-action@master
       with:
@@ -32,7 +32,7 @@ jobs:
         script: |
           curl -sf http://localhost:8080/healthz || exit 1
           echo "✅ Deployment verified"
-    
+
     - name: Notify on failure
       if: failure()
       uses: appleboy/ssh-action@master

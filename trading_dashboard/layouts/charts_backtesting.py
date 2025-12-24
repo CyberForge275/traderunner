@@ -19,19 +19,19 @@ from trading_dashboard.repositories import get_available_symbols
 
 def create_charts_backtesting_layout():
     """Create the Backtesting Charts tab layout."""
-    
+
     # Get symbols from parquet files
     symbols = get_available_symbols()
-    
+
     if not symbols:
         symbols = ['No Data']
-    
+
     return html.Div([
         # Header
         dbc.Row([
             dbc.Col([
                 html.H4("📈 Backtesting Charts", style={"color": "#4a9eff"}),
-                html.P("Historical data (Parquet/EODHD)", 
+                html.P("Historical data (Parquet/EODHD)",
                        className="text-muted", style={"fontSize": "0.9rem"}),
             ], width=8),
             dbc.Col([
@@ -42,18 +42,18 @@ def create_charts_backtesting_layout():
                 ]),
             ], width=4, className="text-end"),
         ], className="mb-3"),
-        
+
         dbc.Row([
             # Sidebar
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
-                        # Data Source Label 
+                        # Data Source Label
                         html.Div([
                             html.Span("📊", style={"fontSize": "1.2rem", "marginRight": "8px"}),
                             html.Strong("BACKTEST", style={"fontSize": "1.1rem", "color": "#4a9eff"}),
                             html.Br(),
-                            html.Small("source: PARQUET_BACKTEST", 
+                            html.Small("source: PARQUET_BACKTEST",
                                      className="text-muted", style={"fontSize": "0.7rem"}),
                         ], style={
                             "padding": "10px",
@@ -62,9 +62,9 @@ def create_charts_backtesting_layout():
                             "marginBottom": "15px",
                             "textAlign": "center"
                         }),
-                        
+
                         html.Hr(),
-                        
+
                         # Symbol Selector
                         html.H6("Symbol"),
                         dcc.Dropdown(
@@ -78,7 +78,7 @@ def create_charts_backtesting_layout():
                             },
                             className="custom-dropdown mb-3"
                         ),
-                        
+
                         # Timeframe Buttons (All timeframes)
                         html.H6("Timeframe", className="mt-3"),
                         dbc.ButtonGroup([
@@ -88,9 +88,9 @@ def create_charts_backtesting_layout():
                             dbc.Button("H1", id="bt-tf-h1", size="sm", outline=True, color="secondary"),
                             dbc.Button("D1", id="bt-tf-d1", size="sm", outline=True, color="secondary"),
                         ], vertical=True, style={"width": "100%"}, className="mb-3"),
-                        
+
                         html.Hr(),
-                        
+
                         # Date Picker (for historical analysis)
                         html.H6("Date"),
                         dcc.DatePickerSingle(
@@ -105,7 +105,7 @@ def create_charts_backtesting_layout():
                             className="text-muted",
                             style={"fontSize": "0.7rem"}
                         ),
-                        
+
                         # Window Dropdown (for D1 only)
                         html.H6("Window (D1 only)", className="mt-2"),
                         dcc.Dropdown(
@@ -130,9 +130,9 @@ def create_charts_backtesting_layout():
                             className="text-muted",
                             style={"fontSize": "0.7rem"}
                         ),
-                        
+
                         html.Hr(),
-                        
+
                         # Session Filters (optional)
                         html.H6("Sessions"),
                         dbc.Checklist(
@@ -145,9 +145,9 @@ def create_charts_backtesting_layout():
                             switch=True,
                             style={"fontSize": "0.85rem"}
                         ),
-                        
+
                         html.Hr(),
-                        
+
                         # Data Availability Box
                         html.H6("📊 Data Availability", style={"fontSize": "0.9rem"}),
                         html.Div(
@@ -169,25 +169,25 @@ def create_charts_backtesting_layout():
                             outline=True,
                             style={"width": "100%", "fontSize": "0.75rem"}
                         ),
-                        
+
                         html.Hr(),
-                        
+
                         # Info
                         html.Div([
                             html.H6("ℹ️ Backtesting Info", style={"fontSize": "0.85rem"}),
-                            html.P("• Historical EODHD data", 
+                            html.P("• Historical EODHD data",
                                   className="text-muted", style={"fontSize": "0.75rem", "margin": "0"}),
-                            html.P("• All symbols available", 
+                            html.P("• All symbols available",
                                   className="text-muted", style={"fontSize": "0.75rem", "margin": "0"}),
-                            html.P("• Full timeframe range", 
+                            html.P("• Full timeframe range",
                                   className="text-muted", style={"fontSize": "0.75rem", "margin": "0"}),
-                            html.P("• Date picker enabled", 
+                            html.P("• Date picker enabled",
                                   className="text-muted", style={"fontSize": "0.75rem", "margin": "0"}),
                         ], style={"marginTop": "15px"}),
                     ])
                 ])
             ], width=3),
-            
+
             # Chart Area
             dbc.Col([
                 dbc.Card([

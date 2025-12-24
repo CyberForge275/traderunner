@@ -1,16 +1,16 @@
 # Pandas 2.x Fix - INT Report
 
-**Date:** 2025-12-19 00:05 CET  
-**Server:** INT (192.168.178.55)  
-**Repo:** /opt/trading/traderunner  
+**Date:** 2025-12-19 00:05 CET
+**Server:** INT (192.168.178.55)
+**Repo:** /opt/trading/traderunner
 **Status:** ✅ **BLOCKER RESOLVED**
 
 ---
 
 ## Executive Summary
 
-**Pandas Blocker:** ✅ **FIXED**  
-**Smoke Test:** ⚠️ Different error (data validation - not pandas)  
+**Pandas Blocker:** ✅ **FIXED**
+**Smoke Test:** ⚠️ Different error (data validation - not pandas)
 **Next Step:** Run with more days or use existing data
 
 ---
@@ -19,8 +19,8 @@
 
 ### Error Localization ✅
 
-**File:** `src/axiom_bt/data/eodhd_fetch.py`  
-**Lines:** 214-221  
+**File:** `src/axiom_bt/data/eodhd_fetch.py`
+**Lines:** 214-221
 **Git Status:** NOT in git (explains .gitignore error)
 
 ### Failing Code (Before)
@@ -39,7 +39,7 @@
 
 **Issue:** String aggregators `"first"` and `"last"` changed behavior in pandas 2.x
 
-**pandas 1.x:** `"first"` meant "first element in group"  
+**pandas 1.x:** `"first"` meant "first element in group"
 **pandas 2.x:** `"first"` requires time offset like `"first('5D')"`
 
 **Error:**
@@ -82,10 +82,10 @@ Replace string aggregators with **lambda callables** - stable across pandas vers
 
 ### Safety Guarantees
 
-✅ **Semantics unchanged:** First/last row selection identical  
-✅ **Empty guard:** `if len(x) > 0` prevents IndexError  
-✅ **Pandas 1.x compatible:** Lambdas work in both versions  
-✅ **Pandas 2.x compatible:** No string dispatcher needed  
+✅ **Semantics unchanged:** First/last row selection identical
+✅ **Empty guard:** `if len(x) > 0` prevents IndexError
+✅ **Pandas 1.x compatible:** Lambdas work in both versions
+✅ **Pandas 2.x compatible:** No string dispatcher needed
 ✅ **No breaking changes:** OHLCV logic identical
 
 ### Verification
@@ -111,7 +111,7 @@ Strategy: inside_bar
 
 ### Result
 
-**Status:** RunStatus.ERROR  
+**Status:** RunStatus.ERROR
 **Error:** `ValueError: [ABORT] TSLA resample produced only 8 rows (interval 5min).`
 
 ### Analysis ✅ **PANDAS FIX CONFIRMED**
@@ -241,18 +241,18 @@ min_m1_rows=200   # Current
 
 ## Summary
 
-**Problem:** Pandas 2.x incompatibility blocking ALL backtests  
-**Fix:** Replace `"first"/"last"` strings with `.iloc[]` lambdas  
-**Result:** ✅ Blocker resolved, backtests can proceed  
-**Evidence:** Error shifted from line 221 (pandas) to line 223 (data validation)  
-**Time:** 15 minutes from diagnosis to fix  
+**Problem:** Pandas 2.x incompatibility blocking ALL backtests
+**Fix:** Replace `"first"/"last"` strings with `.iloc[]` lambdas
+**Result:** ✅ Blocker resolved, backtests can proceed
+**Evidence:** Error shifted from line 221 (pandas) to line 223 (data validation)
+**Time:** 15 minutes from diagnosis to fix
 **Impact:** Unblocks entire validation pipeline
 
 ### Safety Assessment
 
-✅ **Non-breaking:** Semantics identical  
-✅ **Minimal:** 7-line change in one function  
-✅ **Tested:** Compilation passes, execution reaches next stage  
+✅ **Non-breaking:** Semantics identical
+✅ **Minimal:** 7-line change in one function
+✅ **Tested:** Compilation passes, execution reaches next stage
 ✅ **Reviewable:** Clear before/after, documented rationale
 
 ### Production Readiness
@@ -307,6 +307,6 @@ wc -l artifacts/backtests/${run_id}/orders.csv
 
 ---
 
-**Report Generated:** 2025-12-19 00:05 CET  
-**Fix Applied:** Lines 214-220, src/axiom_bt/data/eodhd_fetch.py  
+**Report Generated:** 2025-12-19 00:05 CET
+**Fix Applied:** Lines 214-220, src/axiom_bt/data/eodhd_fetch.py
 **Status:** ✅ **PANDAS BLOCKER RESOLVED** - Ready for full validation

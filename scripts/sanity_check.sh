@@ -104,7 +104,7 @@ echo ""
 echo -e "${BLUE}[4/12] Checking configuration...${NC}"
 if [ -f "$API_DIR/.env" ]; then
     check_pass ".env file exists"
-    
+
     # Check critical settings
     if grep -q "AT_WORKER_MODE" "$API_DIR/.env"; then
         MODE=$(grep "AT_WORKER_MODE" "$API_DIR/.env" | cut -d'=' -f2 | tr -d '"' | tr -d ' ')
@@ -118,7 +118,7 @@ if [ -f "$API_DIR/.env" ]; then
     else
         check_warn "AT_WORKER_MODE not set in .env"
     fi
-    
+
     if grep -q "ENV_ALLOW_SEND" "$API_DIR/.env"; then
         SEND=$(grep "ENV_ALLOW_SEND" "$API_DIR/.env" | cut -d'=' -f2 | tr -d '"' | tr -d ' ')
         if [ "$SEND" = "0" ]; then
@@ -194,7 +194,7 @@ echo -e "${BLUE}[8/12] Checking database...${NC}"
 DB_PATH="$API_DIR/data/automatictrader.db"
 if [ -f "$DB_PATH" ]; then
     check_pass "Database file exists: $DB_PATH"
-    
+
     # Check tables
     TABLES=$(sqlite3 "$DB_PATH" ".tables" 2>/dev/null || echo "")
     if [ -n "$TABLES" ]; then

@@ -1,7 +1,7 @@
 # Pre-PaperTrade Lab - Time Machine Testing Guide
 
-**Date:** 2025-12-09  
-**Mode:** ⏰ Time Machine (Single-Day Replay)  
+**Date:** 2025-12-09
+**Mode:** ⏰ Time Machine (Single-Day Replay)
 **Prerequisites:** ✅ Ready
 
 ---
@@ -9,7 +9,7 @@
 ## ✅ Completed Tasks
 
 ### 1. Dropdown Contrast Fix
-**Issue:** Inactive/disabled dropdown items had poor contrast  
+**Issue:** Inactive/disabled dropdown items had poor contrast
 **Solution:** Added comprehensive dropdown styling to `assets/style.css`
 
 **Changes:**
@@ -250,7 +250,7 @@ ls -lh artifacts/data_m5/*.parquet | wc -l
 - [ ] PASS / [ ] FAIL
 - Signals Generated: X
 - Errors: [None / Description]
-- Notes: 
+- Notes:
 
 ### Test 2: No Data Handling
 - [ ] PASS / [ ] FAIL
@@ -279,12 +279,12 @@ ls -lh artifacts/data_m5/*.parquet | wc -l
 - [ ] Major issues found
 
 **Issues Found:**
-1. 
-2. 
+1.
+2.
 
 **Recommendations:**
-1. 
-2. 
+1.
+2.
 ```
 
 ---
@@ -324,7 +324,7 @@ Time Machine is production-ready when:
 
 ---
 
-**Ready to Test:** ✅ Yes  
-**Prerequisites Met:** ✅ All  
-**Estimated Time:** 15-30 minutes  
+**Ready to Test:** ✅ Yes
+**Prerequisites Met:** ✅ All
+**Estimated Time:** 15-30 minutes
 **Next Action:** Deploy CSS fix, then start Test 1

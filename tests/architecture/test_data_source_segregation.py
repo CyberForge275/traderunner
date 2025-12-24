@@ -74,7 +74,7 @@ def get_imports_from_file(file_path: Path) -> set:
     except SyntaxError:
         pytest.skip(f"Syntax error in {file_path}")
         return set()
-    
+
     imports = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -87,7 +87,7 @@ def get_imports_from_file(file_path: Path) -> set:
                 for alias in node.names:
                     full_import = f"{node.module}.{alias.name}"
                     imports.add(full_import)
-    
+
     return imports
 
 
@@ -99,12 +99,12 @@ def check_forbidden_tokens(file_path: Path, forbidden_tokens: list) -> list:
     except Exception as e:
         pytest.skip(f"Could not read {file_path}: {e}")
         return []
-    
+
     found = []
     for token in forbidden_tokens:
         if token in content:
             found.append(token)
-    
+
     return found
 
 
@@ -115,14 +115,14 @@ def check_forbidden_tokens(file_path: Path, forbidden_tokens: list) -> list:
 def test_live_callbacks_no_parquet_imports():
     """Live chart callbacks MUST NOT import IntradayStore or parquet tools."""
     file_path = REPO_ROOT / 'trading_dashboard/callbacks/charts_live_callbacks.py'
-    
+
     if not file_path.exists():
         pytest.skip("charts_live_callbacks.py not yet created")
-    
+
     imports = get_imports_from_file(file_path)
-    
+
     forbidden_found = [imp for imp in imports if any(fib in imp for fib in LIVE_FORBIDDEN_IMPORTS)]
-    
+
     assert not forbidden_found, (
         f"❌ LIVE CALLBACKS VIOLATED DATA SEGREGATION!\n"
         f"File: {file_path}\n"
@@ -136,12 +136,12 @@ def test_live_callbacks_no_parquet_imports():
 def test_live_callbacks_no_parquet_tokens():
     """Live callbacks MUST NOT contain parquet-related code strings."""
     file_path = REPO_ROOT / 'trading_dashboard/callbacks/charts_live_callbacks.py'
-    
+
     if not file_path.exists():
         pytest.skip("charts_live_callbacks.py not yet created")
-    
+
     forbidden_found = check_forbidden_tokens(file_path, LIVE_FORBIDDEN_TOKENS)
-    
+
     assert not forbidden_found, (
         f"❌ LIVE CALLBACKS VIOLATED DATA SEGREGATION!\n"
         f"File: {file_path}\n"
@@ -155,20 +155,20 @@ def test_live_callbacks_no_parquet_tokens():
 def test_live_repository_no_parquet():
     """LiveCandlesRepository MUST use SQLite only."""
     file_path = REPO_ROOT / 'trading_dashboard/repositories/live_candles.py'
-    
+
     assert file_path.exists(), "LiveCandlesRepository must exist"
-    
+
     imports = get_imports_from_file(file_path)
     forbidden_imports = [imp for imp in imports if any(fib in imp for fib in LIVE_FORBIDDEN_IMPORTS)]
-    
+
     assert not forbidden_imports, (
         f"❌ LiveCandlesRepository VIOLATED DATA SEGREGATION!\n"
         f"Forbidden imports: {forbidden_imports}\n"
         f"Live repository MUST use SQLite only."
     )
-    
+
     forbidden_tokens = check_forbidden_tokens(file_path, LIVE_FORBIDDEN_TOKENS)
-    
+
     assert not forbidden_tokens, (
         f"❌ LiveCandlesRepository VIOLATED DATA SEGREGATION!\n"
         f"Forbidden tokens: {forbidden_tokens}\n"
@@ -183,14 +183,14 @@ def test_live_repository_no_parquet():
 def test_backtesting_callbacks_no_sqlite_imports():
     """Backtesting callbacks MUST NOT import sqlite3 or LiveCandlesRepository."""
     file_path = REPO_ROOT / 'trading_dashboard/callbacks/charts_backtesting_callbacks.py'
-    
+
     if not file_path.exists():
         pytest.skip("charts_backtesting_callbacks.py not yet created")
-    
+
     imports = get_imports_from_file(file_path)
-    
+
     forbidden_found = [imp for imp in imports if any(fib in imp for fib in BACKTESTING_FORBIDDEN_IMPORTS)]
-    
+
     assert not forbidden_found, (
         f"❌ BACKTESTING CALLBACKS VIOLATED DATA SEGREGATION!\n"
         f"File: {file_path}\n"
@@ -204,12 +204,12 @@ def test_backtesting_callbacks_no_sqlite_imports():
 def test_backtesting_callbacks_no_sqlite_tokens():
     """Backtesting callbacks MUST NOT contain sqlite-related code strings."""
     file_path = REPO_ROOT / 'trading_dashboard/callbacks/charts_backtesting_callbacks.py'
-    
+
     if not file_path.exists():
         pytest.skip("charts_backtesting_callbacks.py not yet created")
-    
+
     forbidden_found = check_forbidden_tokens(file_path, BACKTESTING_FORBIDDEN_TOKENS)
-    
+
     assert not forbidden_found, (
         f"❌ BACKTESTING CALLBACKS VIOLATED DATA SEGREGATION!\n"
         f"File: {file_path}\n"
@@ -228,14 +228,14 @@ def test_separate_chart_tabs_exist():
     """Verify that separate tabs are implemented."""
     live_callbacks = REPO_ROOT / 'trading_dashboard/callbacks/charts_live_callbacks.py'
     backtest_callbacks = REPO_ROOT / 'trading_dashboard/callbacks/charts_backtesting_callbacks.py'
-    
+
     assert live_callbacks.exists(), (
         "charts_live_callbacks.py must exist for Live tab"
     )
     assert backtest_callbacks.exists(), (
         "charts_backtesting_callbacks.py must exist for Backtesting tab"
     )
-    
+
     # Verify they are different files
     assert live_callbacks != backtest_callbacks, (
         "Live and Backtesting must be separate callback files"
@@ -245,16 +245,16 @@ def test_separate_chart_tabs_exist():
 def test_separate_repositories_exist():
     """Verify that separate repositories are implemented."""
     live_repo = REPO_ROOT / 'trading_dashboard/repositories/live_candles.py'
-    
+
     assert live_repo.exists(), (
         "live_candles.py repository must exist for Live data"
     )
-    
+
     # Backtesting uses existing IntradayStore (via axiom_bt)
     # Just verify Live repo is separate
     with open(live_repo) as f:
         content = f.read()
-    
+
     assert 'LiveCandlesRepository' in content, (
         "live_candles.py must contain LiveCandlesRepository class"
     )
@@ -263,18 +263,18 @@ def test_separate_repositories_exist():
 def test_helper_has_no_source_imports():
     """Chart preprocessing helper must not import data sources."""
     helper_path = REPO_ROOT / 'trading_dashboard/utils/chart_preprocess.py'
-    
+
     assert helper_path.exists(), (
         "chart_preprocess.py helper must exist"
     )
-    
+
     # Use AST to check actual imports only (not docstrings)
     imports = get_imports_from_file(helper_path)
-    
+
     # Forbidden imports
     forbidden_imports = ['sqlite3', 'read_parquet', 'IntradayStore', 'axiom_bt']
     found = [imp for imp in imports if any(fib in imp for fib in forbidden_imports)]
-    
+
     assert not found, (
         f"❌ Chart preprocessing helper VIOLATED SOURCE NEUTRALITY!\n"
         f"File: {helper_path}\n"
@@ -288,12 +288,12 @@ def test_helper_has_no_source_imports():
 def test_live_callbacks_use_helper():
     """Live callbacks MUST use preprocess_for_chart helper."""
     file_path = REPO_ROOT / 'trading_dashboard/callbacks/charts_live_callbacks.py'
-    
+
     assert file_path.exists(), "charts_live_callbacks.py must exist"
-    
+
     with open(file_path) as f:
         content = f.read()
-    
+
     assert "preprocess_for_chart" in content, (
         "❌ Live callbacks NOT using helper!\n"
         f"File: {file_path}\n"
@@ -305,12 +305,12 @@ def test_live_callbacks_use_helper():
 def test_backtesting_callbacks_use_helper():
     """Backtesting callbacks MUST use preprocess_for_chart helper."""
     file_path = REPO_ROOT / 'trading_dashboard/callbacks/charts_backtesting_callbacks.py'
-    
+
     assert file_path.exists(), "charts_backtesting_callbacks.py must exist"
-    
+
     with open(file_path) as f:
         content = f.read()
-    
+
     assert "preprocess_for_chart" in content, (
         "❌ Backtesting callbacks NOT using helper!\n"
         f"File: {file_path}\n"
@@ -322,27 +322,27 @@ def test_backtesting_callbacks_use_helper():
 def test_app_has_new_chart_tabs():
     """App.py must have new segregated chart tabs wired."""
     file_path = REPO_ROOT / 'trading_dashboard/app.py'
-    
+
     assert file_path.exists(), "app.py must exist"
-    
+
     with open(file_path) as f:
         content = f.read()
-    
+
     assert "charts-live" in content, (
         "❌ App missing 'charts-live' tab!\n"
         "Must have Charts - Live tab defined in app.py"
     )
-    
+
     assert "charts-backtesting" in content, (
         "❌ App missing 'charts-backtesting' tab!\n"
         "Must have Charts - Backtesting tab defined in app.py"
     )
-    
+
     assert "register_charts_live_callbacks" in content, (
         "❌ App not registering Live callbacks!\n"
         "Must call register_charts_live_callbacks(app)"
     )
-    
+
     assert "register_charts_backtesting_callbacks" in content, (
         "❌ App not registering Backtesting callbacks!\n"
         "Must call register_charts_backtesting_callbacks(app)"

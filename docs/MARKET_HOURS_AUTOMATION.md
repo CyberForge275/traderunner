@@ -4,7 +4,7 @@
 
 Automated start/stop of trading services during NYSE market hours:
 - **Start**: 15:30 CET (9:30 AM ET) - Market open
-- **Stop**: 22:00 CET (4:00 PM ET) - Market close  
+- **Stop**: 22:00 CET (4:00 PM ET) - Market close
 - **Days**: Monday-Friday only
 
 ---
@@ -261,11 +261,11 @@ systemctl is-active marketdata-stream
 
 ## Benefits
 
-✅ **Fully Automated**: No manual intervention needed  
-✅ **Market Hours Only**: Runs only when NYSE is open  
-✅ **Logged**: Full audit trail of all starts/stops  
-✅ **Robust**: Health checks and error handling  
-✅ **Weekend Aware**: Skips Saturdays and Sundays  
+✅ **Fully Automated**: No manual intervention needed
+✅ **Market Hours Only**: Runs only when NYSE is open
+✅ **Logged**: Full audit trail of all starts/stops
+✅ **Robust**: Health checks and error handling
+✅ **Weekend Aware**: Skips Saturdays and Sundays
 ✅ **Log Rotation**: Prevents disk space issues
 
 ---

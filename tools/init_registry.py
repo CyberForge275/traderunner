@@ -14,10 +14,10 @@ import yaml
 def create_registry(strategy_dir: Path) -> Path:
     """Create registry database with schema."""
     db_path = strategy_dir / "registry.db"
-    
+
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    
+
     # Versions table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS versions (
@@ -31,7 +31,7 @@ def create_registry(strategy_dir: Path) -> Path:
             created_by TEXT
         )
     """)
-    
+
     # Backtest runs table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS backtest_runs (
@@ -54,7 +54,7 @@ def create_registry(strategy_dir: Path) -> Path:
             result_path TEXT
         )
     """)
-    
+
     # Version history table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS version_history (
@@ -68,7 +68,7 @@ def create_registry(strategy_dir: Path) -> Path:
             created_by TEXT
         )
     """)
-    
+
     # Deployments table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS deployments (
@@ -82,10 +82,10 @@ def create_registry(strategy_dir: Path) -> Path:
             notes TEXT
         )
     """)
-    
+
     conn.commit()
     conn.close()
-    
+
     return db_path
 
 
@@ -107,12 +107,12 @@ def register_version(
 ):
     """Register a version in the database."""
     config_hash = calculate_config_hash(config_path)
-    
+
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    
+
     cursor.execute("""
-        INSERT OR REPLACE INTO versions 
+        INSERT OR REPLACE INTO versions
         (version, created_at, config_hash, config_path, status, lab_stage, notes, created_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
@@ -125,21 +125,21 @@ def register_version(
         notes,
         created_by
     ))
-    
+
     conn.commit()
     conn.close()
-    
+
     return config_hash
 
 
 if __name__ == "__main__":
     # Initialize for InsideBar strategy
     strategy_dir = Path(__file__).parent.parent / "src" / "strategies" / "inside_bar"
-    
+
     print(f"Creating registry for: {strategy_dir}")
     db_path = create_registry(strategy_dir)
     print(f"✅ Registry created: {db_path}")
-    
+
     # Register v1.00
     v100_path = strategy_dir / "versions" / "v1.00.yaml"
     if v100_path.exists():

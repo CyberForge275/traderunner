@@ -276,7 +276,7 @@ def create_backtest_detail(
         if charts_row_children
         else html.Div()
     )
-    
+
     # Diagnostic: if no charts, explain why (avoid silent empty state)
     if not charts_row_children and run_name:
         charts_row = html.Div(
@@ -336,7 +336,7 @@ def create_backtest_detail(
     # Run log & performance (per-step durations + raw log)
     # CRITICAL: Use steps from summary if available (new-pipeline), fallback to log_df (legacy)
     display_log_df = log_df
-    
+
     if summary and "steps" in summary and summary["steps"]:
         # Convert steps (list of dicts from run_steps.jsonl) to DataFrame format
         steps_data = []
@@ -344,7 +344,7 @@ def create_backtest_detail(
             # Defensive: handle None duration with clear "missing" indicator
             dur = step.get("duration_s", None)
             duration_display = "—" if dur is None else round(float(dur), 2)
-            
+
             # CRITICAL: Ensure details is always a string (not dict/object)
             # React error #31: Objects are not valid as React child
             details = step.get("message", "") or step.get("details", "")
@@ -356,7 +356,7 @@ def create_backtest_detail(
                 details = ""
             else:
                 details = str(details)
-            
+
             steps_data.append({
                 "title": str(step.get("step_name", "")),
                 "kind": "step",
@@ -365,7 +365,7 @@ def create_backtest_detail(
                 "details": details,
             })
         display_log_df = pd.DataFrame(steps_data)
-    
+
     # Render log table from resolved log data (steps or legacy log_df)
     log_table = dash_table.DataTable(
         id="backtests-log-table",
@@ -678,7 +678,7 @@ def create_backtests_layout():
         className="dashboard-card",
         children=[
             html.H6("📊 New Backtest Configuration", style={"marginBottom": "15px"}),
-            
+
             # Strategy selector
             html.Label("Strategy", style={"fontWeight": "bold", "marginTop": "8px"}),
             dcc.Dropdown(
@@ -692,16 +692,16 @@ def create_backtests_layout():
                 clearable=False,
                 style={"color": "#000", "marginBottom": "8px"},
             ),
-            
-            
+
+
             # Dynamic strategy configuration container (populated by plugin)
             html.Div(
                 id="strategy-config-container",
                 children=[],
                 style={"marginTop": "12px", "marginBottom": "12px"}
             ),
-            
-            
+
+
             # Run name input with timestamp prefix
             html.Label("Backtest Run Name", style={"fontWeight": "bold", "marginTop": "8px"}),
             html.Div([
@@ -726,7 +726,7 @@ def create_backtests_layout():
                     },
                 ),
             ], style={"display": "flex", "alignItems": "center"}),
-            
+
             # Symbols input with cached selector
             html.Label("Symbols (comma-separated)", style={"fontWeight": "bold", "marginTop": "8px"}),
             html.Div([
@@ -745,7 +745,7 @@ def create_backtests_layout():
                     style={"width": "100%", "marginBottom": "8px"},
                 ),
             ]),
-            
+
             # Timeframe selector
             html.Label("Timeframe", style={"fontWeight": "bold", "marginTop": "8px"}),
             dcc.Dropdown(
@@ -760,8 +760,8 @@ def create_backtests_layout():
                 clearable=False,
                 style={"color": "#000", "marginBottom": "8px"},
             ),
-            
-            
+
+
             # NEW: Session Hours Filter
             html.Label([
                 "Session Hours ",
@@ -789,7 +789,7 @@ def create_backtests_layout():
                 "Filter signals to specific time windows (in market timezone). Leave empty for all trading hours.",
                 style={"fontSize": "0.85em", "color": "var(--text-secondary)", "display": "block", "marginBottom": "8px"}
             ),
-            
+
             # Date selection method (Streamlit-style)
             html.Label("Date Selection", style={"fontWeight": "bold", "marginTop": "8px"}),
             dcc.RadioItems(
@@ -801,7 +801,7 @@ def create_backtests_layout():
                 value="days_back",
                 style={"marginBottom": "8px"},
             ),
-            
+
             # Anchor date (for days back mode)
             html.Div(
                 id="anchor-date-container",
@@ -815,7 +815,7 @@ def create_backtests_layout():
                     ),
                 ],
             ),
-            
+
             # Days back (for days back mode)
             html.Div(
                 id="days-back-container",
@@ -832,7 +832,7 @@ def create_backtests_layout():
                     ),
                 ],
             ),
-            
+
             # Explicit date range (for explicit mode)
             html.Div(
                 id="explicit-range-container",
@@ -854,7 +854,7 @@ def create_backtests_layout():
                 ],
                 style={"display": "none"},  # Hidden by default
             ),
-            
+
             # Data window display
             html.Div(
                 id="data-window-display",
@@ -866,8 +866,8 @@ def create_backtests_layout():
                     "borderRadius": "4px",
                     "marginBottom": "8px"},
             ),
-            
-            
+
+
             # Run button
             dbc.Button(
                 "▶ Run Backtest",
@@ -876,16 +876,16 @@ def create_backtests_layout():
                 className="w-100",
                 style={"marginTop": "10px", "fontWeight": "bold"},
             ),
-            
+
             # Progress indicator
             html.Div(id="backtests-run-progress", style={"marginTop": "12px"}),
-            
+
             # Pipeline execution log (similar to Streamlit "Last run output")
             html.Div(
                 id="backtests-pipeline-log",
                 style={"marginTop": "20px"},
             ),
-            
+
             # Store current job ID for polling (hidden)
             dcc.Store(id="backtests-current-job-id", data=None),
         ],
@@ -944,7 +944,7 @@ def create_backtests_layout():
             html.Div(id="backtests-detail"),
         ]
     )
-    
+
     # Hidden interval for auto-refresh when job completes
     refresh_interval = dcc.Interval(
         id="backtests-refresh-interval",

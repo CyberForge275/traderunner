@@ -7,30 +7,30 @@ Central documentation for the droid-trading ecosystem across multiple repositori
 ## Repositories
 
 ### **traderunner**
-Backtesting and research framework (Axiom-BT).  
-**Focus:** Strategies, data contracts, replay engine, dashboards.  
-**Repository:** https://github.com/CyberForge275/traderunner  
-**Local Path:** `/home/mirko/data/workspace/droid/traderunner`  
+Backtesting and research framework (Axiom-BT).
+**Focus:** Strategies, data contracts, replay engine, dashboards.
+**Repository:** https://github.com/CyberForge275/traderunner
+**Local Path:** `/home/mirko/data/workspace/droid/traderunner`
 **Status:** ✅ Active on GitHub
 
 ### **automatictrader-api**
-API + Worker that processes signals into order intents and sends them to Interactive Brokers (TWS).  
-**Focus:** Planning, idempotency, risk limits, health checks.  
-**Previous Repository:** https://dev.azure.com/mirko2175/AutomaticTrader/_git/AutomaticTrader _(archived)_  
-**Repository:** https://github.com/CyberForge275/automatictrader-api  
-**Local Path:** `/home/mirko/data/workspace/automatictrader-api`  
+API + Worker that processes signals into order intents and sends them to Interactive Brokers (TWS).
+**Focus:** Planning, idempotency, risk limits, health checks.
+**Previous Repository:** https://dev.azure.com/mirko2175/AutomaticTrader/_git/AutomaticTrader _(archived)_
+**Repository:** https://github.com/CyberForge275/automatictrader-api
+**Local Path:** `/home/mirko/data/workspace/automatictrader-api`
 **Status:** ✅ Migrated to GitHub
 
 ### **marketdata-stream**
-Provider-agnostic market data service with WebSocket connectivity.  
-**Focus:** Real-time data from EODHD (and later other providers) streamed/stored in internal format.  
-**Repository:** https://github.com/CyberForge275/marketdata-stream  
-**Local Path:** `/home/mirko/data/workspace/droid/marketdata-stream`  
+Provider-agnostic market data service with WebSocket connectivity.
+**Focus:** Real-time data from EODHD (and later other providers) streamed/stored in internal format.
+**Repository:** https://github.com/CyberForge275/marketdata-stream
+**Local Path:** `/home/mirko/data/workspace/droid/marketdata-stream`
 **Status:** ✅ Active on GitHub
 
 ### **deployment** _(optional)_
-Shared infrastructure artifacts: Docker Compose, K8s manifests, systemd templates, runbooks.  
-**Repository:** https://github.com/CyberForge275/deployment _(future)_  
+Shared infrastructure artifacts: Docker Compose, K8s manifests, systemd templates, runbooks.
+**Repository:** https://github.com/CyberForge275/deployment _(future)_
 **Status:** 📋 Planned
 
 ---
@@ -71,15 +71,15 @@ Shared infrastructure artifacts: Docker Compose, K8s manifests, systemd template
 ## Data Flow
 
 ### **1. marketdata-stream**
-→ Fetches real-time data (WebSocket) from EODHD or other providers  
+→ Fetches real-time data (WebSocket) from EODHD or other providers
 → Provides data internally (REST API, WebSocket, files, DB, queue)
 
 ### **2. traderunner**
-→ Uses historical data (Daily + Intraday) for research and backtesting  
+→ Uses historical data (Daily + Intraday) for research and backtesting
 → Delivers standardized output artifacts (Signals, Orders, Backtest Metrics)
 
 ### **3. automatictrader-api**
-→ Processes signals/orders (from traderunner or external strategies)  
+→ Processes signals/orders (from traderunner or external strategies)
 → Plans and sends orders to IBKR (TWS), with idempotency and safety gates
 
 ---
@@ -148,11 +148,11 @@ services:
   marketdata-stream:
     image: marketdata-stream:latest
     ports: ["8090:8090"]
-  
+
   automatictrader-api:
     image: automatictrader-api:latest
     ports: ["8080:8080"]
-  
+
   automatictrader-worker:
     image: automatictrader-api:latest
     command: python -m worker
@@ -220,6 +220,6 @@ For all repositories, enable:
 
 ---
 
-**Maintained by:** droid-trading team  
-**Last updated:** 2024-11-28  
+**Maintained by:** droid-trading team
+**Last updated:** 2024-11-28
 **Local workspace:** `/home/mirko/data/workspace/droid/`

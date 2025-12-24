@@ -14,43 +14,43 @@ import hashlib
 class OrderSchema(BaseModel):
     """
     Canonical order format with idempotency.
-    
+
     Key features:
     - Deterministic idempotency_key for safe retries
     - OCO (One-Cancels-Other) support
     - Session-based validity
     - Full audit trail metadata
     """
-    
+
     # Identity & Idempotency
     order_id: Optional[str] = Field(None, description="Internal order ID (UUID)")
     idempotency_key: str = Field(..., description="Deterministic key for retry safety")
     oco_id: Optional[str] = Field(None, description="OCO group identifier")
-    
+
     # Tracing
     run_id: str = Field(..., description="Backtest/Live run identifier")
     strategy: str = Field(..., description="Strategy name")
     strategy_version: str = Field(..., description="Strategy version")
-    
+
     # Order details
     symbol: str = Field(..., description="Ticker symbol")
     side: Literal['BUY', 'SELL'] = Field(..., description="Order side")
     qty: Decimal = Field(..., gt=0, description="Quantity (shares)")
-    
+
     # Prices
     limit_price: Optional[Decimal] = Field(None, description="Limit price")
     stop_price: Optional[Decimal] = Field(None, description="Stop price")
     take_profit_price: Optional[Decimal] = Field(None, description="Take profit price")
-    
+
     # Validity
     valid_from: datetime = Field(..., description="Order valid from (UTC)")
     valid_to: datetime = Field(..., description="Order valid until (UTC)")
     session: Optional[str] = Field(None, description="Trading session (e.g., 'RTH')")
     time_in_force: Literal['DAY', 'GTC', 'IOC', 'FOK'] = Field(
-        'DAY', 
+        'DAY',
         description="Time in force"
     )
-    
+
     # Metadata
     source: Literal['backtest', 'paper', 'live'] = Field(..., description="Order source")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -77,7 +77,7 @@ class OrderSchema(BaseModel):
         if len(v) < 8:
             raise ValueError("Idempotency key must be at least 8 characters")
         return v
-    
+
     @classmethod
     def generate_idempotency_key(
         cls,
@@ -90,10 +90,10 @@ class OrderSchema(BaseModel):
     ) -> str:
         """
         Generate deterministic idempotency key.
-        
+
         Given the same inputs, always produces the same key.
         This enables safe retries without duplicate orders.
-        
+
         Args:
             run_id: Run identifier
             strategy: Strategy name
@@ -101,7 +101,7 @@ class OrderSchema(BaseModel):
             symbol: Ticker symbol
             side: BUY or SELL
             oco_id: Optional OCO group ID
-            
+
         Returns:
             16-character hex string (SHA1 hash truncated)
         """
@@ -116,7 +116,7 @@ class OrderSchema(BaseModel):
         hash_input = '|'.join(components)
         hash_obj = hashlib.sha1(hash_input.encode('utf-8'))
         return hash_obj.hexdigest()[:16]
-    
+
     def to_csv_row(self) -> dict:
         """Convert to flat dictionary for CSV export."""
         return {

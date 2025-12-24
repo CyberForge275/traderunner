@@ -6,7 +6,7 @@ from datetime import datetime
 
 def register_timestamp_prefix_callback(app):
     """Register callback to update timestamp prefix when strategy changes."""
-    
+
     @app.callback(
         Output("run-name-timestamp-prefix", "children"),
         Input("backtests-new-strategy", "value"),
@@ -17,6 +17,6 @@ def register_timestamp_prefix_callback(app):
         # Generate current timestamp
         now = datetime.now()
         timestamp = now.strftime("%y%m%d_%H%M%S")  # Format: YYMMDD_HHMMSS
-        
+
         # Always show timestamp with underscore, ready for user input
         return f"{timestamp}_"

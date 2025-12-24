@@ -1,7 +1,7 @@
 # axiom_bt Framework - Critical Issues & Risk Analysis
 
-**Document Version:** 1.0  
-**Date:** 2024-12-24  
+**Document Version:** 1.0
+**Date:** 2024-12-24
 **Purpose:** Identify and document risks, edge cases, and behavioral quirks in axiom_bt
 
 ---
@@ -10,8 +10,8 @@
 
 ### 🔴 ISSUE #1: Hybrid Mode Not Implemented
 
-**Status:** MISSING FEATURE  
-**Impact:** HIGH  
+**Status:** MISSING FEATURE
+**Impact:** HIGH
 **User Request:** Daily signals + intraday SL/TP execution
 
 **Current State:**
@@ -30,12 +30,12 @@ The framework has two **separate, non-communicating** execution paths:
 def simulate_insidebar_from_orders(...):
     # Only loads intraday data
     ohlcv = pd.read_parquet(file_path)  # M1/M5 data
-    
+
 # File: replay_engine.py, line 441
 def simulate_daily_moc_from_orders(...):
     # Only loads daily data
     ohlcv = pd.read_parquet(file_path)  # D1 data
-    
+
 # NO HYBRID FUNCTION EXISTS
 ```
 
@@ -46,8 +46,8 @@ See "Hybrid Mode Implementation" section in interface specification document.
 
 ### 🟡 ISSUE #2: Same-Bar SL/TP Priority Bias
 
-**Status:** CONSERVATIVE BIAS  
-**Impact:** MEDIUM  
+**Status:** CONSERVATIVE BIAS
+**Impact:** MEDIUM
 **Affects:** Backtest performance (underestimates wins)
 
 **Behavior:**
@@ -114,8 +114,8 @@ Compare backtest results with all 4 strategies to establish **confidence interva
 
 ### 🟡 ISSUE #3: Incomplete Daily MOC Implementation
 
-**Status:** STUB IMPLEMENTATION  
-**Impact:** MEDIUM  
+**Status:** STUB IMPLEMENTATION
+**Impact:** MEDIUM
 **Affects:** Multi-day strategies
 
 **Current Behavior:**
@@ -129,7 +129,7 @@ for _, row in group.iterrows():
     row_slice = ohlcv.loc[ohlcv.index.date == day]
     candle = row_slice.iloc[0]
     close = float(candle["Close"])
-    
+
     # ⚠️ Entry and exit at SAME price
     trades.append({
         "entry_ts": str(candle.name),
@@ -157,7 +157,7 @@ Implement position state machine:
 ````python
 def simulate_daily_multiday_from_orders(...):
     positions = {}  # symbol -> Position state
-    
+
     for bar in daily_bars.itertuples():
         # 1. Check exits for open positions
         for symbol, pos in list(positions.items()):
@@ -165,7 +165,7 @@ def simulate_daily_multiday_from_orders(...):
                 pnl = calculate_pnl(pos, bar.Close)
                 record_trade(pos.entry_ts, bar.Index, pnl)
                 del positions[symbol]
-        
+
         # 2. Check entries from orders
         for order in orders_for_date(bar.Index.date()):
             if should_enter(order, bar):
@@ -182,8 +182,8 @@ def simulate_daily_multiday_from_orders(...):
 
 ### 🟠 ISSUE #4: Intra-Bar Fill Timing Ambiguity
 
-**Status:** PRECISION LOSS  
-**Impact:** LOW-MEDIUM  
+**Status:** PRECISION LOSS
+**Impact:** LOW-MEDIUM
 **Affects:** Metrics (hold time, timestamps)
 
 **Problem:**
@@ -226,12 +226,12 @@ def _first_touch_entry(
     fill_timing: Literal["open", "close", "midpoint"] = "open"  # NEW
 ) -> Optional[pd.Timestamp]:
     # ... existing logic ...
-    
+
     if hit.empty:
         return None
-    
+
     bar_ts = hit.index[0]
-    
+
     if fill_timing == "open":
         return bar_ts
     elif fill_timing == "close":
@@ -244,8 +244,8 @@ def _first_touch_entry(
 
 ### 🟠 ISSUE #5: RTH Filter Not Applied in ReplayEngine
 
-**Status:** INCONSISTENCY RISK  
-**Impact:** MEDIUM  
+**Status:** INCONSISTENCY RISK
+**Impact:** MEDIUM
 **Affects:** Lookahead bias potential
 
 **Problem:**
@@ -274,26 +274,26 @@ If user provides **non-RTH data** via `data_path_m1`, execution may use pre-mark
 # Add RTH validation to ReplayEngine
 def _ensure_dtindex_and_ohlcv(df: pd.DataFrame, tz: str, enforce_rth: bool = True):
     # ... existing normalization ...
-    
+
     if enforce_rth:
         # Validate all bars are within RTH
         hours = df.index.hour
         minutes = df.index.minute
-        
+
         # RTH: 09:30 to 16:00
         rth_mask = (
             ((hours == 9) & (minutes >= 30)) |
             ((hours >= 10) & (hours < 16)) |
             ((hours == 16) & (minutes == 0))
         )
-        
+
         if not rth_mask.all():
             non_rth_count = (~rth_mask).sum()
             raise ValueError(
                 f"Found {non_rth_count} non-RTH bars in data. "
                 f"ReplayEngine requires RTH-only data."
             )
-    
+
     return df
 ````
 
@@ -301,8 +301,8 @@ def _ensure_dtindex_and_ohlcv(df: pd.DataFrame, tz: str, enforce_rth: bool = Tru
 
 ### 🟢 ISSUE #6: Warmup Data Leakage Risk
 
-**Status:** POTENTIAL RISK  
-**Impact:** LOW (if strategy implemented correctly)  
+**Status:** POTENTIAL RISK
+**Impact:** LOW (if strategy implemented correctly)
 **Affects:** Signal generation
 
 **Problem:**
@@ -387,7 +387,7 @@ for oco_group, oco_orders in group.groupby("oco_group"):
         entry_ts = _first_touch_entry(...)
         if entry_ts is None:
             continue  # Try next order in group
-        
+
         # ... execute trade ...
         break  # ⚠️ Exit loop after first fill, cancels remaining orders
 ```
@@ -428,7 +428,7 @@ adjusted_entry = _apply_slippage(entry_price, side, costs.slippage_bps)
 
 ### Architecture
 
-**Internal Representation:** UTC datetime (tz-aware)  
+**Internal Representation:** UTC datetime (tz-aware)
 **Display/API:** Configurable timezone (default: `America/New_York`)
 
 ### Conversion Flow

@@ -1,7 +1,7 @@
 # Paper Trading Quick Start Guide
 
-> **Last Updated**: 2025-12-05  
-> **Server**: 192.168.178.55  
+> **Last Updated**: 2025-12-05
+> **Server**: 192.168.178.55
 > **API Port**: 8080 | **Marketdata Port**: 8090
 
 This guide helps you set up and test the paper trading integration between `traderunner` and `automatictrader-api`.

@@ -1,6 +1,6 @@
 # EODHD Consolidation Backlog
 
-**Created**: 2025-12-10  
+**Created**: 2025-12-10
 **Priority**: Medium-Term Infrastructure Improvements
 
 ---
@@ -8,8 +8,8 @@
 ## ✅ Completed
 
 ### Phase 0: Environment Variable Standardization
-**Status**: ✅ COMPLETE  
-**Risk**: VERY LOW  
+**Status**: ✅ COMPLETE
+**Risk**: VERY LOW
 **Duration**: 15 minutes
 
 **Changes**:
@@ -28,8 +28,8 @@ api_key = os.getenv("EODHD_API_KEY") or os.getenv("EODHD_API_TOKEN")
 ## 🎯 Backlog (Prioritized)
 
 ### Phase 1: ParquetRepository Abstraction
-**Priority**: HIGH  
-**Risk**: LOW  
+**Priority**: HIGH
+**Risk**: LOW
 **Estimated Duration**: 2-3 days
 
 **Objective**: Create centralized parquet file access layer
@@ -58,8 +58,8 @@ api_key = os.getenv("EODHD_API_KEY") or os.getenv("EODHD_API_TOKEN")
 ---
 
 ### Phase 2: Backtesting Migration to DataManager
-**Priority**: MEDIUM  
-**Risk**: MEDIUM  
+**Priority**: MEDIUM
+**Risk**: MEDIUM
 **Estimated Duration**: 3-5 days
 
 **Objective**: Migrate backtesting engine to use DataManager instead of direct EODHD API calls
@@ -90,8 +90,8 @@ api_key = os.getenv("EODHD_API_KEY") or os.getenv("EODHD_API_TOKEN")
 ---
 
 ### Phase 3: WebSocket Client Consolidation
-**Priority**: LOW  
-**Risk**: HIGH  
+**Priority**: LOW
+**Risk**: HIGH
 **Estimated Duration**: 1-2 weeks
 
 **Objective**: Consolidate 3 WebSocket implementations into single canonical version
@@ -129,8 +129,8 @@ api_key = os.getenv("EODHD_API_KEY") or os.getenv("EODHD_API_TOKEN")
 ---
 
 ### Phase 4: Full Parquet Access Migration
-**Priority**: LOW  
-**Risk**: MEDIUM-HIGH  
+**Priority**: LOW
+**Risk**: MEDIUM-HIGH
 **Estimated Duration**: 2-3 weeks
 
 **Objective**: Migrate all 60+ direct parquet access points to use ParquetRepository
@@ -175,8 +175,8 @@ df = repo.read(symbol=symbol, timeframe="M5")
 ---
 
 ### Phase 5: Shared Library Extraction (Future)
-**Priority**: VERY LOW  
-**Risk**: LOW  
+**Priority**: VERY LOW
+**Risk**: LOW
 **Estimated Duration**: 1 week
 
 **Objective**: Extract common data code into shared library
@@ -242,6 +242,6 @@ df = repo.read(symbol=symbol, timeframe="M5")
 
 ---
 
-**Status**: Actively managing  
-**Owner**: Engineering team  
+**Status**: Actively managing
+**Owner**: Engineering team
 **Last Updated**: 2025-12-10

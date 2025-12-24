@@ -21,21 +21,21 @@ from trading_dashboard.services.pre_papertrade_adapter import create_adapter
 
 def test_time_machine():
     """Test Time Machine with InsideBar on AAPL for Nov 26, 2024."""
-    
+
     print("=" * 80)
     print("TIME MACHINE DRY RUN TEST")
     print("=" * 80)
     print()
-    
+
     # Progress callback to see what's happening
     progress_log = []
     def progress_callback(msg):
         print(f"  {msg}")
         progress_log.append(msg)
-    
+
     # Create adapter with progress callback
     adapter = create_adapter(progress_callback)
-    
+
     # Test configuration
     test_config = {
         'strategy': 'insidebar_intraday',  # Correct strategy name from registry
@@ -53,7 +53,7 @@ def test_time_machine():
             'inside_bar_mode': 'inclusive',
         }
     }
-    
+
     print("Test Configuration:")
     print(f"  Strategy: {test_config['strategy']}")
     print(f"  Mode: {test_config['mode']}")
@@ -61,21 +61,21 @@ def test_time_machine():
     print(f"  Timeframe: {test_config['timeframe']}")
     print(f"  Replay Date: {test_config['replay_date']}")
     print()
-    
+
     print("Executing Time Machine...")
     print("-" * 80)
-    
+
     # Run Time Machine
     result = adapter.execute_strategy(**test_config)
-    
+
     print("-" * 80)
     print()
-    
+
     # Display results
     print("RESULTS:")
     print("=" * 80)
     print(f"Status: {result.get('status', 'unknown')}")
-    
+
     if result['status'] == 'completed':
         print(f"✅ SUCCESS")
         print()
@@ -83,7 +83,7 @@ def test_time_machine():
         print(f"Lookback Days: {result.get('lookback_days', 0)}")
         print(f"Replay Date: {result.get('replay_date', 'N/A')}")
         print()
-        
+
         if result.get('signals'):
             print(f"Signal Details ({len(result['signals'])} total):")
             print("-" * 80)
@@ -97,7 +97,7 @@ def test_time_machine():
         else:
             print("⚠️ No signals generated (this may be normal if no patterns detected)")
             print()
-        
+
         # Verify lookback in progress log
         print("Lookback Verification:")
         print("-" * 80)
@@ -105,7 +105,7 @@ def test_time_machine():
         for msg in lookback_msgs[:5]:  # Show first 5 lookback-related messages
             print(f"  ✓ {msg}")
         print()
-        
+
     else:
         print(f"❌ FAILED")
         print(f"Error: {result.get('error', 'Unknown error')}")
@@ -113,9 +113,9 @@ def test_time_machine():
             print()
             print("Traceback:")
             print(result['traceback'])
-    
+
     print("=" * 80)
-    
+
     return result['status'] == 'completed'
 
 

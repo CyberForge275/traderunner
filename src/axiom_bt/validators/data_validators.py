@@ -27,7 +27,7 @@ class SLAResult:
     def __post_init__(self) -> None:
         if self.timestamp is None:
             self.timestamp = datetime.now(timezone.utc)
-    
+
     def to_dict(self) -> dict:
         return {
             'sla_name': self.sla_name,
@@ -42,27 +42,27 @@ class SLAResult:
 class DataQualitySLA:
     """
     Data quality SLA checker.
-    
+
     Enforces v2 architecture SLAs:
     - M5 completeness >= 99%
     - Data lateness <= 5 minutes
     - No NaNs in OHLC
     - No duplicate timestamps
     """
-    
+
     # SLA Thresholds
     MIN_M5_COMPLETENESS = 0.99  # 99%
     MAX_LATENESS_MINUTES = 5
-    
+
     @classmethod
     def check_m5_completeness(
-        cls, 
+        cls,
         df: pd.DataFrame,
         calendar=None
     ) -> SLAResult:
         """
         Check M5 data completeness within trading sessions.
-        
+
         Expected: One bar every 5 minutes during market hours.
         """
         if len(df) == 0:
@@ -73,25 +73,25 @@ class DataQualitySLA:
                 threshold=cls.MIN_M5_COMPLETENESS,
                 message='Empty DataFrame'
             )
-        
+
         # Calculate expected vs actual bars
         # TODO: Use calendar for precise session bounds
         start = df.index[0]
         end = df.index[-1]
-        
+
         # Simple approximation: 6.5 hours/day * 12 bars/hour = 78 bars/day
         # For accurate check, need market calendar
         business_days = pd.bdate_range(start, end).size
         expected_bars = business_days * 78  # Approximate
         actual_bars = len(df)
-        
+
         if expected_bars > 0:
             completeness = actual_bars / expected_bars
         else:
             completeness = 1.0
-        
+
         passed = completeness >= cls.MIN_M5_COMPLETENESS
-        
+
         return SLAResult(
             sla_name='m5_completeness',
             passed=passed,
@@ -99,13 +99,13 @@ class DataQualitySLA:
             threshold=cls.MIN_M5_COMPLETENESS,
             message=f"Completeness: {completeness:.2%} (expected ~{expected_bars} bars, got {actual_bars})"
         )
-    
+
     @classmethod
     def check_no_nan_ohlc(cls, df: pd.DataFrame) -> SLAResult:
         """Check for NaNs in OHLC columns."""
         ohlc_cols = ['Open', 'High', 'Low', 'Close']
         available_cols = [col for col in ohlc_cols if col in df.columns]
-        
+
         if not available_cols:
             return SLAResult(
                 sla_name='no_nan_ohlc',
@@ -114,13 +114,13 @@ class DataQualitySLA:
                 threshold=0.0,
                 message='OHLC columns not found'
             )
-        
+
         nan_count = df[available_cols].isna().sum().sum()
         total_values = len(df) * len(available_cols)
         nan_ratio = nan_count / total_values if total_values > 0 else 0.0
-        
+
         passed = nan_count == 0
-        
+
         return SLAResult(
             sla_name='no_nan_ohlc',
             passed=passed,
@@ -128,14 +128,14 @@ class DataQualitySLA:
             threshold=0.0,
             message=f"Found {nan_count} NaNs in OHLC ({nan_ratio:.2%})"
         )
-    
+
     @classmethod
     def check_no_duplicates(cls, df: pd.DataFrame) -> SLAResult:
         """Check for duplicate index timestamps."""
         dup_count = df.index.duplicated().sum()
-        
+
         passed = dup_count == 0
-        
+
         return SLAResult(
             sla_name='no_dupe_index',
             passed=passed,
@@ -143,21 +143,21 @@ class DataQualitySLA:
             threshold=0.0,
             message=f"Found {dup_count} duplicate timestamps"
         )
-    
+
     @classmethod
     def check_lateness(
-        cls, 
+        cls,
         df: pd.DataFrame,
         reference_time: Optional[datetime] = None
     ) -> SLAResult:
         """
         Check data lateness (how old is the latest data).
-        
+
         Only relevant for real-time data.
         """
         if reference_time is None:
             reference_time = datetime.now(timezone.utc)
-        
+
         if len(df) == 0:
             return SLAResult(
                 sla_name='lateness',
@@ -166,18 +166,18 @@ class DataQualitySLA:
                 threshold=cls.MAX_LATENESS_MINUTES,
                 message='Empty DataFrame'
             )
-        
+
         latest_bar = df.index[-1]
         if latest_bar.tzinfo is None:
             latest_bar = latest_bar.tz_localize('UTC')
-        
+
         if reference_time.tzinfo is None:
             reference_time = reference_time.replace(tzinfo=latest_bar.tzinfo)
-        
+
         lateness = (reference_time - latest_bar).total_seconds() / 60.0  # minutes
-        
+
         passed = lateness <= cls.MAX_LATENESS_MINUTES
-        
+
         return SLAResult(
             sla_name='lateness',
             passed=passed,
@@ -185,7 +185,7 @@ class DataQualitySLA:
             threshold=cls.MAX_LATENESS_MINUTES,
             message=f"Data is {lateness:.1f} minutes old"
         )
-    
+
     @classmethod
     def check_all(
         cls,
@@ -196,20 +196,20 @@ class DataQualitySLA:
     ) -> Dict[str, SLAResult]:
         """
         Run all SLA checks.
-        
+
         Returns dict of {sla_name: SLAResult}
         """
         results = {}
-        
+
         results['m5_completeness'] = cls.check_m5_completeness(df, calendar)
         results['no_nan_ohlc'] = cls.check_no_nan_ohlc(df)
         results['no_dupe_index'] = cls.check_no_duplicates(df)
-        
+
         if not skip_lateness:
             results['lateness'] = cls.check_lateness(df, reference_time)
-        
+
         return results
-    
+
     @classmethod
     def all_passed(cls, results: Dict[str, SLAResult]) -> bool:
         """Check if all SLAs passed."""
@@ -223,24 +223,24 @@ def validate_ohlcv_dataframe(
 ) -> tuple[bool, List[str]]:
     """
     Validate OHLCV DataFrame with optional SLA enforcement.
-    
+
     Args:
         df: DataFrame to validate
         enforce_sla: If True, enforce SLAs (fail if SLA violations)
         calendar: Market calendar for session validation
-        
+
     Returns:
         (is_valid, messages) tuple
     """
     from axiom_bt.contracts.data_contracts import DailyFrameSpec
-    
+
     messages = []
-    
+
     # Basic contract validation
     is_valid, violations = DailyFrameSpec.validate(df, strict=False)
     if not is_valid:
         messages.extend(violations)
-    
+
     # SLA checks
     if enforce_sla:
         sla_results = DataQualitySLA.check_all(df, calendar=calendar)
@@ -248,7 +248,7 @@ def validate_ohlcv_dataframe(
             if not result.passed:
                 messages.append(f"SLA violation [{sla_name}]: {result.message}")
                 is_valid = False
-    
+
     return is_valid, messages
 
 
@@ -258,7 +258,7 @@ def validate_m5_completeness(
 ) -> bool:
     """
     Quick check for M5 data completeness.
-    
+
     Returns True if completeness >= min_completeness.
     """
     result = DataQualitySLA.check_m5_completeness(df)

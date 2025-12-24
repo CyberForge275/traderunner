@@ -31,18 +31,18 @@ metadata = StrategyMetadata(
     display_name="Inside Bar Breakout",
     version="2.0.0",
     description="Inside bar pattern with ATR-based breakouts",
-    
+
     capabilities=StrategyCapabilities(
         supports_live_trading=True,
         supports_backtest=True,
         supports_pre_papertrade=True,
     ),
-    
+
     data_requirements=DataRequirements(
         required_timeframes=["M5"],
         min_history_days=30,
     ),
-    
+
     config_class_path="strategies.inside_bar.core.InsideBarConfig",
     default_parameters={"atr_period": 14, "risk_reward_ratio": 2.0},
     signal_module_path="signals.cli_inside_bar",

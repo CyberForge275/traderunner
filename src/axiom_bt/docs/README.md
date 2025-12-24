@@ -1,6 +1,6 @@
 # axiom_bt Framework Documentation
 
-**Last Updated:** 2024-12-24  
+**Last Updated:** 2024-12-24
 **Version:** 1.0
 
 ---
@@ -35,7 +35,7 @@ This directory contains comprehensive technical documentation for the `axiom_bt`
 - Edge cases and behavioral quirks
 - Implementation recommendations
 
-**When to read:** 
+**When to read:**
 - Before implementing a new strategy
 - When integrating with the backtest pipeline
 - To understand execution semantics and fill logic

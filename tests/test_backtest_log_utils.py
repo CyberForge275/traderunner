@@ -22,7 +22,7 @@ def temp_backtests_dir(tmp_path):
 def test_parse_run_log_missing_file(temp_backtests_dir):
     """Test behavior when run_log.json doesn't exist."""
     state = get_pipeline_log_state("nonexistent_run", temp_backtests_dir)
-    
+
     assert state.total_steps == 0
     assert state.completed_steps == 0
     assert state.progress_pct == 0.0
@@ -36,7 +36,7 @@ def test_parse_run_log_success_pipeline(temp_backtests_dir):
     run_name = "test_successful_run"
     run_dir = temp_backtests_dir / run_name
     run_dir.mkdir()
-    
+
     # Create mock run_log.json with successful pipeline
     log_data = {
         "status": "success",
@@ -48,12 +48,12 @@ def test_parse_run_log_success_pipeline(temp_backtests_dir):
             {"kind": "command", "title": "3) axiom_bt.runner", "status": "success", "duration": 5.0},
         ]
     }
-    
+
     log_path = run_dir / "run_log.json"
     log_path.write_text(json.dumps(log_data))
-    
+
     state = get_pipeline_log_state(run_name, temp_backtests_dir)
-    
+
     assert state.total_steps == 5
     assert state.completed_steps == 5
     assert state.progress_pct == 100.0
@@ -67,7 +67,7 @@ def test_parse_run_log_with_running_step(temp_backtests_dir):
     run_name = "test_running_run"
     run_dir = temp_backtests_dir / run_name
     run_dir.mkdir()
-    
+
     log_data = {
         "status": "running",
         "entries": [
@@ -76,12 +76,12 @@ def test_parse_run_log_with_running_step(temp_backtests_dir):
             {"kind": "command", "title": "1) signals.cli_inside_bar", "status": "running"},
         ]
     }
-    
+
     log_path = run_dir / "run_log.json"
     log_path.write_text(json.dumps(log_data))
-    
+
     state = get_pipeline_log_state(run_name, temp_backtests_dir)
-    
+
     assert state.total_steps == 3
     assert state.completed_steps == 2
     assert state.progress_pct == pytest.approx(66.67, rel=0.1)
@@ -94,7 +94,7 @@ def test_parse_run_log_with_error_step(temp_backtests_dir):
     run_name = "test_failed_run"
     run_dir = temp_backtests_dir / run_name
     run_dir.mkdir()
-    
+
     log_data = {
         "status": "error",
         "entries": [
@@ -103,12 +103,12 @@ def test_parse_run_log_with_error_step(temp_backtests_dir):
             {"kind": "command", "title": "1) signals.cli_inside_bar", "status": "error", "message": "Failed to process HOOD"},
         ]
     }
-    
+
     log_path = run_dir / "run_log.json"
     log_path.write_text(json.dumps(log_data))
-    
+
     state = get_pipeline_log_state(run_name, temp_backtests_dir)
-    
+
     assert state.total_steps == 3
     assert state.completed_steps == 3  # All have final status
     assert state.progress_pct == 100.0
@@ -124,13 +124,13 @@ def test_parse_run_log_invalid_json(temp_backtests_dir):
     run_name = "test_invalid_json"
     run_dir = temp_backtests_dir / run_name
     run_dir.mkdir()
-    
+
     # Write invalid JSON
     log_path = run_dir / "run_log.json"
     log_path.write_text("{ invalid json }")
-    
+
     state = get_pipeline_log_state(run_name, temp_backtests_dir)
-    
+
     assert state.total_steps == 0
     assert state.overall_status == "error"
 
@@ -159,7 +159,7 @@ def test_parse_run_log_skips_meta_entries(temp_backtests_dir):
     run_name = "test_meta_skip"
     run_dir = temp_backtests_dir / run_name
     run_dir.mkdir()
-    
+
     log_data = {
         "status": "success",
         "entries": [
@@ -168,12 +168,12 @@ def test_parse_run_log_skips_meta_entries(temp_backtests_dir):
             {"kind": "command", "title": "1) signals", "status": "success"},
         ]
     }
-    
+
     log_path = run_dir / "run_log.json"
     log_path.write_text(json.dumps(log_data))
-    
+
     state = get_pipeline_log_state(run_name, temp_backtests_dir)
-    
+
     # Should only have 2 steps (meta entry skipped)
     assert state.total_steps == 2
     assert state.steps[0].name == "0) ensure-intraday"

@@ -68,7 +68,7 @@ app.layout = html.Div([
             html.Div(id="header-time", style={"color": "var(--text-secondary)"})
         ]
     ),
-    
+
     # Navigation Tabs
     dbc.Tabs(
         id="main-tabs",
@@ -85,10 +85,10 @@ app.layout = html.Div([
         ],
         style={"backgroundColor": "var(--bg-secondary)"}
     ),
-    
+
     # Tab content
     html.Div(id="tab-content", style={"paddingBottom": "50px"}),
-    
+
     # Auto-refresh interval (only for Live Monitor tab)
     dcc.Interval(
         id="refresh-interval",
@@ -96,7 +96,7 @@ app.layout = html.Div([
         n_intervals=0,
         disabled=False  # Will be controlled by tab switching
     ),
-    
+
     # Status bar
     html.Div(
         className="status-bar",
@@ -120,14 +120,14 @@ app.layout = html.Div([
 def update_content(active_tab, n_intervals):
     """Update tab content and timestamps."""
     from dash import ctx
-    
+
     now = datetime.now()
     time_str = now.strftime("%H:%M:%S")
     update_str = f"Last update: {time_str}"
-    
+
     # Check what triggered this callback
     triggered_id = ctx.triggered_id if ctx.triggered else None
-    
+
     if active_tab == "live-monitor":
         content = get_live_monitor_content()
     elif active_tab == "portfolio":
@@ -149,7 +149,7 @@ def update_content(active_tab, n_intervals):
         content = get_trade_inspector_content()
     else:
         content = html.Div("Unknown tab")
-    
+
     return content, time_str, update_str
 
 
@@ -208,7 +208,7 @@ def update_market_status(n_intervals):
     now = datetime.now()
     hour = now.hour
     weekday = now.weekday()
-    
+
     # US market hours in CET (roughly 15:30-22:00)
     if weekday < 5 and 15 <= hour < 22:
         return "🟢 Open (US)"
@@ -230,6 +230,5 @@ if __name__ == "__main__":
     print(f"Debug mode: {DEBUG}")
     print(f"Refresh interval: {UPDATE_INTERVAL_MS}ms")
     print("=" * 50)
-    
-    app.run(host=HOST, port=PORT, debug=DEBUG)
 
+    app.run(host=HOST, port=PORT, debug=DEBUG)

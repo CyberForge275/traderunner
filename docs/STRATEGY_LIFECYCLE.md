@@ -1,7 +1,7 @@
 # Strategy Development Lifecycle
 
-**Version**: 1.0  
-**Last Updated**: 2025-12-02  
+**Version**: 1.0
+**Last Updated**: 2025-12-02
 **Status**: Active Framework
 
 ---

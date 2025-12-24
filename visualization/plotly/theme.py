@@ -11,7 +11,7 @@ from typing import Literal
 class ChartTheme:
     """
     Immutable color and style theme for charts.
-    
+
     Attributes:
         bg_color: Main background color
         paper_color: Paper/card background color
@@ -25,24 +25,24 @@ class ChartTheme:
         font_color: Text color
         font_family: Font stack
     """
-    
+
     # Background colors
     bg_color: str
     paper_color: str
-    
+
     # Grid and axes
     grid_color: str
     axis_color: str
-    
+
     # Candles
     candle_up_color: str
     candle_down_color: str
     candle_up_line: str
     candle_down_line: str
-    
+
     # Volume
     volume_color: str
-    
+
     # Text
     font_color: str
     font_family: str = "Inter, -apple-system, BlinkMacSystemFont, sans-serif"
@@ -81,16 +81,16 @@ LIGHT_THEME = ChartTheme(
 def get_default_theme(mode: Literal["light", "dark"] = "dark") -> ChartTheme:
     """
     Get the default theme for the specified mode.
-    
+
     Args:
         mode: Theme mode ("light" or "dark")
-    
+
     Returns:
         ChartTheme instance
-    
+
     Raises:
         ValueError: If mode is not "light" or "dark"
-    
+
     Examples:
         >>> theme = get_default_theme("dark")
         >>> theme.bg_color

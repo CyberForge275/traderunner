@@ -1,7 +1,7 @@
 # After-Deploy Verification Report
 
-**Date:** 2025-12-19 00:15 CET  
-**Environment:** INT (192.168.178.55)  
+**Date:** 2025-12-19 00:15 CET
+**Environment:** INT (192.168.178.55)
 **Deployment:** InsideBar SSOT + Pandas Fix
 
 ---
@@ -77,9 +77,9 @@ WWW-Authenticate: Basic realm="Trading Dashboard"
 
 **Recent Activity:**
 ```
-2025-12-19 00:09:37 - run_discovery_service - INFO - ✅ Discovery complete: 
+2025-12-19 00:09:37 - run_discovery_service - INFO - ✅ Discovery complete:
   41 discovered, 0 corrupt, 21 skipped
-2025-12-19 00:09:37 - backtests_callbacks - INFO - 📊 Loaded details: 
+2025-12-19 00:09:37 - backtests_callbacks - INFO - 📊 Loaded details:
   status=SUCCESS, source=manifest, symbols=['TSLA']
 ```
 ✅ No errors, discovering runs successfully
@@ -150,7 +150,7 @@ run_steps.jsonl
 ["15:00-16:00", "16:00-17:00"]
 "session_end"
 ```
-✅ Sessions: 15:00-17:00 Berlin  
+✅ Sessions: 15:00-17:00 Berlin
 ✅ Validity policy: session_end
 
 **File Counts:**
@@ -232,11 +232,11 @@ requested_end="2024-12-17"  # Instead of None
 
 ## Dashboard Status
 
-**Service:** trading-dashboard-v2  
-**Status:** Active (running)  
-**Uptime:** 3h 41min  
-**Memory:** 387.3M  
-**Discovered Runs:** 41 total (0 corrupt)  
+**Service:** trading-dashboard-v2
+**Status:** Active (running)
+**Uptime:** 3h 41min
+**Memory:** 387.3M
+**Discovered Runs:** 41 total (0 corrupt)
 
 **Latest Activity:**
 - Successfully loading TSLA smoke runs
@@ -254,7 +254,7 @@ requested_end="2024-12-17"  # Instead of None
 2. ⚠️ **API docs** - document that requested_end cannot be None
 3. ✅ **Monitoring** - track first live sessions
 
-### Short-Term  
+### Short-Term
 4. Run longer backtests (30-45 days) to generate trades
 5. Compare with November baseline for parity check
 6. Add API validation for requested_end=None edge case
@@ -270,8 +270,8 @@ requested_end="2024-12-17"  # Instead of None
 
 **Deployment Status:** ✅ **VERIFIED AND OPERATIONAL**
 
-**Deployment Integrity:** 100% (correct commit, environment, services)  
-**Functional Tests:** 90% (API parameter issue is minor)  
+**Deployment Integrity:** 100% (correct commit, environment, services)
+**Functional Tests:** 90% (API parameter issue is minor)
 **Production Readiness:** ✅ APPROVED
 
 **Confidence Level:** HIGH (95%)
@@ -297,6 +297,6 @@ requested_end="2024-12-17"  # Instead of None
 
 ---
 
-**Report Generated:** 2025-12-19 00:15 CET  
-**Verification Lead:** Antigravity AI  
+**Report Generated:** 2025-12-19 00:15 CET
+**Verification Lead:** Antigravity AI
 **Status:** ✅ **DEPLOYMENT VERIFIED - PRODUCTION OPERATIONAL**

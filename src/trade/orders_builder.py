@@ -158,7 +158,7 @@ def build_orders_for_backtest(
     The underlying builder is responsible for detailed price rounding,
     sizing, and timestamp localization. When ``signals`` is empty, the
     function simply returns the empty orders DataFrame from the builder.
-    
+
     Phase 5 Integration: Orders with invalid validity windows (valid_to <= valid_from)
     are now filtered out to prevent zero-fill scenarios. This is critical for
     November parity.
@@ -211,7 +211,7 @@ def build_orders_for_backtest(
         orders_df = orders_df.copy()
         orders_df["valid_from"] = new_valid_from
         orders_df["valid_to"] = new_valid_to
-    
+
     # Phase 5: Apply validity validation (CRITICAL for fills)
     if not orders_df.empty and 'valid_from' in orders_df.columns and 'valid_to' in orders_df.columns:
         # Check for invalid windows (valid_to <= valid_from)
@@ -219,14 +219,14 @@ def build_orders_for_backtest(
             pd.to_datetime(orders_df['valid_to'], utc=True)
             <= pd.to_datetime(orders_df['valid_from'], utc=True)
         )
-        
+
         if invalid_mask.any():
             num_invalid = invalid_mask.sum()
             logger.warning(
                 f"Filtered {num_invalid} orders with invalid validity windows (valid_to <= valid_from). "
                 "This prevents zero-fill scenarios and ensures November parity."
             )
-            
+
             # Log details for first few invalid orders
             for idx in orders_df[invalid_mask].head(3).index:
                 row = orders_df.loc[idx]
@@ -234,11 +234,11 @@ def build_orders_for_backtest(
                     f"Invalid order #{idx}: valid_from={row['valid_from']}, "
                     f"valid_to={row['valid_to']}, symbol={row.get('symbol', 'N/A')}"
                 )
-            
+
             # Filter out invalid orders
             orders_df = orders_df[~invalid_mask].copy()
             logger.info(f"Remaining valid orders: {len(orders_df)}")
-    
+
     # Add timezone debug columns for easier debugging
     if not orders_df.empty and 'valid_from' in orders_df.columns:
         # Convert valid_from to NY and Berlin time for debug visibility
@@ -247,11 +247,11 @@ def build_orders_for_backtest(
         # NY time (already in this TZ usually, but ensure conversion)
         ny_time = valid_from_ts.dt.tz_convert('America/New_York')
         orders_df['NY_time'] = ny_time.dt.strftime('%Y-%m-%d %H:%M:%S %Z')
-        
+
         # Berlin time
         berlin_time = valid_from_ts.dt.tz_convert('Europe/Berlin')
         orders_df['Berlin_time'] = berlin_time.dt.strftime('%Y-%m-%d %H:%M:%S %Z')
-        
+
         logger.debug(f"Added timezone debug columns: NY_time, Berlin_time")
-    
+
     return orders_df

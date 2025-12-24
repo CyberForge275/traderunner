@@ -1,7 +1,7 @@
 # Redis Integration Guide
 
-**Status**: Planning/Reference  
-**Last Updated**: 2025-12-07  
+**Status**: Planning/Reference
+**Last Updated**: 2025-12-07
 **Purpose**: Evaluation guide for adding Redis to the trading system
 
 ---
@@ -38,7 +38,7 @@ app = Celery('trading', broker='redis://localhost:6379')
 def run_backtest(run_name, strategy, symbols, ...):
     # Your backtest logic
     return results
-    
+
 # In your dashboard
 result = run_backtest.delay(run_name, strategy, symbols, ...)
 ```
@@ -198,13 +198,13 @@ REDIS_CONFIG = {
 def get_latest_candle(symbol, interval):
     cache_key = f'candle:{symbol}:{interval}'
     cached = redis_client.get(cache_key)
-    
+
     if cached:
         return json.loads(cached)
-    
+
     # Fetch from database
     candle = db.get_latest_candle(symbol, interval)
-    
+
     # Cache for 5 minutes
     redis_client.setex(cache_key, 300, json.dumps(candle))
     return candle
@@ -239,13 +239,13 @@ def run_backtest_task(self, run_name, strategy, symbols, timeframe, period, conf
     """Execute backtest in Celery worker."""
     from apps.streamlit.pipeline import execute_pipeline
     from apps.streamlit.state import PipelineConfig, FetchConfig
-    
+
     # Update progress
     self.update_state(state='PROGRESS', meta={'status': 'Fetching data...'})
-    
+
     # Run pipeline
     effective_run_name = execute_pipeline(...)
-    
+
     return {'status': 'success', 'run_name': effective_run_name}
 
 # In dashboard callback
@@ -281,7 +281,7 @@ def signal_listener():
     r = redis.Redis(host='localhost', port=6379)
     pubsub = r.pubsub()
     pubsub.subscribe('trading:signals')
-    
+
     for message in pubsub.listen():
         if message['type'] == 'message':
             signal = json.loads(message['data'])
@@ -495,8 +495,8 @@ Before implementing Redis, ask:
 - [ ] Am I comfortable managing another service (Redis)?
 - [ ] Do I have 1-2GB RAM to spare for Redis?
 
-**If 3+ are "Yes"**: Redis is worth it  
-**If 1-2 are "Yes"**: Consider Redis for future  
+**If 3+ are "Yes"**: Redis is worth it
+**If 1-2 are "Yes"**: Consider Redis for future
 **If 0 are "Yes"**: Current architecture is sufficient
 
 ---

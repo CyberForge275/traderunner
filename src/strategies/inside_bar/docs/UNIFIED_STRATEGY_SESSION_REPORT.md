@@ -1,7 +1,7 @@
 # Unified InsideBar Strategy - Progress Report
 
-**Date:** 2025-12-06, 23:17 CET  
-**Session:** Phase 1 Implementation  
+**Date:** 2025-12-06, 23:17 CET
+**Session:** Phase 1 Implementation
 **Status:** ✅ Phase 1.1 & 1.2 COMPLETE
 
 ---
@@ -14,11 +14,11 @@
   - InsideBarConfig: Validated configuration
   - InsideBarCore: Single source of truth
   - RawSignal: Format-agnostic output
-  
+
 - `src/strategies/inside_bar/config.py`
   - YAML config loading
   - Default path detection
-  
+
 - `config/inside_bar.yaml`
   - Unified configuration file
   - Controls BOTH backtest and live
@@ -98,7 +98,7 @@ marketdata-stream/
    - Import InsideBarCore from traderunner
    - Replace all pattern detection with core.process_data()
    - Convert RawSignal → SignalOutputSpec
-   
+
 3. **Symlink config file**
    ```bash
    ln -s /opt/trading/traderunner/config/inside_bar.yaml \
@@ -129,10 +129,10 @@ marketdata-stream/
    # test_parity.py
    def test_backtest_vs_live_identical():
        data = load_fixture('APP_2025-11-24_M5.parquet')
-       
+
        backtest_signals = backtest_strategy.generate_signals(data, 'APP', config)
        live_signals = live_detector.detect_patterns(data, 'APP', 'M5')
-       
+
        assert len(backtest_signals) == len(live_signals)
        for bs, ls in zip(backtest_signals, live_signals):
            assert bs.entry_price == ls.entry_price
@@ -144,7 +144,7 @@ marketdata-stream/
    ```bash
    pytest src/strategies/inside_bar/tests/test_parity.py -v
    ```
-   
+
    **MUST PASS 100%** ✅
 
 4. **CI/CD Integration**
@@ -233,10 +233,10 @@ Start mit Backup und Analyse der current live implementation.
 ### Potential Issues to Watch
 1. **Import Path:** Live needs to import from traderunner
    - Solution: Add `/opt/trading/traderunner` to PYTHONPATH
-   
+
 2. **Config Sync:** Symlink could break
    - Solution: Test config loading in both locations
-   
+
 3. **Async Compatibility:** Live detector is async
    - Solution: Core is sync, wrap in executor if needed
 
@@ -252,7 +252,7 @@ Start mit Backup und Analyse der current live implementation.
 **Before Production:**
 - [ ] All unit tests green
 - [ ] Parity test green
-- [ ] Integration test green  
+- [ ] Integration test green
 - [ ] Code review complete
 - [ ] Documentation updated
 

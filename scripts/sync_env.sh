@@ -29,19 +29,19 @@ install_deps() {
     echo ""
     echo "Installing dependencies in $venv_path..."
     source "$venv_path/bin/activate"
-    
+
     # Install base requirements
     if [ -f "$PROJECT_DIR/requirements.txt" ]; then
         echo "  → Installing base requirements..."
         pip install -q -r "$PROJECT_DIR/requirements.txt"
     fi
-    
+
     # Install dashboard requirements
     if [ -f "$PROJECT_DIR/trading_dashboard/requirements.txt" ]; then
         echo "  → Installing dashboard requirements..."
         pip install -q -r "$PROJECT_DIR/trading_dashboard/requirements.txt"
     fi
-    
+
     deactivate
     echo "✅ Dependencies installed"
 }
@@ -76,16 +76,16 @@ case $choice in
         echo "Comparing environments..."
         check_venv "$PROJECT_VENV" || exit 1
         check_venv "$SPYDER_VENV" || exit 1
-        
+
         # Get package lists
         source "$PROJECT_VENV/bin/activate"
         pip list --format=freeze | cut -d'=' -f1 | sort > /tmp/proj_pkgs.txt
         deactivate
-        
+
         source "$SPYDER_VENV/bin/activate"
         pip list --format=freeze | cut -d'=' -f1 | sort > /tmp/spyder_pkgs.txt
         deactivate
-        
+
         echo "Packages in spyder6 but NOT in project .venv:"
         comm -13 /tmp/proj_pkgs.txt /tmp/spyder_pkgs.txt | head -20
         echo ""

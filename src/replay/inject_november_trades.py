@@ -60,9 +60,9 @@ def inject_trades(signals_db_path: str):
     """Inject November trades as signals."""
     conn = sqlite3.connect(signals_db_path)
     cursor = conn.cursor()
-    
+
     print(f"📂 Injecting {len(TRADES)} November APP trades...")
-    
+
     inserted = 0
     for trade in TRADES:
         try:
@@ -85,17 +85,17 @@ def inject_trades(signals_db_path: str):
             print(f"  ✅ {trade['symbol']} {trade['side']} @ {trade['entry_price']} ({trade['timestamp']})")
         except sqlite3.IntegrityError:
             print(f"  ⚠️  Duplicate: {trade['symbol']} at {trade['timestamp']}")
-    
+
     conn.commit()
     conn.close()
-    
+
     print(f"\n✅ Injected {inserted}/{len(TRADES)} trades")
     return inserted
 
 if __name__ == "__main__":
     """
     Main entry point.
-    
+
     Uses central Settings for signals database path (configurable via TRADING_SIGNALS_DB_PATH env var).
     """
     if len(sys.argv) > 1:
@@ -105,9 +105,9 @@ if __name__ == "__main__":
         script_dir = Path(__file__).resolve().parent
         project_root = script_dir.parent.parent
         sys.path.insert(0, str(project_root))
-        
+
         from src.core.settings import get_settings
         settings = get_settings()
         db_path = str(settings.signals_db_path)
-    
+
     inject_trades(db_path)

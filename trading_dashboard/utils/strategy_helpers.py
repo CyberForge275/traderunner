@@ -26,7 +26,7 @@ for profile in [INSIDE_BAR_V1_PROFILE, INSIDE_BAR_V2_PROFILE, RUDOMETKIN_MOC_PRO
 def get_registry() -> StrategyRegistry:
     """
     Get the central StrategyRegistry instance.
-    
+
     Returns:
         StrategyRegistry singleton
     """
@@ -36,10 +36,10 @@ def get_registry() -> StrategyRegistry:
 def get_strategy_metadata(strategy_id: str) -> Optional[StrategyMetadata]:
     """
     Get strategy metadata by ID.
-    
+
     Args:
         strategy_id: Strategy identifier
-        
+
     Returns:
         StrategyMetadata or None if not found
     """
@@ -49,7 +49,7 @@ def get_strategy_metadata(strategy_id: str) -> Optional[StrategyMetadata]:
 def get_all_strategies() -> Dict[str, StrategyMetadata]:
     """
     Get all registered strategies as dict.
-    
+
     Returns:
         Dictionary mapping strategy_id to StrategyMetadata
     """
@@ -59,7 +59,7 @@ def get_all_strategies() -> Dict[str, StrategyMetadata]:
 def get_strategy_display_names() -> Dict[str, str]:
     """
     Get mapping of strategy_id to display_name.
-    
+
     Returns:
         Dictionary mapping strategy_id to display_name
     """
@@ -69,7 +69,7 @@ def get_strategy_display_names() -> Dict[str, str]:
 def get_live_capable_strategies() -> Dict[str, StrategyMetadata]:
     """
     Get strategies that support live trading.
-    
+
     Returns:
         Dictionary of live-capable strategies
     """
@@ -82,7 +82,7 @@ def get_live_capable_strategies() -> Dict[str, StrategyMetadata]:
 def get_backtest_capable_strategies() -> Dict[str, StrategyMetadata]:
     """
     Get strategies that support backtesting.
-    
+
     Returns:
         Dictionary of backtest-capable strategies
     """
@@ -106,7 +106,7 @@ def get_available_strategies() -> List[str]:
 def get_pre_papertrade_capable_strategies() -> Dict[str, StrategyMetadata]:
     """
     Get strategies that support pre-papertrading.
-    
+
     Returns:
         Dictionary of pre-papertrade-capable strategies
     """

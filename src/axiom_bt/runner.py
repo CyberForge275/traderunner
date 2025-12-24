@@ -169,7 +169,7 @@ def main() -> int:
         filled.to_csv(run_dir / "filled_orders.csv", index=False)
     if isinstance(trades, pd.DataFrame):
         trades.to_csv(run_dir / "trades.csv", index=False)
-    
+
     # Add drawdown_pct column to equity before saving
     if isinstance(equity, pd.DataFrame) and not equity.empty and "equity" in equity.columns:
         # Calculate drawdown percentage

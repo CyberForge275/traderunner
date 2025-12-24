@@ -7,11 +7,11 @@ from datetime import datetime, timedelta
 
 def register_period_buttons_callback(app):
     """Register callbacks for Quick Period buttons to auto-set date range.
-    
+
     Each button (1D, 5D, 1M, 3M, 1Y) updates the date range picker
     to show the appropriate lookback period from today.
     """
-    
+
     @app.callback(
         Output("backtests-new-daterange", "start_date"),
         Output("backtests-new-daterange", "end_date"),
@@ -25,14 +25,14 @@ def register_period_buttons_callback(app):
     def update_date_range(n1d, n5d, n1mo, n3mo, n1y):
         """Update date range based on which period button was clicked."""
         from dash import ctx
-        
+
         if not ctx.triggered:
             raise PreventUpdate
-        
+
         button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-        
+
         end_date = datetime.utcnow().date()
-        
+
         # Map button to days
         period_days = {
             "period-1d": 1,
@@ -41,8 +41,8 @@ def register_period_buttons_callback(app):
             "period-3mo": 90,
             "period-1y": 365,
         }
-        
+
         days = period_days.get(button_id, 30)
         start_date = end_date - timedelta(days=days)
-        
+
         return start_date, end_date

@@ -1,8 +1,8 @@
 # AG 4-Checks Diagnostic Report
 
-**Date:** 2025-12-18 23:42 CET  
-**Server:** INT (192.168.178.55)  
-**Repo:** /opt/trading/traderunner  
+**Date:** 2025-12-18 23:42 CET
+**Server:** INT (192.168.178.55)
+**Repo:** /opt/trading/traderunner
 **Commit:** ec785f0
 
 ---
@@ -48,10 +48,10 @@ axiom_bt.__file__ = /opt/trading/traderunner/src/axiom_bt/__init__.py
 full_backtest_runner.__file__ = /opt/trading/traderunner/src/axiom_bt/full_backtest_runner.py
 
 run_backtest_full signature:
-(run_id: str, symbol: str, timeframe: str, requested_end: str, lookback_days: int, 
- strategy_key: str, strategy_params: dict, artifacts_root: pathlib.Path, 
- market_tz: str = 'America/New_York', initial_cash: float = 100000.0, 
- costs: Optional[dict] = None, orders_source_csv: Union[pathlib.Path, str, NoneType] = None, 
+(run_id: str, symbol: str, timeframe: str, requested_end: str, lookback_days: int,
+ strategy_key: str, strategy_params: dict, artifacts_root: pathlib.Path,
+ market_tz: str = 'America/New_York', initial_cash: float = 100000.0,
+ costs: Optional[dict] = None, orders_source_csv: Union[pathlib.Path, str, NoneType] = None,
  debug_trace: bool = False) -> backtest.services.run_status.RunResult
 ```
 
@@ -96,7 +96,7 @@ Starting run: AG_4C_TSLA_BASELINE_20251218_234039
 === RESULT ===
 RUN_ID: AG_4C_TSLA_BASELINE_20251218_234039
 STATUS: RunStatus.ERROR
-[AG_4C_TSLA_BASELINE_20251218_234039] Pipeline exception: 
+[AG_4C_TSLA_BASELINE_20251218_234039] Pipeline exception:
   NDFrame.first() missing 1 required positional argument: 'offset'
 ```
 
@@ -114,7 +114,7 @@ TypeError: NDFrame.first() missing 1 required positional argument: 'offset'
 **Runner Status:** ❌ ERROR - pandas API incompatibility
 
 **Root Cause:** Pandas version mismatch
-- Code uses `.agg({"column": "first"})` 
+- Code uses `.agg({"column": "first"})`
 - Pandas 2.x requires `.agg({"column": lambda x: x.first(offset=0)})`
 - This is a **data pipeline issue**, NOT an InsideBar strategy issue
 
@@ -154,7 +154,7 @@ run_backtest_full(
 ```
 Coverage check SKIPPED via environment variable (INT runtime mode)
 
-Filtered 5 orders with invalid validity windows (valid_to <= valid_from). 
+Filtered 5 orders with invalid validity windows (valid_to <= valid_from).
 This prevents zero-fill scenarios and ensures November parity.
 
 Starting HOOD one_bar run: AG_4C_HOOD_ONEBAR_20251218_234113
@@ -187,7 +187,7 @@ cd artifacts/backtests/AG_4C_HOOD_ONEBAR_20251218_234113
 
 ### Filtered Orders Evidence
 ```json
-{"step": "signal_detection", "status": "completed", 
+{"step": "signal_detection", "status": "completed",
  "note": "Filtered 5 orders with invalid validity windows"}
 ```
 
@@ -409,9 +409,9 @@ PY
 
 ## Evidence Files
 
-**Check 1 Output:** Import paths verified correct  
-**Check 2 Run:** `/opt/trading/traderunner/artifacts/backtests/AG_4C_TSLA_BASELINE_20251218_234039/`  
-**Check 3 Run:** `/opt/trading/traderunner/artifacts/backtests/AG_4C_HOOD_ONEBAR_20251218_234113/`  
+**Check 1 Output:** Import paths verified correct
+**Check 2 Run:** `/opt/trading/traderunner/artifacts/backtests/AG_4C_TSLA_BASELINE_20251218_234039/`
+**Check 3 Run:** `/opt/trading/traderunner/artifacts/backtests/AG_4C_HOOD_ONEBAR_20251218_234113/`
 **Check 4 Grep:** 0 Python v2 refs, 1 doc mention
 
 ---
@@ -433,6 +433,6 @@ PY
 
 ---
 
-**Report Generated:** 2025-12-18 23:42 CET  
-**Execution Time:** 20 minutes  
+**Report Generated:** 2025-12-18 23:42 CET
+**Execution Time:** 20 minutes
 **All Checks:** COMPLETE ✅

@@ -12,4 +12,3 @@ resolve to the same source of truth.
 from __future__ import annotations
 
 from src.core.settings import *  # noqa: F401,F403
-

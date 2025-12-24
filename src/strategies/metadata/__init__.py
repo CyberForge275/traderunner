@@ -12,13 +12,13 @@ This package provides:
 
 Usage:
     from strategies.metadata import StrategyMetadata, StrategyRegistry
-    
+
     # Get registry instance
     registry = StrategyRegistry()
-    
+
     # Lookup strategy
     strategy = registry.get("inside_bar")
-    
+
     # List all strategies
     all_strategies = registry.list_all()
 """

@@ -42,41 +42,41 @@ def calculate_warmup_days(
     strategy_params: dict,
 ) -> int:
     """Calculate required warmup days for indicator lookback needs.
-    
+
     Warmup ensures indicators like ATR have sufficient historical bars
     before the backtest window starts.
-    
+
     Args:
         timeframe: M1, M5, M15
         strategy_params: Dict with 'atr_period' etc.
-    
+
     Returns:
         Warmup days needed (minimum 1, maximum 5)
-    
+
     Example:
         M5 + ATR(14):
         - 78 bars/day (6.5h * 60min / 5min)
         - Warmup = ceil(14 / 78) = 1 day
     """
     from math import ceil
-    
+
     # Get indicator requirements
     atr_period = int(strategy_params.get("atr_period", 14))
     required_warmup_bars = max(atr_period, 1)
-    
+
     # Calculate bars per trading day
     tf_minutes = {"M1": 1, "M5": 5, "M15": 15}.get(timeframe.upper(), 5)
     bars_per_day = int(6.5 * 60 / tf_minutes) if tf_minutes > 0 else 78
-    
+
     # Calculate days needed, cap at reasonable bounds
     warmup_days = ceil(required_warmup_bars / max(bars_per_day, 1))
     warmup_days = max(1, min(5, warmup_days))
-    
+
     logger.debug(
         f"Warmup calculation: {timeframe} + ATR({atr_period}) → "
         f"{required_warmup_bars} bars / {bars_per_day} bars/day = {warmup_days} days"
     )
-    
+
     return warmup_days
 
 
@@ -90,7 +90,7 @@ def _persist_bars(run_dir: Path, timeframe: str, market_tz: str, signal_df: pd.D
 
     bars_dir = run_dir / "bars"
     bars_dir.mkdir(parents=True, exist_ok=True)
-    
+
     logger.info(f"[_persist_bars] Created bars_dir: {bars_dir}")
     logger.info(f"[_persist_bars] ohlcv_exec is None: {ohlcv_exec is None}")
     if ohlcv_exec is not None:
@@ -160,7 +160,7 @@ def run_backtest_full(
 ) -> RunResult:
     """
     Full backtest runner - SSOT for production backtests.
-    
+
     Phases:
     1. Coverage Gate (precondition)
     2. Signal Detection → orders.csv generation
@@ -168,7 +168,7 @@ def run_backtest_full(
     4. Equity/orders/trades persistence
     5. Artifacts index generation
     6. Postcondition gate (verify equity exists)
-    
+
     Args:
         run_id: Unique run identifier
         symbol: Stock symbol
@@ -181,7 +181,7 @@ def run_backtest_full(
         market_tz: Market timezone (default: "America/New_York")
         initial_cash: Initial equity (default: 10000.0)
         costs: Trading costs dict {"fees_bps": 0.0, "slippage_bps": 0.0}
-    
+
     Returns:
         RunResult with status SUCCESS/FAILED_PRECONDITION/FAILED_POSTCONDITION/ERROR
     """
@@ -207,7 +207,7 @@ def run_backtest_full(
         )
         # Initialize artifacts manager
         manager = ArtifactsManager(artifacts_root=artifacts_root)
-        
+
         # Phase 0: Create run directory
         ctx = manager.create_run_dir(run_id)
         run_dir = Path(ctx.run_dir)
@@ -219,11 +219,11 @@ def run_backtest_full(
         if effective_debug:
             debug_dir = run_dir / "debug"
             debug_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Initialize step tracker
         tracker = StepTracker(run_dir)
         tracker._emit_event(1, "create_run_dir", "completed")
-        
+
         # Phase 0.5: Write run_meta.json via ArtifactsManager so that the
         # manifest writer is initialized and run_manifest.json is produced.
         with tracker.step("write_run_meta"):
@@ -240,13 +240,13 @@ def run_backtest_full(
                 profile_version="default",
             )
             logger.info(f"[{run_id}] run_meta.json written via ArtifactsManager (execution_mode=full_backtest)")
-        
+
         # Phase 0.7: Ensure Intraday Data (with warmup buffer)
         with tracker.step("ensure_intraday_data") as step:
             logger.info(f"[{run_id}] Ensuring intraday data availability...")
-            
+
             from axiom_bt.intraday import IntradayStore, IntradaySpec, Timeframe
-            
+
             # CRITICAL: Calculate warmup days BEFORE fetching data
             # This ensures indicators have sufficient historical bars
             warmup_days = calculate_warmup_days(
@@ -257,20 +257,20 @@ def run_backtest_full(
                 f"[{run_id}] Warmup buffer: {warmup_days} days for {timeframe} "
                 f"(ATR period: {strategy_params.get('atr_period', 14)})"
             )
-            
+
             # Calculate range WITH warmup extension
             end_ts = pd.Timestamp(requested_end, tz=market_tz)
             start_ts = (end_ts - pd.Timedelta(days=int(lookback_days + warmup_days))).normalize()
-            
+
             logger.info(
                 f"[{run_id}] Data range: {start_ts.date()} to {end_ts.date()} "
                 f"(requested: {lookback_days}d + warmup: {warmup_days}d = {lookback_days + warmup_days}d total)"
             )
 
-            
+
             # Convert timeframe string to enum
             tf_enum = Timeframe[timeframe.upper()] if isinstance(timeframe, str) else timeframe
-            
+
             # Create spec
             spec = IntradaySpec(
                 symbols=[symbol],
@@ -279,23 +279,23 @@ def run_backtest_full(
                 timeframe=tf_enum,
                 tz=market_tz,
             )
-            
+
             # Call ensure with auto_fill_gaps
             store = IntradayStore(default_tz=market_tz)
             actions = store.ensure(spec, force=False, auto_fill_gaps=True)
-            
+
             logger.info(f"[{run_id}] ensure() actions: {actions}")
             step.add_detail("actions", str(actions))
             step.add_detail("date_range", f"{spec.start} to {spec.end}")
             step.add_detail("warmup_days", warmup_days)
             step.add_detail("total_days", lookback_days + warmup_days)
 
-        
+
         # Phase 1: Coverage Gate
         with tracker.step("coverage_gate") as step:
             logger.info(f"[{run_id}] Running coverage gate...")
             requested_end_ts = pd.Timestamp(requested_end, tz=market_tz)
-            
+
             coverage_result = check_coverage(
                 symbol=symbol,
                 timeframe=timeframe,
@@ -303,34 +303,34 @@ def run_backtest_full(
                 lookback_days=lookback_days,
                 auto_fetch=False
             )
-            
+
             step.add_detail("status", coverage_result.status.value if hasattr(coverage_result.status, 'value') else str(coverage_result.status))
-        
+
         # Write coverage check result
         manager.write_coverage_check_result(coverage_result)
-        
+
         # Check coverage status
         if coverage_result.status == CoverageStatus.GAP_DETECTED:
             logger.warning(f"[{run_id}] Coverage gap detected: {coverage_result.gap}")
-            
+
             tracker.skip_step("signal_detection", "coverage_gate_failed")
             tracker.skip_step("trade_simulation", "coverage_gate_failed")
             tracker.skip_step("write_artifacts", "coverage_gate_failed")
-            
+
             run_result = RunResult(
                 run_id=run_id,
                 status=RunStatus.FAILED_PRECONDITION,
                 reason=FailureReason.DATA_COVERAGE_GAP,
                 details=coverage_result.to_dict()
             )
-            
+
             with tracker.step("write_run_result"):
                 manager.write_run_result(run_result)
-            
+
             return run_result
-        
+
         logger.info(f"[{run_id}] Coverage sufficient")
-        
+
         # Phase 2: Signal Detection → Orders Generation
         signals_debug_df: Optional[pd.DataFrame] = None
         orders_debug_df: Optional[pd.DataFrame] = None
@@ -595,17 +595,17 @@ def run_backtest_full(
                 strategy_key=strategy_key,
                 strategy_params=strategy_params,
             )
-        
+
         # Phase 3: Trade Simulation (ReplayEngine)
         with tracker.step("trade_simulation") as step:
             logger.info(f"[{run_id}] Running trade simulation...")
-            
+
             # Prepare data paths
             # NOTE: These must be DIRECTORIES, not files!
             # The replay engine will append /{symbol}.parquet
             data_path = Path(f"artifacts/data_{timeframe.lower()}")
             data_path_m1 = Path(f"artifacts/data_m1")
-            
+
             # Prepare costs (default to configured bps if not provided)
             if costs is None:
                 costs_dict = {"fees_bps": DEFAULT_FEE_BPS, "slippage_bps": DEFAULT_SLIPPAGE_BPS}
@@ -616,7 +616,7 @@ def run_backtest_full(
                 }
             else:
                 costs_dict = costs
-            
+
             # Determine which orders CSV to use for simulation.
             orders_csv = orders_csv_path or (run_dir / "orders.csv")
 
@@ -639,7 +639,7 @@ def run_backtest_full(
                     ]
                 )
                 empty_orders.to_csv(orders_csv, index=False)
-            
+
             # Run simulation
             try:
                 # Convert costs dict to Costs object
@@ -651,7 +651,7 @@ def run_backtest_full(
                     )
                 else:
                     costs_obj = costs_dict
-                
+
                 sim_result = replay_engine.simulate_insidebar_from_orders(
                     orders_csv=orders_csv,
                     data_path=data_path,
@@ -669,7 +669,7 @@ def run_backtest_full(
                     error_id=_generate_error_id(),
                     details={"simulation_error": str(e)}
                 )
-            
+
             # Extract results
             equity = sim_result.get("equity", pd.DataFrame())
             filled_orders = sim_result.get("filled_orders", pd.DataFrame())
@@ -692,15 +692,15 @@ def run_backtest_full(
                         }
                     ]
                 )
-            
+
             step.add_detail("equity_rows", len(equity))
             step.add_detail("fills_count", len(filled_orders))
             step.add_detail("trades_count", len(trades))
-        
+
         # Phase 4: Write Artifacts
         with tracker.step("write_artifacts"):
             logger.info(f"[{run_id}] Writing artifacts...")
-            
+
             # Write equity (required)
             if not equity.empty and "equity" in equity.columns:
                 equity_values = pd.to_numeric(equity["equity"], errors="coerce")
@@ -708,17 +708,17 @@ def run_backtest_full(
                 equity["drawdown_pct"] = ((equity_values / running_max) - 1.0)
                 equity.to_csv(run_dir / "equity_curve.csv", index=False)
                 logger.info(f"[{run_id}] Wrote equity_curve.csv ({len(equity)} rows)")
-            
+
             # Write orders
             if not orders.empty:
                 orders.to_csv(run_dir / "orders.csv", index=False)
                 logger.info(f"[{run_id}] Wrote orders.csv ({len(orders)} rows)")
-            
+
             # Write filled_orders
             if not filled_orders.empty:
                 filled_orders.to_csv(run_dir / "filled_orders.csv", index=False)
                 logger.info(f"[{run_id}] Wrote filled_orders.csv ({len(filled_orders)} rows)")
-            
+
             # Write trades
             if not trades.empty:
                 trades.to_csv(run_dir / "trades.csv", index=False)
@@ -731,12 +731,12 @@ def run_backtest_full(
                     logger.info(f"[{run_id}] Wrote trade_evidence.csv ({len(evidence_df)} rows)")
             except Exception as evidence_err:  # pragma: no cover - defensive
                 logger.warning(f"[{run_id}] Could not generate trade evidence: {evidence_err}")
-            
+
             # Write metrics
             if metrics:
                 (run_dir / "metrics.json").write_text(json.dumps(metrics, indent=2))
                 logger.info(f"[{run_id}] Wrote metrics.json")
-            
+
             # Generate PNGs (optional, don't fail if errors)
             try:
                 if not equity.empty:
@@ -745,22 +745,22 @@ def run_backtest_full(
                     logger.info(f"[{run_id}] Generated chart PNGs")
             except Exception as e:
                 logger.warning(f"[{run_id}] Could not generate chart images: {e}")
-        
+
         # Phase 5: Artifacts Index
         with tracker.step("write_artifacts_index"):
             write_artifacts_index(run_dir)
-        
+
         # Phase 6: Postcondition Gate (verify equity exists)
         with tracker.step("equity_postcondition") as step:
             postcondition = check_equity_postcondition(run_dir, "full_backtest")
-            
+
             step.add_detail("status", postcondition.status)
             step.add_detail("equity_exists", postcondition.equity_file_exists)
             step.add_detail("equity_rows", postcondition.equity_rows)
-            
+
             if postcondition.status == "fail":
                 logger.error(f"[{run_id}] Postcondition FAILED: {postcondition.error_message}")
-                
+
                 run_result = RunResult(
                     run_id=run_id,
                     status=RunStatus.FAILED_POSTCONDITION,
@@ -771,12 +771,12 @@ def run_backtest_full(
                         "equity_file_exists": postcondition.equity_file_exists
                     }
                 )
-                
+
                 with tracker.step("write_run_result"):
                     manager.write_run_result(run_result)
-                
+
                 return run_result
-        
+
         # Success!
         run_result = RunResult(
             run_id=run_id,
@@ -787,19 +787,19 @@ def run_backtest_full(
                 "coverage": coverage_result.to_dict()
             }
         )
-        
+
         with tracker.step("write_run_result"):
             manager.write_run_result(run_result)
             logger.info(f"[{run_id}] Full backtest completed successfully")
-        
+
         return run_result
-    
+
     except Exception as e:
         # Unhandled exception
         logger.error(f"[{run_id}] Pipeline exception: {e}", exc_info=True)
-        
+
         error_id = _generate_error_id()
-        
+
         run_result = RunResult(
             run_id=run_id,
             status=RunStatus.ERROR,
@@ -809,7 +809,7 @@ def run_backtest_full(
                 "exception_type": type(e).__name__
             }
         )
-        
+
         # Try to write result
         try:
             manager.write_run_result(run_result)

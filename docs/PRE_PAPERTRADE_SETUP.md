@@ -1,10 +1,10 @@
 # Pre-PaperTrade Lab Configuration
 
-> **Last Updated**: 2025-12-05  
-> **Server**: 192.168.178.55 (Debian)  
+> **Last Updated**: 2025-12-05
+> **Server**: 192.168.178.55 (Debian)
 > **Port**: 8090
 
-**Mode**: Stage 3 - Live Data Validation (Read-Only)  
+**Mode**: Stage 3 - Live Data Validation (Read-Only)
 **Goal**: Validate signal generation with live ticks, NO order submission
 
 ---
@@ -226,17 +226,17 @@ python -m src.signals.cli_rudometkin_moc --symbols AAPL,TSLA --output /opt/tradi
 sqlite3 /opt/trading/marketdata-stream/data/signals.db
 
 # Get summary of today's signals
-SELECT 
+SELECT
     symbol,
     side,
     COUNT(*) as signal_count,
     AVG(entry_price) as avg_entry_price
-FROM signals 
+FROM signals
 WHERE DATE(created_at) = DATE('now')
 GROUP BY symbol, side;
 
 # Get detailed signal list
-SELECT 
+SELECT
     id,
     symbol,
     side,
@@ -246,7 +246,7 @@ SELECT
     take_profit,
     created_at,
     status
-FROM signals 
+FROM signals
 WHERE DATE(created_at) = DATE('now')
 ORDER BY created_at DESC;
 

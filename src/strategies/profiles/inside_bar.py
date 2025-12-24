@@ -24,7 +24,7 @@ INSIDE_BAR_V1_PROFILE = StrategyMetadata(
     display_name="Inside Bar Intraday",
     version="1.0.0",
     description="Original inside bar pattern strategy with ATR-based breakouts and risk management",
-    
+
     # Capabilities
     capabilities=StrategyCapabilities(
         supports_live_trading=True,
@@ -40,7 +40,7 @@ INSIDE_BAR_V1_PROFILE = StrategyMetadata(
         supports_position_sizing=True,
         supports_portfolio_mode=False,
     ),
-    
+
     # Data Requirements
     data_requirements=DataRequirements(
         required_timeframes=["M5"],
@@ -51,7 +51,7 @@ INSIDE_BAR_V1_PROFILE = StrategyMetadata(
         requires_market_data_db=True,
         requires_signals_db=False,
     ),
-    
+
     # Configuration
     config_class_path="strategies.inside_bar.core.InsideBarConfig",
     default_parameters={
@@ -74,14 +74,14 @@ INSIDE_BAR_V1_PROFILE = StrategyMetadata(
         },
         "required": ["atr_period", "risk_reward_ratio"],
     },
-    
+
     # Runtime Paths
     signal_module_path="signals.cli_inside_bar",
     core_module_path="strategies.inside_bar.core",
-    
+
     # Dependencies
     required_indicators=["ATR"],
-    
+
     # Deployment
     deployment_info=DeploymentInfo(
         deployed_environments=[
@@ -94,7 +94,7 @@ INSIDE_BAR_V1_PROFILE = StrategyMetadata(
         git_tag="insidebar-v1.0.0",
 deployment_notes="Original implementation, stable and tested",
     ),
-    
+
     #  Metadata
     created_by="migration_from_streamlit_state",
     documentation_url=None,  # TODO: Add docs link
@@ -109,7 +109,7 @@ INSIDE_BAR_V2_PROFILE = StrategyMetadata(
     display_name="Inside Bar Intraday v2",
     version="2.0.0",
     description="Unified inside bar implementation with 100% parity between backtest and live trading",
-    
+
     # Capabilities
     capabilities=StrategyCapabilities(
         supports_live_trading=True,
@@ -125,7 +125,7 @@ INSIDE_BAR_V2_PROFILE = StrategyMetadata(
         supports_position_sizing=True,
         supports_portfolio_mode=False,
     ),
-    
+
     # Data Requirements
     data_requirements=DataRequirements(
         required_timeframes=["M5"],
@@ -136,7 +136,7 @@ INSIDE_BAR_V2_PROFILE = StrategyMetadata(
         requires_market_data_db=True,
         requires_signals_db=False,
     ),
-    
+
     # Configuration
     config_class_path="strategies.inside_bar.core.InsideBarConfig",
     default_parameters={
@@ -159,14 +159,14 @@ INSIDE_BAR_V2_PROFILE = StrategyMetadata(
         },
         "required": ["atr_period", "risk_reward_ratio"],
     },
-    
+
     # Runtime Paths
     signal_module_path="signals.cli_inside_bar",
     core_module_path="strategies.inside_bar.core",
-    
+
     # Dependencies
     required_indicators=["ATR"],
-    
+
     # Deployment
     deployment_info=DeploymentInfo(
         deployed_environments=[
@@ -184,7 +184,7 @@ INSIDE_BAR_V2_PROFILE = StrategyMetadata(
             "100% identical signals between backtest and live."
         ),
     ),
-    
+
     # Metadata
     created_by="migration_from_config_versions",
     documentation_url=None,  # TODO: Add docs link

@@ -26,21 +26,21 @@ def calculate_validity_window(
 ) -> Tuple[pd.Timestamp, pd.Timestamp]:
     """
     Calculate order validity window.
-    
+
     CRITICAL: session_end is calculated from valid_from, NOT signal_ts,
     to prevent zero-duration windows at session boundaries.
-    
+
     Example Problem (without this fix):
         - Signal at 15:55 Berlin
         - valid_from_policy = "next_bar" → valid_from = 16:00
         - Session 1 ends at 16:00
         - If we calculate session_end from signal_ts → valid_to = 16:00
         - Result: valid_to == valid_from → ZERO DURATION → No fills!
-    
+
     Solution:
         - Calculate session_end from valid_from
         - If valid_from is outside session, reject order entirely
-    
+
     Args:
         signal_ts: Signal timestamp (MUST be timezone-aware)
         timeframe_minutes: Bar duration (e.g., 5 for M5)
@@ -49,13 +49,13 @@ def calculate_validity_window(
         validity_policy: "session_end" | "fixed_minutes" | "one_bar"
         validity_minutes: Minutes for fixed_minutes policy
         valid_from_policy: "signal_ts" | "next_bar"
-    
+
     Returns:
         (valid_from, valid_to) tuple where valid_to > valid_from
-        
+
     Raises:
         ValueError: If signal not in session, window invalid, or valid_from crosses session boundary
-        
+
     Examples:
         >>> # Signal at 15:30, session_end policy
         >>> signal_ts = pd.Timestamp("2025-11-28 15:30:00", tz="Europe/Berlin")
@@ -77,7 +77,7 @@ def calculate_validity_window(
             f"signal_ts must be timezone-aware: {signal_ts}. "
             "All timestamps must have timezone info for validity calculation."
         )
-    
+
     # Calculate valid_from based on policy
     if valid_from_policy == "next_bar":
         valid_from = signal_ts + timedelta(minutes=timeframe_minutes)
@@ -88,12 +88,12 @@ def calculate_validity_window(
             f"Unknown valid_from_policy: {valid_from_policy}. "
             "Must be 'signal_ts' or 'next_bar'."
         )
-    
+
     # Calculate valid_to based on validity_policy
     if validity_policy == "one_bar":
         # Order valid for one bar duration
         valid_to = valid_from + timedelta(minutes=timeframe_minutes)
-    
+
     elif validity_policy == "session_end":
         # CRITICAL FIX: Use valid_from, not signal_ts
         # This prevents zero-duration windows when valid_from crosses session boundary
@@ -104,7 +104,7 @@ def calculate_validity_window(
             raise ValueError(
                 f"Session filter error for valid_from ({valid_from}): {e}"
             )
-        
+
         if session_end is None:
             # valid_from is outside session - this can happen with next_bar policy
             # when signal occurs near session end
@@ -114,9 +114,9 @@ def calculate_validity_window(
                 f"moved it outside the session. Cannot use 'session_end' policy. "
                 "Order rejected."
             )
-        
+
         valid_to = session_end
-        
+
         # Additional safety check
         if valid_to <= valid_from:
             raise ValueError(
@@ -124,11 +124,11 @@ def calculate_validity_window(
                 f"Signal at {signal_ts} is too close to session boundary. "
                 "Order rejected to prevent zero-duration window."
             )
-    
+
     elif validity_policy == "fixed_minutes":
         # Order valid for fixed number of minutes
         valid_to = valid_from + timedelta(minutes=validity_minutes)
-        
+
         # Optional: Clamp to session end if valid_from is in session
         try:
             session_end = session_filter.get_session_end(valid_from, session_timezone)
@@ -138,13 +138,13 @@ def calculate_validity_window(
         except ValueError:
             # valid_from not in session or naive timestamp - ignore clamping
             pass
-    
+
     else:
         raise ValueError(
             f"Unknown validity_policy: {validity_policy}. "
             "Must be 'session_end', 'fixed_minutes', or 'one_bar'."
         )
-    
+
     # Final validation: ensure non-zero duration
     if valid_to <= valid_from:
         raise ValueError(
@@ -153,5 +153,5 @@ def calculate_validity_window(
             f"This should never happen if logic is correct. "
             f"signal_ts={signal_ts}, policy={validity_policy}, valid_from_policy={valid_from_policy}"
         )
-    
+
     return (valid_from, valid_to)

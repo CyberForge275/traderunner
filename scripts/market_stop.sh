@@ -15,7 +15,7 @@ echo "[$TIMESTAMP] ===========================================" >> $LOG_FILE
 if systemctl is-active --quiet marketdata-stream; then
     UPTIME=$(curl -s http://localhost:8090/health 2>/dev/null | grep -o '"uptime_seconds":[0-9]*' | cut -d':' -f2)
     SYMBOLS=$(curl -s http://localhost:8090/health 2>/dev/null | grep -o '"subscribed_symbols":[0-9]*' | cut -d':' -f2)
-    
+
     echo "[$TIMESTAMP] Session statistics:" >> $LOG_FILE
     echo "[$TIMESTAMP]   - Uptime: ${UPTIME:-0} seconds" >> $LOG_FILE
     echo "[$TIMESTAMP]   - Symbols monitored: ${SYMBOLS:-0}" >> $LOG_FILE

@@ -2,8 +2,8 @@
 
 ## Quick Links
 
-**Workspace:** `/home/mirko/data/workspace/droid/traderunner`  
-**Streamlit UI:** `streamlit run apps/streamlit/app.py`  
+**Workspace:** `/home/mirko/data/workspace/droid/traderunner`
+**Streamlit UI:** `streamlit run apps/streamlit/app.py`
 **Successful Run:** `artifacts/backtests/run_20251127_120221_ui_m5_APP_360d_10k`
 
 ---
@@ -119,11 +119,11 @@ python src/replay/time_machine.py --rollback
 
 ### 1. InsideBar Strategy
 
-**Source:** `src/strategies/inside_bar.py`  
+**Source:** `src/strategies/inside_bar.py`
 **Config:** `marketdata-stream/config/strategy_params.yaml`
 
-**Entry:** Breakout above/below mother candle  
-**Exit:** Take-profit (R:R based) or stop-loss  
+**Entry:** Breakout above/below mother candle
+**Exit:** Take-profit (R:R based) or stop-loss
 **Timeframes:** M5, M15, H1
 
 **Key Parameters:**
@@ -135,8 +135,8 @@ python src/replay/time_machine.py --rollback
 
 **Source:** `src/strategies/rudometkin_moc.py`
 
-**Entry:** Close momentum triggers  
-**Exit:** Similar to InsideBar  
+**Entry:** Close momentum triggers
+**Exit:** Similar to InsideBar
 **Best on:** Volatile stocks
 
 ---
@@ -145,9 +145,9 @@ python src/replay/time_machine.py --rollback
 
 ### Historical Data Storage
 
-**Location:** `traderunner/data/`  
-**Format:** Parquet files  
-**Symbols:** HOOD, PLTR, APP, INTC, TSLA, NVDA, MU, AVGO, LRCX, WBD  
+**Location:** `traderunner/data/`
+**Format:** Parquet files
+**Symbols:** HOOD, PLTR, APP, INTC, TSLA, NVDA, MU, AVGO, LRCX, WBD
 **Timeframes:** M1, M5, M15, H1
 
 ### Data Sources
@@ -301,6 +301,6 @@ pytest trading_dashboard/tests/ -v
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** 2025-12-06  
+**Document Version:** 1.0
+**Last Updated:** 2025-12-06
 **Contact:** See conversation fc7048c2-45ea-4ac3-b01e-608952bc074b for full context

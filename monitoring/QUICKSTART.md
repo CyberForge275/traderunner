@@ -31,7 +31,7 @@ docker-compose ps
 ```bash
 # Quick health check
 curl http://localhost:9090/-/healthy && echo "✅ Prometheus OK"
-curl http://localhost:3000/api/health && echo "✅ Grafana OK"  
+curl http://localhost:3000/api/health && echo "✅ Grafana OK"
 curl http://localhost:9093/-/healthy && echo "✅ Alertmanager OK"
 
 # Check if Prometheus is scraping automatictrader-api

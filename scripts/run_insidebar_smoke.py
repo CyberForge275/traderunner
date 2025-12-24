@@ -58,12 +58,12 @@ try:
         costs={"fees_bps": 0.0, "slippage_bps": 0.0},
         debug_trace=True,
     )
-    
+
     print(f"\n✅ Run completed successfully!")
     print(f"   Run ID: {result.run_id}")
     print(f"   Status: {result.status}")
     print(f"   Path: {result.run_path}")
-    
+
     # Save run info for validation
     import json
     with open("/tmp/int_smoke_run_info.json", "w") as f:
@@ -73,10 +73,10 @@ try:
             "status": str(result.status),
             "timestamp": datetime.now().isoformat(),
         }, f, indent=2)
-    
+
     print(f"\n✅ Run info saved to /tmp/int_smoke_run_info.json")
     print(f"\nNext: Run validation on {result.run_path}")
-    
+
 except Exception as e:
     print(f"\n❌ Run failed: {e}")
     import traceback

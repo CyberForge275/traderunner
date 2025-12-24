@@ -28,16 +28,16 @@ class TestNormalizeOHLCVFrame:
             'close': [np.nan] * 5,
             'volume': [np.nan] * 5,
         })
-        
+
         result = _normalize_ohlcv_frame(df, target_tz='America/New_York')
-        
+
         # Should use Capitalized columns (with data), not lowercase (NaN)
         assert result['open'].notna().all(), "open column should have data, not NaN"
         assert result['high'].notna().all(), "high column should have data, not NaN"
         assert result['low'].notna().all(), "low column should have data, not NaN"
         assert result['close'].notna().all(), "close column should have data, not NaN"
         assert result['volume'].notna().all(), "volume column should have data, not NaN"
-        
+
         # Verify actual values from Capitalized columns
         assert result['open'].iloc[0] == 100.0
         assert result['close'].iloc[-1] == 104.2
@@ -53,9 +53,9 @@ class TestNormalizeOHLCVFrame:
             'close': [10.2, 11.2, 12.2],
             'volume': [100, 200, 300],
         })
-        
+
         result = _normalize_ohlcv_frame(df, target_tz='America/New_York')
-        
+
         assert result['open'].notna().all()
         assert result['open'].iloc[0] == 10.0
         assert len(result) == 3
@@ -70,9 +70,9 @@ class TestNormalizeOHLCVFrame:
             'Close': [20.2, 21.2, 22.2],
             'Volume': [1000, 2000, 3000],
         })
-        
+
         result = _normalize_ohlcv_frame(df, target_tz='America/New_York')
-        
+
         assert result['open'].notna().all()
         assert result['close'].iloc[-1] == 22.2
         assert len(result) == 3
@@ -85,7 +85,7 @@ class TestNormalizeOHLCVFrame:
             'high': [10.5, 11.5, 12.5],
             # Missing low, close, volume
         })
-        
+
         with pytest.raises(ValueError, match="missing required columns"):
             _normalize_ohlcv_frame(df, target_tz='America/New_York')
 
@@ -99,9 +99,9 @@ class TestNormalizeOHLCVFrame:
             'Close': [100.2, 101.2, 102.2],
             'Volume': [1000, 2000, 3000],
         })
-        
+
         result = _normalize_ohlcv_frame(df, target_tz='America/New_York')
-        
+
         assert result.index.tz.zone == 'America/New_York'
         assert result.index.name == 'timestamp'
         # 14:30 UTC = 09:30 NY (in winter)

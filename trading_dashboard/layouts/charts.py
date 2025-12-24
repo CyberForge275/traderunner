@@ -13,7 +13,7 @@ def create_charts_layout():
     """Create the Charts tab layout."""
     # Get symbols from actual parquet files (not config)
     symbols = get_available_symbols()
-    
+
     return html.Div([
         # Controls row at top
         dbc.Row([
@@ -25,7 +25,7 @@ def create_charts_layout():
                 ], style={"marginBottom": "10px"})
             ], width=12)
         ]),
-        
+
         dbc.Row([
             # Left sidebar: Symbol selector + controls
             dbc.Col([
@@ -38,7 +38,7 @@ def create_charts_layout():
                                 html.P("Loading...", className="text-muted", style={"fontSize": "0.9rem"})
                             ]),
                         ], style={"marginBottom": "15px"}),
-                        
+
                       # Live Data Section
         html.Div([
             html.H5("📡 Live Data", style={"marginBottom": "10px", "color": "#00d26a"}),
@@ -47,12 +47,12 @@ def create_charts_layout():
                 html.Span("Checking...", id="live-data-text", style={"marginLeft": "8px"})
             ]),
             html.Div(id="live-symbols-container", style={"marginTop": "10px"}),  # Clickable symbols
-            html.P(id="live-data-count", children="", className="text-muted", 
+            html.P(id="live-data-count", children="", className="text-muted",
                    style={"fontSize": "0.75rem", "marginTop": "5px"})
         ], style={"marginBottom": "15px"}),
-                        
+
                         html.Hr(),
-                        
+
                         # Symbol Selector
                         html.H5("Symbol"),
                         dcc.Dropdown(
@@ -67,16 +67,16 @@ def create_charts_layout():
                             },
                             className="custom-dropdown"
                         ),
-                        
+
                         # Hidden state: tracks data source mode
                         html.Div(
                             id="chart-data-source-mode",
                             children="parquet",  # Default: parquet mode (Symbol selector)
                             style={"display": "none"}
                         ),
-                        
+
                         html.Hr(),
-                        
+
                         # Market Session Toggles
                         html.H5("Market Sessions", style={"marginTop": "20px", "fontSize": "0.9rem"}),
                         dbc.Checklist(
@@ -90,9 +90,9 @@ def create_charts_layout():
                             style={"fontSize": "0.85rem", "marginTop": "10px"}
                         ),
                         html.P("Default: Regular hours only", className="text-muted", style={"fontSize": "0.75rem", "marginTop": "5px"}),
-                        
+
                         html.Hr(),
-                        
+
                         # Strategy Indicators Section (NEW)
                         html.H5("📊 Strategy Indicators", style={"marginTop": "20px", "fontSize": "0.9rem"}),
                         html.P(
@@ -100,7 +100,7 @@ def create_charts_layout():
                             className="text-muted",
                             style={"fontSize": "0.75rem", "marginBottom": "10px"}
                         ),
-                        
+
                         # Strategy selector
                         dcc.Dropdown(
                             id="indicator-strategy-selector",
@@ -119,7 +119,7 @@ def create_charts_layout():
                             },
                             className="custom-dropdown"
                         ),
-                        
+
                         # Indicator toggles (permanent element, options updated by callback)
                         dbc.Checklist(
                             id="indicator-toggles",
@@ -128,9 +128,9 @@ def create_charts_layout():
                             switch=True,
                             style={"fontSize": "0.80rem", "marginTop": "10px"}
                         ),
-                        
+
                         html.Hr(),
-                        
+
                         html.H5("Timeframe", style={"marginTop": "20px"}),
                         dbc.ButtonGroup([
                             dbc.Button("M1", id="tf-m1", size="sm", outline=True, color="secondary"),
@@ -148,9 +148,9 @@ def create_charts_layout():
                             style={"width": "100%", "marginTop": "10px"}
                         ),
                         html.P("Select trading day", className="text-muted", style={"fontSize": "0.85rem", "marginTop": "5px"}),
-                        
+
                         html.Hr(),
-                        
+
                         # Data Freshness Telemetry (NEW)
                         html.H5("📊 Data Freshness", style={"marginTop": "20px", "fontSize": "0.9rem"}),
                         html.Div(id="data-freshness-indicator", children=[
@@ -170,7 +170,7 @@ def create_charts_layout():
                             className="text-muted",
                             style={"fontSize": "0.7rem", "marginTop": "5px"}
                         ),
-                        
+
                         html.Hr(),
                         html.H5("📅 D1 Day Range", style={"marginTop": "20px", "fontSize": "0.9rem"}),
                         dcc.Dropdown(
@@ -229,13 +229,13 @@ def create_charts_layout():
                                     "fontWeight": "bold"
                                 })
                             ], style={"fontSize": "0.75rem", "marginTop": "8px"}),
-                            html.P("Place .parquet files in data_m1/, data_m5/, or data_m15/", 
-                                   className="text-muted", 
+                            html.P("Place .parquet files in data_m1/, data_m5/, or data_m15/",
+                                   className="text-muted",
                                    style={"fontSize": "0.7rem", "marginTop": "8px", "fontStyle": "italic"})                        ]),
                     ])
                 ])
             ], width=2),
-            
+
             # Main chart area
             dbc.Col([
                 html.Div(className="dashboard-card", style={"height": "700px"}, children=[

@@ -89,7 +89,7 @@ echo "   Copied: $(basename "$TARGET_CORE")"
 
 if [ -f "${STRATEGY_DIR}/config.py" ]; then
     cp "${STRATEGY_DIR}/config.py" "$TARGET_CONFIG"
-    
+
     # Rewrite import in config file
     # From: from .core import InsideBarConfig
     # To:   from .inside_bar_core_v2_0_0 import InsideBarConfig
@@ -100,7 +100,7 @@ if [ -f "${STRATEGY_DIR}/config.py" ]; then
         sed -i "s/from src.unified_core.core/from .${STRATEGY}_core_v${VERSION_CLEAN}/g" "$TARGET_CONFIG"
         sed -i "s/from .core/from .${STRATEGY}_core_v${VERSION_CLEAN}/g" "$TARGET_CONFIG"
     fi
-    
+
     echo "   Copied: $(basename "$TARGET_CONFIG") (with import rewrite)"
 fi
 
@@ -152,7 +152,7 @@ if git status --porcelain | grep -q "src/strategies/${STRATEGY}"; then
 - Version: ${VERSION}
 - Checksum: ${TR_CHECKSUM}
 - Ready for vendoring to marketdata-stream"
-    
+
     git tag "${STRATEGY}-v${VERSION}"
     echo -e "${GREEN}✅ traderunner: committed and tagged${NC}"
 else

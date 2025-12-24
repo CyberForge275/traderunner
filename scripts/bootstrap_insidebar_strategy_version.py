@@ -66,35 +66,35 @@ def get_git_commit() -> str:
 def get_config_from_profile() -> dict:
     """
     Extract configuration from INSIDE_BAR_V1_PROFILE.
-    
+
     Returns:
         Dictionary with strategy configuration parameters
     """
     # Use default_parameters from the profile
     config = INSIDE_BAR_V1_PROFILE.default_parameters.copy()
-    
+
     # Add any additional metadata
     config['_profile_source'] = 'INSIDE_BAR_V1_PROFILE'
     config['_strategy_id'] = INSIDE_BAR_V1_PROFILE.strategy_id
     config['_version'] = INSIDE_BAR_V1_PROFILE.version
-    
+
     return config
 
 
 def main():
     """Bootstrap InsideBar Intraday strategy version."""
-    
+
     print("=" * 70)
     print("InsideBar Intraday Strategy Version Bootstrap")
     print("=" * 70)
     print()
-    
+
     # Step 1: Get Git commit
     print("📋 Step 1: Getting Git commit reference...")
     git_commit = get_git_commit()
     print(f"   Git commit: {git_commit}")
     print()
-    
+
     # Step 2: Load configuration
     print("📋 Step 2: Loading InsideBar V1 configuration...")
     config_dict = get_config_from_profile()
@@ -102,13 +102,13 @@ def main():
     print(f"   Sample: atr_period={config_dict.get('atr_period')}, "
           f"risk_reward_ratio={config_dict.get('risk_reward_ratio')}")
     print()
-    
+
     # Step 3: Get repository (uses Settings for DB path)
     print("📋 Step 3: Connecting to strategy metadata repository...")
     repo = get_repository()  # Uses Settings.signals_db_path
     print(f"   Database: {repo.db_path}")
     print()
-    
+
     # Step 4: Define strategy version parameters
     print("📋 Step 4: Strategy version parameters...")
     strategy_key = "insidebar_intraday"
@@ -117,7 +117,7 @@ def main():
     profile_version = 1
     label = "InsideBar v1.00 – Initial Stable"
     lifecycle_stage = LifecycleStage.BACKTEST_APPROVED
-    
+
     print(f"   strategy_key:     {strategy_key}")
     print(f"   impl_version:     {impl_version}")
     print(f"   profile_key:      {profile_key}")
@@ -125,7 +125,7 @@ def main():
     print(f"   label:            {label}")
     print(f"   lifecycle_stage:  {lifecycle_stage.name}")
     print()
-    
+
     # Step 5: Check if version already exists
     print("📋 Step 5: Checking for existing strategy version...")
     existing_version = repo.find_strategy_version(
@@ -134,7 +134,7 @@ def main():
         profile_key=profile_key,
         profile_version=profile_version
     )
-    
+
     if existing_version:
         print(f"✅ Strategy version ALREADY EXISTS:")
         print(f"   ID:                {existing_version.id}")
@@ -147,11 +147,11 @@ def main():
         print("ℹ️  No action needed - using existing version.")
         print("=" * 70)
         return 0
-    
+
     # Step 6: Create new strategy version
     print("🆕 Strategy version does NOT exist - creating new version...")
     print()
-    
+
     try:
         version_id = repo.create_strategy_version(
             strategy_key=strategy_key,
@@ -165,7 +165,7 @@ def main():
             code_ref_type="git",
             universe_key=None  # InsideBar doesn't use universe
         )
-        
+
         print(f"✅ SUCCESS! Strategy version created:")
         print(f"   ID:                {version_id}")
         print(f"   strategy_key:      {strategy_key}")
@@ -176,14 +176,14 @@ def main():
         print(f"   lifecycle_stage:   {lifecycle_stage.name}")
         print(f"   code_ref_value:    {git_commit}")
         print()
-        
+
         # Verify by reading it back
         created_version = repo.get_strategy_version_by_id(version_id)
         if created_version:
             print("✅ Verification: Version successfully persisted to database")
             print(f"   Config Hash:       {created_version.config_hash}")
             print(f"   Created At:        {created_version.created_at}")
-        
+
         print()
         print("=" * 70)
         print("🎉 Bootstrap complete!")
@@ -193,9 +193,9 @@ def main():
         print("  2. Run tests: PYTHONPATH=src pytest tests/test_lifecycle_integration.py")
         print("  3. Deploy to other environments (int, prod) and run this script there")
         print("=" * 70)
-        
+
         return 0
-        
+
     except Exception as e:
         print(f"❌ ERROR creating strategy version:")
         print(f"   {type(e).__name__}: {e}")

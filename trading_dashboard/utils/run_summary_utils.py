@@ -26,7 +26,7 @@ def build_run_summary(
 ) -> list:
     """
     Build comprehensive run summary for display in Pre-Paper tab.
-    
+
     Args:
         result: Result dict from execute_strategy (contains strategy_version, strategy_run_id, etc.)
         strategy: Strategy selection from dropdown
@@ -36,22 +36,22 @@ def build_run_summary(
         replay_date: Date for replay mode (optional)
         session_filter_input: Session hours filter (optional)
         show_technical_details: Whether to include expandable technical section
-        
+
     Returns:
         List of Dash components for run summary display
     """
     components = []
-    
+
     # Extract strategy name (remove version suffix if present)
     strategy_name = strategy.split("|")[0] if "|" in strategy else strategy
-    
+
     # Parse symbols
     symbols_list = [s.strip().upper() for s in symbols_str.split(",") if s.strip()]
     symbols_display = ", ".join(symbols_list) if symbols_list else "None"
-    
+
     # Session hours display
     session_display = session_filter_input if session_filter_input and session_filter_input.strip() else "All sessions"
-    
+
     # Determine lab designation
     if mode == "replay":
         lab_display = "Pre-Paper (Time Machine)"
@@ -59,7 +59,7 @@ def build_run_summary(
     else:
         lab_display = "Pre-Paper (Live)"
         mode_display = "Live (Real-time)"
-    
+
     # Build run setup grid
     components.append(
         html.Div([
@@ -92,11 +92,11 @@ def build_run_summary(
             ]),
         ], className="p-3 bg-light rounded")
     )
-    
+
     # Add lifecycle metadata if available
     if "strategy_version" in result or "strategy_run_id" in result:
         lifecycle_rows = []
-        
+
         if "strategy_version" in result:
             v = result["strategy_version"]
             lifecycle_rows.append(
@@ -119,12 +119,12 @@ def build_run_summary(
                     ], width=12, className="mb-1"),
                 ])
             )
-        
+
         if "strategy_run_id" in result:
             run_id = result["strategy_run_id"]
             # Get environment from result if available
             environment = result.get("environment", "N/A")
-            
+
             lifecycle_rows.append(
                 dbc.Row([
                     dbc.Col([
@@ -137,7 +137,7 @@ def build_run_summary(
                     ], width=6, className="mb-1"),
                 ])
             )
-        
+
         # Get duration if available
         if "duration_seconds" in result:
             lifecycle_rows.append(
@@ -148,18 +148,18 @@ def build_run_summary(
                     ], width=6, className="mb-1"),
                 ])
             )
-        
+
         components.append(
             html.Div([
                 html.H6("🔖 Lifecycle Metadata", className="mt-3 mb-2 text-info"),
                 *lifecycle_rows
             ], className="p-3 bg-light rounded mt-2")
         )
-    
+
     # Add technical details (expandable)
     if show_technical_details and ("strategy_run_id" in result or "strategy_version" in result):
         technical_content = []
-        
+
         # Add raw data if available
         if "strategy_version" in result:
             v = result["strategy_version"]
@@ -175,7 +175,7 @@ def build_run_summary(
                     html.Code(v.get("code_ref", "N/A"), className="ms-1")
                 ], className="mb-1")
             )
-        
+
         # Add metrics if available
         if "metrics_summary" in result:
             technical_content.append(
@@ -188,7 +188,7 @@ def build_run_summary(
                     )
                 ], className="mb-1")
             )
-        
+
         components.append(
             dbc.Card([
                 dbc.CardHeader(
@@ -209,19 +209,19 @@ def build_run_summary(
                 )
             ], className="mt-2")
         )
-    
+
     return components
 
 
 def format_strategy_display_name(strategy_value: str) -> str:
     """
     Format strategy value for user-friendly display.
-    
+
     Handles both simple strategy keys and compound "strategy|version" values.
-    
+
     Args:
         strategy_value: Value from dropdown (e.g., "insidebar_intraday" or "strategy|v1.00")
-        
+
     Returns:
         Human-readable strategy name
     """
@@ -231,16 +231,16 @@ def format_strategy_display_name(strategy_value: str) -> str:
         "insidebar_intraday_v2": "InsideBar Intraday v2",
         "rudometkin_moc_mode": "Rudometkin MOC",
     }
-    
+
     # Extract base strategy key
     base_key = strategy_value.split("|")[0] if "|" in strategy_value else strategy_value
-    
+
     # Get display name
     display_name = strategy_names.get(base_key, base_key.replace("_", " ").title())
-    
+
     # Add version suffix if present
     if "|" in strategy_value:
         version = strategy_value.split("|")[1]
         display_name = f"{display_name} ({version})"
-    
+
     return display_name

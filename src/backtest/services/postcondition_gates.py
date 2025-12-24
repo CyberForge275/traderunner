@@ -31,14 +31,14 @@ def check_equity_postcondition(
 ) -> EquityPostcondition:
     """
     Verify equity_curve.csv exists for full_backtest mode.
-    
+
     Rule: If execution_mode=full_backtest, equity_curve.csv MUST exist
           (even if empty/flat - indicates 0 trades is valid)
-    
+
     Args:
         run_dir: Run artifacts directory
         execution_mode: Execution mode from run_meta.json
-    
+
     Returns:
         EquityPostcondition with pass/fail status
     """
@@ -51,9 +51,9 @@ def check_equity_postcondition(
             equity_rows=0,
             error_message=None
         )
-    
+
     equity_path = run_dir / "equity_curve.csv"
-    
+
     if not equity_path.exists():
         error_msg = (
             f"equity_curve.csv not found in {run_dir}. "
@@ -66,7 +66,7 @@ def check_equity_postcondition(
             equity_rows=0,
             error_message=error_msg
         )
-    
+
     # Verify file is readable (not corrupted)
     try:
         df = pd.read_csv(equity_path)
@@ -81,7 +81,7 @@ def check_equity_postcondition(
             equity_rows=0,
             error_message=error_msg
         )
-    
+
     # Empty equity is OK (0 trades scenario)
     return EquityPostcondition(
         status="pass",

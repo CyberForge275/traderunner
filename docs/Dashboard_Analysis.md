@@ -257,9 +257,9 @@ Next Steps
 ⏳ Test and verify functionality
 ⏳ Deploy on port 9001
 References
-Screenshot: 
+Screenshot:
 
 streamlit_dashboard_1765125323816.png
-Recording: 
+Recording:
 
 streamlit_dashboard_capture_1765125268752.webp

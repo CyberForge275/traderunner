@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def generate_error_id() -> str:
     """
     Generate a short, unique error ID for exception tracking.
-    
+
     Returns:
         8-character uppercase hex string (e.g., "A1B2C3D4")
     """
@@ -49,9 +49,9 @@ def build_chart_meta(
 ) -> Dict[str, Any]:
     """
     Build structured chart metadata dict.
-    
+
     All chart callbacks should use this to ensure consistent logging.
-    
+
     Args:
         source: Data source (e.g., "BACKTEST_PARQUET", "LIVE_SQLITE")
         symbol: Stock symbol
@@ -69,7 +69,7 @@ def build_chart_meta(
         display_tz: Display timezone from UI toggle
         session_flags: Dict of session toggle states (pre, after, etc.)
         data_path: Resolved file path(s) used
-    
+
     Returns:
         Dict with all chart metadata (JSON-serializable)
     """
@@ -96,7 +96,7 @@ def build_chart_meta(
 def log_chart_meta(chart_meta: Dict[str, Any]) -> None:
     """
     Log chart metadata as single-line JSON.
-    
+
     Args:
         chart_meta: Dict from build_chart_meta()
     """
@@ -110,19 +110,19 @@ def log_chart_error(
 ) -> None:
     """
     Log chart error with full stacktrace and correlation ID.
-    
+
     This logs to errors.log with:
     - error_id for correlation
     - full exception details
     - chart_meta context
-    
+
     Args:
         error_id: Generated error ID (from generate_error_id())
         exception: The exception that occurred
         chart_meta: Chart metadata dict for context
     """
     error_logger = logging.getLogger("errors")
-    
+
     error_logger.error(
         f"Chart Error [error_id={error_id}]\n"
         f"Exception: {type(exception).__name__}: {str(exception)}\n"

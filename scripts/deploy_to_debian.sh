@@ -49,7 +49,7 @@ else
     echo -e "${YELLOW}⚠ Cannot create ${REMOTE_DIR} (requires sudo)${NC}"
     echo -e "${BLUE}Would you like to use ~/trading instead? (y/n)${NC}"
     read -p "Use home directory? " USE_HOME
-    
+
     if [[ "$USE_HOME" == "y" || "$USE_HOME" == "Y" ]]; then
         REMOTE_DIR="~/trading"
         ssh ${SERVER} "mkdir -p ${REMOTE_DIR}"
@@ -181,11 +181,11 @@ read -p "Setup systemd? " SETUP_SYSTEMD
 
 if [[ "$SETUP_SYSTEMD" == "y" || "$SETUP_SYSTEMD" == "Y" ]]; then
     echo -e "${BLUE}Setting up systemd services...${NC}"
-    
+
     # Create trading user
     ssh -t ${SERVER} "sudo useradd -r -s /bin/bash -d ${REMOTE_DIR} trading 2>/dev/null || echo 'User already exists'"
     ssh -t ${SERVER} "sudo chown -R trading:trading ${REMOTE_DIR}"
-    
+
     # Create API service file
     ssh -t ${SERVER} sudo tee /etc/systemd/system/automatictrader-api.service > /dev/null << EOF
 [Unit]
@@ -205,7 +205,7 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOF
-    
+
     # Create Worker service file
     ssh -t ${SERVER} sudo tee /etc/systemd/system/automatictrader-worker.service > /dev/null << EOF
 [Unit]
@@ -226,21 +226,21 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOF
-    
+
     # Reload systemd and enable services
     ssh -t ${SERVER} << 'ENDSSH'
 sudo systemctl daemon-reload
 sudo systemctl enable automatictrader-api
 sudo systemctl enable automatictrader-worker
 ENDSSH
-    
+
     echo -e "${GREEN}✓ Systemd services created and enabled${NC}"
     echo ""
-    
+
     # Ask if they want to start services now
     echo -e "${YELLOW}Start services now? (y/n)${NC}"
     read -p "Start services? " START_SERVICES
-    
+
     if [[ "$START_SERVICES" == "y" || "$START_SERVICES" == "Y" ]]; then
         ssh -t ${SERVER} << 'ENDSSH'
 sudo systemctl start automatictrader-api
@@ -248,7 +248,7 @@ sudo systemctl start automatictrader-worker
 ENDSSH
         echo -e "${GREEN}✓ Services started${NC}"
         echo ""
-        
+
         # Show status
         echo -e "${BLUE}Service Status:${NC}"
         ssh -t ${SERVER} "sudo systemctl status automatictrader-api --no-pager -l"

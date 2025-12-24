@@ -11,7 +11,7 @@ This document explains how Antigravity maintains context and history across sess
 ## 1. Automatic Memory Sources
 
 ### Conversation Summaries
-Antigravity automatically maintains summaries of recent conversations (last ~20).  
+Antigravity automatically maintains summaries of recent conversations (last ~20).
 **What's stored:**
 - Conversation ID and title
 - Creation and modification timestamps

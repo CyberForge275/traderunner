@@ -31,12 +31,12 @@ def task1_inventory():
         "bars_exec_M5": BASE_PATH / "bars" / "bars_exec_M5_rth.parquet",
         "bars_signal_M5": BASE_PATH / "bars" / "bars_signal_M5_rth.parquet",
     }
-    
+
     inventory = []
     for name, path in files.items():
         exists = path.exists()
         size = path.stat().st_size if exists else 0
-        
+
         # Count rows for CSV/JSONL
         rows = None
         if exists:
@@ -46,7 +46,7 @@ def task1_inventory():
                 rows = len(open(path).readlines())
             elif path.suffix == ".parquet":
                 rows = len(pd.read_parquet(path))
-        
+
         inventory.append({
             "file": name,
             "path": str(path),
@@ -54,17 +54,17 @@ def task1_inventory():
             "size_bytes": size,
             "rows": rows
         })
-    
+
     return pd.DataFrame(inventory)
 
 def task2_extract_config():
     """Task 2: Extract Configuration & Timeframe Semantics"""
     with open(BASE_PATH / "run_meta.json") as f:
         run_meta = json.load(f)
-    
+
     with open(BASE_PATH / "diagnostics.json") as f:
         diagnostics = json.load(f)
-    
+
     config = {
         "signal_timeframe": run_meta["data"]["timeframe"],
         "signal_timeframe_minutes": run_meta["params"]["timeframe_minutes"],
@@ -82,7 +82,7 @@ def task2_extract_config():
             "slippage_model": "Applied (see slippage columns in filled_orders)",
         }
     }
-    
+
     return config, run_meta, diagnostics
 
 def task3_timestamp_analysis():
@@ -90,15 +90,15 @@ def task3_timestamp_analysis():
     trades = pd.read_csv(BASE_PATH / "trades.csv")
     trades['entry_ts'] = pd.to_datetime(trades['entry_ts'], utc=True)
     trades['exit_ts'] = pd.to_datetime(trades['exit_ts'], utc=True)
-    
+
     # Extract minute distributions
     entry_minutes = trades['entry_ts'].dt.minute.value_counts().sort_index()
     exit_minutes = trades['exit_ts'].dt.minute.value_counts().sort_index()
-    
+
     # Load bars for signal grid validation
     bars_signal = pd.read_parquet(BASE_PATH / "bars" / "bars_signal_M5_rth.parquet")
     signal_minutes = bars_signal.index.minute.unique()
-    
+
     analysis = {
         "entry_minute_dist": entry_minutes.to_dict(),
         "exit_minute_dist": exit_minutes.to_dict(),
@@ -106,7 +106,7 @@ def task3_timestamp_analysis():
         "signal_grid_valid": all(m % 5 == 0 for m in signal_minutes),
         "exec_grid_valid": "M1 allows any minute (0-59)"
     }
-    
+
     return analysis, trades
 
 def task4_lineage_joins():
@@ -114,7 +114,7 @@ def task4_lineage_joins():
     orders = pd.read_csv(BASE_PATH / "orders.csv")
     filled_orders = pd.read_csv(BASE_PATH / "filled_orders.csv")
     trades = pd.read_csv(BASE_PATH / "trades.csv")
-    
+
     lineage = {
         "orders_count": len(orders),
         "filled_orders_count": len(filled_orders),
@@ -126,7 +126,7 @@ def task4_lineage_joins():
             "notes": "Each trade should have one filled_orders row with entry+exit info"
         }
     }
-    
+
     return lineage
 
 def task5_execution_validity(trades):
@@ -134,41 +134,41 @@ def task5_execution_validity(trades):
     # Sample trades
     sample_indices = []
     sample_indices.extend(trades.head(5).index.tolist())
-    
+
     winners = trades[trades['pnl'] > 0]
     losers = trades[trades['pnl'] < 0]
-    
+
     if len(winners) >= 5:
         sample_indices.extend(winners.sample(min(5, len(winners)), random_state=42).index.tolist())
     if len(losers) >= 5:
         sample_indices.extend(losers.sample(min(5, len(losers)), random_state=42).index.tolist())
-    
+
     sample_indices = list(set(sample_indices))  # Remove duplicates
-    
+
     # Load M1 bars (we have M5, will note this limitation)
     bars_exec = pd.read_parquet(BASE_PATH / "bars" / "bars_exec_M5_rth.parquet")
-    
+
     proof_rows = []
     for idx in sample_indices:
         trade = trades.iloc[idx]
         entry_ts = pd.to_datetime(trade['entry_ts'], utc=True)
         exit_ts = pd.to_datetime(trade['exit_ts'], utc=True)
-        
+
         # Find closest bars (M5 resolution)
         entry_bar = bars_exec.loc[bars_exec.index >= entry_ts].iloc[0] if len(bars_exec.loc[bars_exec.index >= entry_ts]) > 0 else None
         exit_bar = bars_exec.loc[bars_exec.index >= exit_ts].iloc[0] if len(bars_exec.loc[bars_exec.index >= exit_ts]) > 0 else None
-        
+
         entry_valid = None
         exit_valid = None
-        
+
         if entry_bar is not None:
             entry_price = trade['entry_price']
             entry_valid = entry_bar['low'] <= entry_price <= entry_bar['high']
-        
+
         if exit_bar is not None:
             exit_price = trade['exit_price']
             exit_valid = exit_bar['low'] <= exit_price <= exit_bar['high']
-        
+
         proof_rows.append({
             "trade_idx": idx,
             "entry_ts": entry_ts,
@@ -185,24 +185,24 @@ def task5_execution_validity(trades):
             "proof_status": "PASS" if (entry_valid and exit_valid) else "PARTIAL" if (entry_valid or exit_valid) else "FAIL",
             "notes": "Using M5 bars (M1 not available)"
         })
-    
+
     return pd.DataFrame(proof_rows)
 
 def task6_rth_enforcement():
     """Task 6: RTH-Only Enforcement Proof"""
     bars_exec = pd.read_parquet(BASE_PATH / "bars" / "bars_exec_M5_rth.parquet")
     bars_exec_ny = bars_exec.index.tz_convert('America/New_York')
-    
+
     hours = bars_exec_ny.hour.unique()
     minutes = bars_exec_ny.minute.unique()
-    
+
     # Check time ranges
     min_time = f"{bars_exec_ny.hour.min():02d}:{bars_exec_ny.minute.min():02d}"
     max_time = f"{bars_exec_ny.hour.max():02d}:{bars_exec_ny.minute.max():02d}"
-    
+
     # Count by hour
     hour_counts = bars_exec_ny.hour.value_counts().sort_index()
-    
+
     rth_check = {
         "min_time": min_time,
         "max_time": max_time,
@@ -211,12 +211,12 @@ def task6_rth_enforcement():
         "violations": [],
         "rth_compliant": all((9 <= h < 16) for h in hours)
     }
-    
+
     # Check for violations
     for h in hours:
         if h < 9 or h >= 16:
             rth_check["violations"].append(f"Hour {h} outside RTH (09:30-16:00)")
-    
+
     return rth_check
 
 def task7_risk_assessment(trades, bars_exec):
@@ -225,7 +225,7 @@ def task7_risk_assessment(trades, bars_exec):
     tp_trades = trades[trades['reason'] == 'TP']
     sl_trades = trades[trades['reason'] == 'SL']
     eod_trades = trades[trades['reason'] == 'EOD']
-    
+
     risk_assessment = {
         "trade_distribution": {
             "total": int(len(trades)),
@@ -250,15 +250,15 @@ def task7_risk_assessment(trades, bars_exec):
             "note": "Sampled trades pass M5 bar range check - need M1 for full validation"
         }
     }
-    
+
     return risk_assessment
 
 def generate_markdown_report(inventory, config, timestamp_analysis, lineage, proof_df, rth_check, risk):
     """Generate comprehensive markdown report"""
     report = f"""# Trade Verification Audit Report
 
-**Run ID**: {RUN_ID}  
-**Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
+**Run ID**: {RUN_ID}
+**Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 **Status**: ✅ AUDIT COMPLETE
 
 ---
@@ -342,7 +342,7 @@ Distribution of minutes in `exit_ts` (top 10):
 
 ### Conclusion
 
-✅ **Signal timestamps align to M5 grid** (0, 5, 10, 15, ... minutes)  
+✅ **Signal timestamps align to M5 grid** (0, 5, 10, 15, ... minutes)
 ✅ **Execution times show varied minutes** confirming M1 execution (e.g., :25, :35, :40, :45, :50)
 
 ---
@@ -386,7 +386,7 @@ Sampled {len(proof_df)} trades for validation:
 
 ### Conclusion
 
-⚠️ **Validation limited to M5 bars** - fills within M5 bar ranges  
+⚠️ **Validation limited to M5 bars** - fills within M5 bar ranges
 🔍 **Recommendation**: Generate M1 execution bars for exact fill validation
 
 ---
@@ -458,7 +458,7 @@ Sampled {len(proof_df)} trades for validation:
 
 This report was generated by: `scripts/audit_trade_verification.py`
 """
-    
+
     return report
 
 def _format_minute_dist(dist):
@@ -480,55 +480,55 @@ def _format_violations(violations):
 
 def main():
     print(f"Starting Trade Verification Audit for {RUN_ID}...")
-    
+
     # Task 1: Inventory
     print("Task 1: Artifact Inventory...")
     inventory = task1_inventory()
-    
+
     # Task 2: Config
     print("Task 2: Extract Configuration...")
     config, run_meta, diagnostics = task2_extract_config()
-    
+
     # Task 3: Timestamps
     print("Task 3: Timestamp Analysis...")
     timestamp_analysis, trades = task3_timestamp_analysis()
-    
+
     # Task 4: Lineage
     print("Task 4: Lineage Joins...")
     lineage = task4_lineage_joins()
-    
+
     # Task 5: Execution Validity
     print("Task 5: Execution Validity Proof...")
     proof_df = task5_execution_validity(trades)
-    
+
     # Task 6: RTH Enforcement    print("Task 6: RTH Enforcement...")
     bars_exec = pd.read_parquet(BASE_PATH / "bars" / "bars_exec_M5_rth.parquet")
     rth_check = task6_rth_enforcement()
-    
+
     # Task 7: Risk Assessment
     print("Task 7: Risk Assessment...")
     risk = task7_risk_assessment(trades, bars_exec)
-    
+
     # Generate reports
     print("Generating reports...")
     markdown_report = generate_markdown_report(
-        inventory, config, timestamp_analysis, lineage, 
+        inventory, config, timestamp_analysis, lineage,
         proof_df, rth_check, risk
     )
-    
+
     # Save markdown report
     report_md_path = REPORT_PATH / f"trade_verification_audit_{RUN_ID}.md"
     with open(report_md_path, 'w') as f:
         f.write(markdown_report)
-    
+
     # Save CSV proof
     proof_csv_path = REPORT_PATH / f"trade_verification_proof_{RUN_ID}.csv"
     proof_df.to_csv(proof_csv_path, index=False)
-    
+
     print(f"\n✅ Audit Complete!")
     print(f"- Report: {report_md_path}")
     print(f"- Proof CSV: {proof_csv_path}")
-    
+
     # Executive summary
     print(f"\n### Executive Summary")
     print(f"- ✅ Artifacts: {len(inventory[inventory['exists'] == 'Yes'])}/{len(inventory)}")

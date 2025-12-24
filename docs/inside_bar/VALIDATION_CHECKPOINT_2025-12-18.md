@@ -1,8 +1,8 @@
 # InsideBar SSOT - Final Validation Report
 
-**Date:** 2025-12-18 19:02 CET  
-**Commit:** `3c870db` (Phases 2-5 complete)  
-**Branch:** `feature/enterprise-metadata-ssot`  
+**Date:** 2025-12-18 19:02 CET
+**Commit:** `3c870db` (Phases 2-5 complete)
+**Branch:** `feature/enterprise-metadata-ssot`
 **Run Analyzed:** `artifacts/backtests/TSLA_AUDIT_WITH_DEBUG/`
 
 ---
@@ -384,7 +384,7 @@ rg -n "inside_bar_v2|insidebar_intraday_v2" --no-heading
 # File counts
 wc -l artifacts/backtests/TSLA_AUDIT_WITH_DEBUG/*.csv
 
-# Trace analysis  
+# Trace analysis
 grep -c "naive_timestamp" debug/inside_bar_trace.jsonl
 
 # Run metadata
@@ -393,9 +393,9 @@ cat diagnostics.json | jq '{strategy_key, timeframe, tz}'
 
 ---
 
-**Report Generated:** 2025-12-18 19:02 CET  
-**Validator:** Antigravity AI  
+**Report Generated:** 2025-12-18 19:02 CET
+**Validator:** Antigravity AI
 **Recommendation:** Cleanup → Revalidate → Merge
 
-**Sign-off:** Implementation is **functionally correct** and achieves **core objective** (fills > 0).  
+**Sign-off:** Implementation is **functionally correct** and achieves **core objective** (fills > 0).
 **Next Step:** Execute cleanup script, then final validation run.

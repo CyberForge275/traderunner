@@ -485,4 +485,3 @@ def get_rudometkin_candidates(run_name: str) -> pd.DataFrame:
 
     df._source_path = latest  # type: ignore[attr-defined]
     return df
-

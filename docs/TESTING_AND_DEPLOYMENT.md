@@ -88,9 +88,9 @@ SUMMARY:
 ```bash
 cd /home/mirko/data/workspace/automatictrader-api
 sqlite3 data/automatictrader.db << EOF
-SELECT id, symbol, side, quantity, status, created_at 
-FROM order_intents 
-ORDER BY id DESC 
+SELECT id, symbol, side, quantity, status, created_at
+FROM order_intents
+ORDER BY id DESC
 LIMIT 10;
 EOF
 ```

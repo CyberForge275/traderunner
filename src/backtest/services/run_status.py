@@ -36,7 +36,7 @@ class FailureReason(Enum):
 class RunResult:
     """
     Immutable result of backtest run.
-    
+
     Attributes:
         run_id: Unique run identifier
         status: Terminal status (SUCCESS / FAILED_PRECONDITION / ERROR)
@@ -49,7 +49,7 @@ class RunResult:
     reason: Optional[FailureReason] = None
     details: Optional[Dict[str, Any]] = None
     error_id: Optional[str] = None
-    
+
     def to_dict(self):
         """Convert to dict for serialization."""
         return {

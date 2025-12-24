@@ -9,7 +9,7 @@ strategies:
     description: "Inside bar pattern with ATR-based breakouts"
     latest_stable: "2.0.0"
     latest_testing: null
-    
+
     versions:
       "2.0.0":
         status: production

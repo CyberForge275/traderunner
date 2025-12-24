@@ -30,7 +30,7 @@ Check if real data sources are available:
 # Check signals database
 sqlite3 ~/data/workspace/droid/marketdata-stream/data/signals.db ".schema signals"
 
-# Check trading database  
+# Check trading database
 sqlite3 ~/data/workspace/automatictrader-api/data/trading.db ".schema order_intents"
 ```
 

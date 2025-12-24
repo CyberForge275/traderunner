@@ -212,10 +212,10 @@ ssh -L 5900:localhost:5900 mirko@192.168.178.55
 
 ## Summary
 
-✅ **No full X-Server or GUI needed**  
-✅ **Runs completely in background**  
-✅ **Xvfb provides virtual display**  
-✅ **IBC handles auto-login and session management**  
-✅ **Systemd manages service lifecycle**  
+✅ **No full X-Server or GUI needed**
+✅ **Runs completely in background**
+✅ **Xvfb provides virtual display**
+✅ **IBC handles auto-login and session management**
+✅ **Systemd manages service lifecycle**
 
 This setup is perfect for headless servers!

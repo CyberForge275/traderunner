@@ -1,7 +1,7 @@
 # BACKTESTING CONTRACT TEST PLAN
 
-**Status:** Test Strategy & Enforcement Plan  
-**Companion Doc:** [BACKTESTING_INTERFACE_CONTRACT.md](./BACKTESTING_INTERFACE_CONTRACT.md)  
+**Status:** Test Strategy & Enforcement Plan
+**Companion Doc:** [BACKTESTING_INTERFACE_CONTRACT.md](./BACKTESTING_INTERFACE_CONTRACT.md)
 **Purpose:** Define comprehensive test coverage to enforce contract compliance forever.
 
 ---
@@ -37,7 +37,7 @@ def generate_synthetic_rth_bars(
     - Known entry/TP/SL touch points
     - Consistent timezone (market_tz)
     - No pre/post market data
-    
+
     Returns DataFrame with columns: ts, open, high, low, close, volume
     """
 ```
@@ -263,7 +263,7 @@ assert exit_fill.exit_reason == "SL"  # Conservative: SL wins
 ```python
 for fill in all_fills:
     exec_bar = exec_bars.loc[fill.bar_ts_exec]
-    
+
     assert exec_bar.low <= fill.fill_price <= exec_bar.high
     # Or if slippage model allows push beyond:
     assert within_slippage_tolerance(fill.fill_price, exec_bar, slippage_model)
@@ -344,7 +344,7 @@ for trade in trades:
         (filled_orders.trade_id == trade.trade_id) &
         (filled_orders.fill_type == "EXIT")
     ]
-    
+
     assert len(entry_fills) == 1, f"Trade {trade.trade_id} has {len(entry_fills)} entries"
     assert len(exit_fills) == 1, f"Trade {trade.trade_id} has {len(exit_fills)} exits"
 ```
@@ -490,16 +490,16 @@ if signal_tf == "D1":
 ```python
 for fill in filled_orders[filled_orders.fill_type == "ENTRY"].itertuples():
     order = orders[orders.order_id == fill.order_id].iloc[0]
-    
+
     # Get all bars between valid_from and fill_ts
     eligible_bars = exec_bars[order.valid_from_ts : fill.fill_ts]
-    
+
     # Verify fill_ts is earliest bar where touch condition met
     if order.side == "LONG":
         earlier_touches = eligible_bars[eligible_bars.high >= order.entry_level]
     else:
         earlier_touches = eligible_bars[eligible_bars.low <= order.entry_level]
-    
+
     assert earlier_touches.index[0] == fill.bar_ts_exec
 ```
 
@@ -518,7 +518,7 @@ for fill in filled_orders[filled_orders.fill_type == "ENTRY"].itertuples():
 ```python
 for fill in filled_orders.itertuples():
     exec_bar = exec_bars.loc[fill.bar_ts_exec]
-    
+
     assert exec_bar.low <= fill.fill_price <= exec_bar.high, \
         f"Fill {fill.fill_id} price {fill.fill_price} outside bar [{exec_bar.low}, {exec_bar.high}]"
 ```
@@ -543,7 +543,7 @@ for order in orders.itertuples():
         order.valid_to_ts,
         order.entry_level
     )
-    
+
     assert order.order_id == recomputed_id
 ```
 
@@ -560,14 +560,14 @@ for order in orders.itertuples():
 # Every trade has exactly 1 entry, 1 exit
 for trade in trades.itertuples():
     entries = filled_orders[
-        (filled_orders.trade_id == trade.trade_id) & 
+        (filled_orders.trade_id == trade.trade_id) &
         (filled_orders.fill_type == "ENTRY")
     ]
     exits = filled_orders[
-        (filled_orders.trade_id == trade.trade_id) & 
+        (filled_orders.trade_id == trade.trade_id) &
         (filled_orders.fill_type == "EXIT")
     ]
-    
+
     assert len(entries) == 1
     assert len(exits) == 1
 ```
@@ -589,7 +589,7 @@ for trade in trades.itertuples():
     assert trade.evidence_status in ["PASS", "WARN", "FAIL"]
     assert isinstance(trade.evidence_codes, str)
     assert len(trade.evidence_codes) > 0
-    
+
     # Verify codes are from canonical list
     for code in trade.evidence_codes.split(","):
         assert code.strip() in CANONICAL_EVIDENCE_CODES
@@ -620,7 +620,7 @@ service_modules = [
 
 for module_path in service_modules:
     source = read_file(module_path)
-    
+
     # Forbidden imports
     assert "from trading_dashboard.layouts" not in source
     assert "from trading_dashboard.callbacks" not in source
@@ -644,7 +644,7 @@ callback_files = glob("trading_dashboard/callbacks/*.py")
 
 for callback_file in callback_files:
     source = read_file(callback_file)
-    
+
     # Callbacks should delegate, not compute
     assert "def calculate_" not in source  # Computation should be in service
     assert "pd.DataFrame" in source implies "service." in source  # DataFrames from services
@@ -669,7 +669,7 @@ consumer_modules = glob("trading_dashboard/repositories/*.py")
 
 for module_path in consumer_modules:
     source = read_file(module_path)
-    
+
     # Repositories should only read artifacts
     assert ".to_csv(" not in source  # No writing
     assert ".to_parquet(" not in source
@@ -696,31 +696,31 @@ jobs:
   contract-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      
+
       - name: Install dependencies
         run: |
           pip install -r requirements-test.txt
-      
+
       - name: Run Contract Unit Tests
         run: |
           pytest tests/contract/unit/ -v --tb=short
-      
+
       - name: Run Contract Integration Tests
         run: |
           pytest tests/contract/integration/ -v --tb=short
-      
+
       - name: Run Architecture Separation Tests
         run: |
           pytest tests/architecture/ -v --tb=short
-      
+
       - name: Contract Compliance Report
         if: failure()
         run: |
@@ -786,7 +786,7 @@ tests/
 **Assertions:**
 ```python
 tp_fills_long = filled_orders[
-    (filled_orders.exit_reason == "TP") & 
+    (filled_orders.exit_reason == "TP") &
     (filled_orders.side == "LONG")
 ]
 
@@ -826,9 +826,9 @@ for trade in trades.itertuples():
         (filled_orders.trade_id == trade.trade_id) &
         (filled_orders.fill_type == "ENTRY")
     ].iloc[0]
-    
+
     signal_bar_close_ts = order.created_from_ts + signal_tf_timedelta
-    
+
     assert entry_fill.fill_ts > signal_bar_close_ts, \
         f"Lookahead: Entry fill {entry_fill.fill_ts} before signal close {signal_bar_close_ts}"
 ```
@@ -890,6 +890,6 @@ Some evidence checks should warn but not fail builds:
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** 2025-12-24  
+**Document Version:** 1.0
+**Last Updated:** 2025-12-24
 **Maintaining Team:** Trading Platform Engineering

@@ -23,17 +23,17 @@ def test_normalize_handles_duplicate_open_columns():
         'Close': [103.0, 104.0, 105.0],
         'Volume': [1000, 2000, 3000]
     })
-    
+
     result = _normalize_ohlcv_frame(df, target_tz='America/New_York', symbol='TEST')
-    
+
     # Should have only lowercase columns
     assert list(result.columns) == ['open', 'high', 'low', 'close', 'volume']
-    
+
     # Should have merged data from both Open and open
     assert result['open'].iloc[0] == 100.0  # From Open
     assert result['open'].iloc[1] == 101.0  # From open
     assert result['open'].iloc[2] == 102.0  # From open
-    
+
     # Metadata should indicate duplicates were found
     assert result.attrs.get('ohlcv_had_duplicates') == True
 
@@ -55,18 +55,18 @@ def test_normalize_handles_all_duplicate_columns():
         'close': [np.nan, 104.0],
         'volume': [np.nan, 2000.0],
     })
-    
+
     result = _normalize_ohlcv_frame(df, target_tz='America/New_York', symbol='DUPES')
-    
+
     # All columns should be lowercase
     assert set(result.columns) == {'open', 'high', 'low', 'close', 'volume'}
-    
+
     # Data should be merged correctly
     assert result['open'].iloc[0] == 100.0
     assert result['open'].iloc[1] == 101.0
     assert result['high'].iloc[0] == 105.0
     assert result['high'].iloc[1] == 106.0
-    
+
     # Should have 5 merge operations logged in metadata
     assert result.attrs.get('ohlcv_had_duplicates') == True
 
@@ -81,9 +81,9 @@ def test_normalize_lowercase_only_no_duplicates():
         'close': [103.0, 104.0],
         'volume': [1000, 2000]
     })
-    
+
     result = _normalize_ohlcv_frame(df, target_tz='America/New_York', symbol='CLEAN')
-    
+
     assert list(result.columns) == ['open', 'high', 'low', 'close', 'volume']
     assert result.attrs.get('ohlcv_had_duplicates') == False
     assert result['open'].iloc[0] == 100.0
@@ -100,16 +100,16 @@ def test_normalize_uppercase_only_gets_renamed():
         'Close': [103.0, 104.0],
         'Volume': [1000, 2000]
     })
-    
+
     result = _normalize_ohlcv_frame(df, target_tz='America/New_York', symbol='UPPER')
-    
+
     # Should have lowercase columns
     assert list(result.columns) == ['open', 'high', 'low', 'close', 'volume']
-    
+
     # Data should be preserved
     assert result['open'].iloc[0] == 100.0
     assert result['close'].iloc[1] == 104.0
-    
+
     # No duplicates since only uppercase existed
     assert result.attrs.get('ohlcv_had_duplicates') == False
 
@@ -124,13 +124,13 @@ def test_normalize_preserves_timezone():
         'close': [103.0],
         'volume': [1000]
     })
-    
+
     result = _normalize_ohlcv_frame(df, target_tz='America/New_York', symbol='TZ_TEST')
-    
+
     # Index should be timezone-aware
     assert result.index.tz is not None
     assert str(result.index.tz) == 'America/New_York'
-    
+
     # 14:30 UTC = 09:30 EST (winter) or 10:30 EDT (summer)
     # Just verify it's in NY timezone
     ny_time = result.index[0]
@@ -147,21 +147,21 @@ def test_normalize_calculates_nan_stats():
         'close': [103.0, 104.0, 105.0, np.nan],
         'volume': [1000, 2000, 3000, 4000]
     })
-    
+
     result = _normalize_ohlcv_frame(df, target_tz='America/New_York', symbol='NAN_TEST')
-    
+
     # Check NaN stats in metadata
     nan_stats = result.attrs.get('ohlcv_nan_stats', {})
-    
+
     assert nan_stats['open']['count'] == 1
     assert nan_stats['open']['pct'] == 25.0
-    
+
     assert nan_stats['high']['count'] == 1
     assert nan_stats['high']['pct'] == 25.0
-    
+
     assert nan_stats['low']['count'] == 0
     assert nan_stats['low']['pct'] == 0.0
-    
+
     assert nan_stats['close']['count'] == 1
     assert nan_stats['close']['pct'] == 25.0
 
@@ -170,20 +170,20 @@ if __name__ == "__main__":
     # Run tests
     test_normalize_handles_duplicate_open_columns()
     print("✓ test_normalize_handles_duplicate_open_columns PASSED")
-    
+
     test_normalize_handles_all_duplicate_columns()
     print("✓ test_normalize_handles_all_duplicate_columns PASSED")
-    
+
     test_normalize_lowercase_only_no_duplicates()
     print("✓ test_normalize_lowercase_only_no_duplicates PASSED")
-    
+
     test_normalize_uppercase_only_gets_renamed()
     print("✓ test_normalize_uppercase_only_gets_renamed PASSED")
-    
+
     test_normalize_preserves_timezone()
     print("✓ test_normalize_preserves_timezone PASSED")
-    
+
     test_normalize_calculates_nan_stats()
     print("✓ test_normalize_calculates_nan_stats PASSED")
-    
+
     print("\nAll OHLCV normalization tests PASSED!")

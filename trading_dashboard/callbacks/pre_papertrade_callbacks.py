@@ -25,7 +25,7 @@ def register_pre_papertrade_callbacks(app):
     def toggle_time_machine(mode):
         """Toggle Time Machine visibility and update mode description."""
         from dash import html
-        
+
         if mode == "replay":
             return (
                 {"display": "block"},
@@ -51,20 +51,20 @@ def register_pre_papertrade_callbacks(app):
     def update_strategy_description(strategy):
         """Update strategy description when selection changes."""
         from dash import html
-        
+
         # Hardcoded strategy descriptions (avoid import issues)
         strategy_descriptions = {
             "insidebar_intraday": "InsideBar Intraday - Pattern breakout strategy (V1)",
             "insidebar_intraday_v2": "InsideBar Intraday v2 - Enhanced pattern breakout with strict filtering (V2)",
             "rudometkin_moc_mode": "Rudometkin MOC - Market-On-Close mean reversion system",
         }
-        
+
         if not strategy:
             return html.Small("Select a strategy", className="text-muted")
-        
+
         # Extract base strategy key (handle "strategy|version" format)
         base_strategy = strategy.split("|")[0] if "|" in strategy else strategy
-        
+
         description = strategy_descriptions.get(base_strategy, f"Strategy: {base_strategy.replace('_', ' ').title()}")
         return html.Small(description, className="text-muted")
 
@@ -75,7 +75,7 @@ def register_pre_papertrade_callbacks(app):
     def load_past_runs(_):
         """Load list of past Pre-PaperTrade test runs."""
         from ..repositories.pre_papertrade import get_past_runs
-        
+
         try:
             past_runs = get_past_runs()
             options = [
@@ -88,7 +88,7 @@ def register_pre_papertrade_callbacks(app):
             return options
         except Exception:
             return []
-    
+
     @app.callback(
         Output("technical-details-collapse", "is_open"),
         Input("technical-details-toggle", "n_clicks"),
@@ -165,13 +165,13 @@ def register_pre_papertrade_callbacks(app):
             # Parse combined strategy|version value
             strategy_name = strategy
             version = None
-            
+
             if strategy and "|" in strategy:
                 # Format: "strategy_id|version"
                 parts = strategy.split("|", 1)
                 strategy_name = parts[0]
                 version = parts[1]
-            
+
             # Validate inputs
             if not symbols_str or not symbols_str.strip():
                 return (
@@ -214,23 +214,23 @@ def register_pre_papertrade_callbacks(app):
                                 True,  # Disable interval
                                 [],  # Empty run history on error
                             )
-                    
+
                     # NEW: Lifecycle Integration for InsideBar Intraday
                     # Resolve strategy version for lifecycle tracking
                     strategy_version_id = None
                     version_metadata = None
-                    
+
                     if strategy_name == "insidebar_intraday":
                         try:
                             from trading_dashboard.utils.version_resolver import (
                                 resolve_pre_paper_version,
                                 format_version_for_ui
                             )
-                            
+
                             resolved_version = resolve_pre_paper_version(strategy_name)
                             strategy_version_id = resolved_version.id
                             version_metadata = format_version_for_ui(resolved_version)
-                            
+
                         except Exception as e:
                             # Version resolution failed - show clear error
                             from dash import html
@@ -251,7 +251,7 @@ def register_pre_papertrade_callbacks(app):
                                 True,  # Disable interval
                                 [],  # Empty run history on error
                             )
-                    
+
                     if mode == "live":
                         # Live mode
                         result = adapter.execute_strategy(
@@ -278,7 +278,7 @@ def register_pre_papertrade_callbacks(app):
 
                     if result["status"] == "completed":
                         signals = result.get("signals", [])
-                        
+
                         # Format signals for table
                         table_data = [
                             {
@@ -292,16 +292,16 @@ def register_pre_papertrade_callbacks(app):
                             }
                             for s in signals
                         ]
-                        
+
                         # Count by side
                         buy_count = sum(1 for s in signals if s["side"] == "BUY")
                         sell_count = sum(1 for s in signals if s["side"] == "SELL")
-                        
-                        
+
+
                         # Build success message with improved contrast
                         from dash import html
                         from trading_dashboard.utils.run_summary_utils import build_run_summary
-                        
+
                         # Main success header with better contrast
                         status_header = html.Div([
                             html.H5(
@@ -309,7 +309,7 @@ def register_pre_papertrade_callbacks(app):
                                 className="mb-0 text-success"
                             )
                         ], className="p-3 bg-success-subtle border border-success rounded")
-                        
+
                         # Build comprehensive run summary
                         run_summary = build_run_summary(
                             result=result,
@@ -321,10 +321,10 @@ def register_pre_papertrade_callbacks(app):
                             session_filter_input=session_filter_input,
                             show_technical_details=True
                         )
-                        
+
                         # Combine header and summary
                         status_parts = [status_header] + run_summary
-                        
+
                         return (
                             status_parts,
                             "light",  # Changed from "success" for better contrast
@@ -364,7 +364,7 @@ def register_pre_papertrade_callbacks(app):
         if triggered_id == "pre-papertrade-interval":
             # Refresh signal statistics
             df = get_signals_summary(source="pre_papertrade_replay")
-            
+
             if df.empty:
                 return (
                     "No signals in database",

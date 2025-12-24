@@ -25,16 +25,16 @@ logger = logging.getLogger(__name__)
 class CandleDataAdapter:
     """
     Intelligent candle data adapter that routes requests to the appropriate source.
-    
+
     Rules:
     - Today's date: Load from market_data.db (live websocket data)
     - Historic dates: Load from parquet files (backtesting/mock data)
     - Fallback: Try both sources, merge if necessary
     """
-    
+
     def __init__(self):
         self.logger = logging.getLogger(f"{__name__}.CandleDataAdapter")
-    
+
     def get_candles(
         self,
         symbol: str,
@@ -45,53 +45,53 @@ class CandleDataAdapter:
     ) -> pd.DataFrame:
         """
         Get candle data from the appropriate source based on context.
-        
+
         Args:
             symbol: Stock symbol
             timeframe: Candle interval (M1, M5, M15, H1)
             reference_date: Date to get data for (default: today)
             hours: Hours of data to retrieve
             limit: Maximum candles to return
-            
+
         Returns:
             DataFrame with candle data (may be empty)
         """
         if reference_date is None:
             reference_date = date.today()
-        
+
         self.logger.info(f"📊 Fetching {symbol} {timeframe} for {reference_date}")
-        
+
         # Determine strategy based on date
         is_today = reference_date == date.today()
-        
+
         if is_today:
             self.logger.info("   Context: TODAY → trying database (websocket data)")
             df = self._get_from_database(symbol, timeframe, reference_date, limit)
-            
+
             if not df.empty:
                 self.logger.info(f"   ✅ Loaded {len(df)} candles from database")
                 return df
-            
+
             self.logger.info("   Database empty, trying parquet fallback...")
             df = self._get_from_parquet(symbol, timeframe, reference_date, hours)
-            
+
             if not df.empty:
                 self.logger.info(f"   ✅ Loaded {len(df)} candles from parquet (fallback)")
             else:
                 self.logger.warning(f"   ❌ No data found in database or parquet for {symbol}")
-            
+
             return df
         else:
             self.logger.info("   Context: HISTORIC → loading from parquet")
             df = self._get_from_parquet(symbol, timeframe, reference_date, hours)
-            
+
             if not df.empty:
                 self.logger.info(f"   ✅ Loaded {len(df)} candles from parquet")
             else:
                 self.logger.warning(f"   ❌ No parquet data for {symbol} on {reference_date}")
-            
+
             return df
-    
+
     def _get_from_database(
         self,
         symbol: str,
@@ -106,7 +106,7 @@ class CandleDataAdapter:
         except Exception as e:
             self.logger.error(f"   Error loading from database: {e}")
             return pd.DataFrame()
-    
+
     def _get_from_parquet(
         self,
         symbol: str,
@@ -121,17 +121,17 @@ class CandleDataAdapter:
         except Exception as e:
             self.logger.error(f"   Error loading from parquet: {e}")
             return pd.DataFrame()
-    
+
     def get_availability_info(self, query_date: Optional[date] = None) -> dict:
         """
         Check which data sources are available for a given date.
-        
+
         Returns:
             dict with 'database' and 'parquet' availability info
         """
         if query_date is None:
             query_date = date.today()
-        
+
         result = {
             'date': query_date,
             'is_today': query_date == date.today(),
@@ -139,7 +139,7 @@ class CandleDataAdapter:
             'parquet_available': False,
             'recommended_source': None
         }
-        
+
         # Check database (only for today)
         if result['is_today']:
             try:
@@ -150,12 +150,12 @@ class CandleDataAdapter:
                 result['database_timeframes'] = db_check.get('timeframes', [])
             except Exception as e:
                 self.logger.error(f"Error checking database: {e}")
-        
+
         # Check parquet (always check for fallback)
         # Note: This would need implementation in candles.py
         # For now, we'll assume parquet might be available
         result['parquet_available'] = True  # Simplified
-        
+
         # Determine recommendation
         if result['is_today'] and result['database_available']:
             result['recommended_source'] = 'database'
@@ -163,7 +163,7 @@ class CandleDataAdapter:
             result['recommended_source'] = 'parquet'
         else:
             result['recommended_source'] = None
-        
+
         return result
 
 

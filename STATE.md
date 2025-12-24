@@ -1,16 +1,16 @@
 # PROJECT STATE - Pre-INT Debug Deploy
 
-**Date:** 2025-12-19 12:30 CET  
+**Date:** 2025-12-19 12:30 CET
 **Purpose:** Audit-ready snapshot before November parity restoration and INT debug deployment
 
 ---
 
 ## Git State
 
-**Current Commit:** `a6a51fb`  
-**Branch:** `feature/enterprise-metadata-ssot`  
-**Backup Branch:** `backup/pre_int_debug_2025-12-19`  
-**Backup Tag:** `pre_int_debug_2025-12-19`  
+**Current Commit:** `a6a51fb`
+**Branch:** `feature/enterprise-metadata-ssot`
+**Backup Branch:** `backup/pre_int_debug_2025-12-19`
+**Backup Tag:** `pre_int_debug_2025-12-19`
 
 **Working Tree:** Clean ✅
 
@@ -68,7 +68,7 @@ Location: /home/mirko/data/workspace/droid/traderunner
 ### Key Dependencies (pip freeze extract)
 ```
 pandas==2.2.3
-numpy==2.2.1  
+numpy==2.2.1
 pytz==2025.1
 plotly==5.24.1
 dash==2.19.1
@@ -79,21 +79,21 @@ dash==2.19.1
 ## Known Issues
 
 ### 1. Session Filter Timezone Bug
-**Status:** Partially fixed (f9f90e0)  
-**Issue:** `is_in_session()` called without `tz` parameter → uses default Europe/Berlin  
-**Fix Applied:** Added `session_tz` parameter to final filter (line 619)  
+**Status:** Partially fixed (f9f90e0)
+**Issue:** `is_in_session()` called without `tz` parameter → uses default Europe/Berlin
+**Fix Applied:** Added `session_tz` parameter to final filter (line 619)
 **Remaining:** Pattern detection filter needs verification
 
 ### 2. INT vs DEV Divergence
-**Status:** Under investigation  
-**Symptom:** 50% of orders outside configured session windows on INT  
-**Local Test:** Session filter works correctly (0 orders outside windows)  
+**Status:** Under investigation
+**Symptom:** 50% of orders outside configured session windows on INT
+**Local Test:** Session filter works correctly (0 orders outside windows)
 **Hypothesis:** INT running different code version or config parsing issue
 
 ### 3. OHLCV Column Case Sensitivity
-**Status:** To be addressed  
-**Issue:** EODHD data has lowercase columns, some code expects uppercase  
-**Risk:** Duplicate columns (Open+open) or NaN propagation  
+**Status:** To be addressed
+**Issue:** EODHD data has lowercase columns, some code expects uppercase
+**Risk:** Duplicate columns (Open+open) or NaN propagation
 **Plan:** Enforce lowercase everywhere, add normalization guardrails
 
 ---
@@ -142,6 +142,6 @@ git status          # Should be: clean
 
 ---
 
-**Commit Hash (for audit):** `a6a51fb`  
-**Author:** mirko2175  
+**Commit Hash (for audit):** `a6a51fb`
+**Author:** mirko2175
 **State Captured:** 2025-12-19 12:30:00 CET

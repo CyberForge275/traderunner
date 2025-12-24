@@ -34,7 +34,7 @@ def get_trade_inspector_content():
                                 config={
                                     "displayModeBar": True,  # Show modebar for zoom/pan controls
                                     "modeBarButtonsToRemove": [
-                                        "select2d", 
+                                        "select2d",
                                         "lasso2d",
                                         "autoScale2d",
                                     ],
@@ -53,4 +53,3 @@ def get_trade_inspector_content():
             ])
         ],
     )
-

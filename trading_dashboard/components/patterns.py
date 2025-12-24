@@ -27,9 +27,9 @@ def create_pattern_item(row: dict):
     status = row.get("status", "detected")
     side = row.get("side", "BUY")
     entry = row.get("entry_price", 0.0)
-    
+
     side_color = "var(--accent-green)" if side == "BUY" else "var(--accent-red)"
-    
+
     return html.Div(
         className="order-flow-item",
         children=[
@@ -56,7 +56,7 @@ def create_patterns_panel(patterns_df: pd.DataFrame):
         items = [html.P("No patterns detected", className="text-muted", style={"padding": "20px"})]
     else:
         items = [create_pattern_item(row) for _, row in patterns_df.head(10).iterrows()]
-    
+
     return html.Div(
         className="dashboard-card",
         children=[

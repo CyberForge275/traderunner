@@ -14,15 +14,15 @@ __all__ = ["ChartBuilder"]
 class ChartBuilder(Protocol):
     """
     Protocol for chart builder implementations.
-    
+
     Chart builders take domain data (DataFrames, configs) and produce
     framework-specific chart objects.
     """
-    
+
     def build(self, *args: Any, **kwargs: Any) -> Any:
         """
         Build and return a chart figure.
-        
+
         Returns:
             Framework-specific chart object (e.g., go.Figure for Plotly)
         """

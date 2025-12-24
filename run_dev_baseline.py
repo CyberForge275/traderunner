@@ -30,7 +30,7 @@ config = {
     "valid_from_policy": "signal_ts",
 }
 
-# Data config  
+# Data config
 end_date = "2025-12-18"
 lookback_days = 6
 artifacts_root = Path("artifacts/backtests")
@@ -56,14 +56,14 @@ try:
         artifacts_root=artifacts_root,
         market_tz="America/New_York",
     )
-    
+
     print("\n" + "=" * 70)
     print("RUN COMPLETED")
     print("=" * 70)
     print(f"Status: {result.get('status', 'UNKNOWN')}")
     print(f"Run ID: {result.get('run_id', run_id)}")
     print(f"Artifacts: {artifacts_root / run_id}")
-    
+
     # Check for orders
     orders_path = artifacts_root / run_id / "orders.csv"
     if orders_path.exists():
@@ -76,9 +76,9 @@ try:
             print(orders[['valid_from', 'symbol', 'side', 'NY_time']].head())
     else:
         print("\n⚠️  No orders.csv generated")
-    
+
     print("\n" + "=" * 70)
-    
+
 except Exception as e:
     print(f"\n❌ ERROR: {e}")
     import traceback

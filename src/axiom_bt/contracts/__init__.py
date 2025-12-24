@@ -11,7 +11,7 @@ from .order_schema import OrderSchema
 
 __all__ = [
     'DailyFrameSpec',
-    'IntradayFrameSpec', 
+    'IntradayFrameSpec',
     'SignalOutputSpec',
     'OrderSchema'
 ]

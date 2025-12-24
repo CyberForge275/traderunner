@@ -11,7 +11,7 @@
 TradeRunner is an enhanced trading strategy framework designed to scale from single strategies to n-strategy implementations. Built with modern Python practices, it provides:
 
 - **🏗️ Scalable Architecture**: Protocol-based design for easy strategy expansion
-- **📊 Unified Signal Format**: Standardized signal interface across all strategies  
+- **📊 Unified Signal Format**: Standardized signal interface across all strategies
 - **🔧 Configuration Management**: Pydantic-based validation and schema generation
 - **🖥️ Dashboard Integration**: Streamlit-based monitoring and control interface
 - **🧪 Comprehensive Testing**: Quality-first development with automated checks

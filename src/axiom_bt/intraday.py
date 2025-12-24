@@ -17,25 +17,25 @@ logger = logging.getLogger(__name__)
 
 def get_eodhd_token_with_guard() -> str:
     """Get EODHD API token with strict validation.
-    
+
     Raises:
         ValueError: If token is missing or set to 'demo'
     """
     import os
     token = os.getenv("EODHD_API_TOKEN")
-    
+
     if not token:
         raise ValueError(
             "EODHD_API_TOKEN not found in environment. "
             "Configure token in /opt/trading/marketdata-stream/.env"
         )
-    
+
     if token.lower() == "demo":
         raise ValueError(
             "EODHD_API_TOKEN is set to 'demo'. "
             "This is forbidden. Use your actual API token."
         )
-    
+
     return token
 
 
@@ -46,17 +46,17 @@ def check_local_m1_coverage(
     tz: str = "America/New_York"
 ) -> dict:
     """Check how many days of M1 data are available locally and identify precise gaps.
-    
+
     This function determines exactly which data is missing by comparing the requested
     range against existing data. It returns precise gap boundaries to avoid re-fetching
     data that already exists.
-    
+
     Args:
         symbol: Stock symbol (e.g., "AAPL")
         start: Start date ISO format (e.g., "2024-09-28")
         end: End date ISO format (e.g., "2024-12-17")
         tz: Timezone for date calculations
-    
+
     Returns:
         Dict with keys:
             - available_days: int - Days of data currently in file
@@ -68,7 +68,7 @@ def check_local_m1_coverage(
                 - gap_start: str (ISO)
                 - gap_end: str (ISO)
                 - gap_days: int
-    
+
     Example:
         >>> # Existing data: 2024-12-01 to 2024-12-19
         >>> # Requested: 2024-10-01 to 2024-12-19
@@ -77,13 +77,13 @@ def check_local_m1_coverage(
         [{'gap_start': '2024-10-01', 'gap_end': '2024-11-30', 'gap_days': 61}]
     """
     from datetime import datetime, timedelta
-    
+
     m1_path = DATA_M1 / f"{symbol}.parquet"
-    
+
     requested_start = datetime.fromisoformat(start).date()
     requested_end = datetime.fromisoformat(end).date()
     requested_days = (requested_end - requested_start).days + 1
-    
+
     if not m1_path.exists():
         # No data at all - entire range is a gap
         return {
@@ -96,11 +96,11 @@ def check_local_m1_coverage(
                 "gap_days": requested_days
             }]
         }
-    
+
     # Load existing M1 data
     try:
         df = pd.read_parquet(m1_path)
-        
+
         # Get index in UTC (critical: keep in UTC for date() calculations)
         # EODHD provides UTC timestamps, so we extract dates in UTC
         if "timestamp" in df.columns:
@@ -122,16 +122,16 @@ def check_local_m1_coverage(
                     "gap_days": requested_days
                 }]
             }
-        
+
         # Get date range of existing data (in UTC!)
         # IMPORTANT: .date() on UTC time to avoid timezone shift bugs
         earliest = df_index_utc.min().date()
         latest = df_index_utc.max().date()
         available_days = (latest - earliest).days + 1
-        
+
         # Identify precise gaps
         gaps = []
-        
+
         # Gap 1: Before existing data (if requested_start < earliest)
         if requested_start < earliest:
             gap_end = earliest - timedelta(days=1)
@@ -142,7 +142,7 @@ def check_local_m1_coverage(
                 "gap_days": gap_days,
                 "reason": "before_existing_data"
             })
-        
+
         # Gap 2: After existing data (if requested_end > latest)
         if requested_end > latest:
             gap_start = latest + timedelta(days=1)
@@ -153,7 +153,7 @@ def check_local_m1_coverage(
                 "gap_days": gap_days,
                 "reason": "after_existing_data"
             })
-        
+
         # Build result
         result = {
             "available_days": available_days,
@@ -163,9 +163,9 @@ def check_local_m1_coverage(
             "latest_data": latest.isoformat(),
             "gaps": gaps
         }
-        
+
         return result
-    
+
     except Exception as e:
         logger.warning(f"Could not read {m1_path} for coverage check: {e}")
         # On error, assume entire range is gap to be safe
@@ -234,7 +234,7 @@ class IntradayStore:
         auto_fill_gaps: bool = True,
     ) -> Dict[str, List[str]]:
         """Ensure required intraday data exists on disk.
-        
+
         NEW: Now checks local coverage and auto-fills gaps from EODHD if enabled.
 
         Args:
@@ -242,7 +242,7 @@ class IntradayStore:
             force: Force rebuild even if cache exists
             use_sample: Use sample data (testing only)
             auto_fill_gaps: If True, automatically fetch missing data from EODHD
-            
+
         Returns:
             Dict mapping symbol -> list of actions taken
         """
@@ -260,7 +260,7 @@ class IntradayStore:
         for symbol in symbols:
             sym_actions: List[str] = []
             m1_path = DATA_M1 / f"{symbol}.parquet"
-            
+
             # NEW: Check coverage before deciding to fetch
             if not force and auto_fill_gaps:
                 coverage = check_local_m1_coverage(
@@ -269,7 +269,7 @@ class IntradayStore:
                     end=end_str,
                     tz=tz
                 )
-                
+
                 if coverage["has_gap"]:
                     # Gap(s) detected - fetch only missing data
                     logger.info(
@@ -277,13 +277,13 @@ class IntradayStore:
                         f"need {coverage['requested_days']} days. "
                         f"Found {len(coverage['gaps'])} gap(s)."
                     )
-                    
+
                     # Fetch each gap separately
                     # CRITICAL FIX: Skip weekend/holiday gaps (<=4 days)
                     # EODHD delivers only TRADING DAYS - weekend/holiday gaps are EXPECTED
                     # Only fetch gaps > 4 days which indicate actual missing trading data
                     MAX_EXPECTED_CALENDAR_GAP = 4
-                    
+
                     for gap in coverage["gaps"]:
                         # Skip small gaps (weekends, 3-day weekends, holiday closures)
                         if gap["gap_days"] <= MAX_EXPECTED_CALENDAR_GAP:
@@ -292,18 +292,18 @@ class IntradayStore:
                                 f"({gap['gap_days']} days) - likely weekend/holiday, within {MAX_EXPECTED_CALENDAR_GAP}d threshold"
                             )
                             continue
-                        
+
                         logger.info(
                             f"[{symbol}] Fetching gap: {gap['gap_start']} to {gap['gap_end']} "
                             f"({gap['gap_days']} days, reason: {gap.get('reason', 'unknown')})"
                         )
 
-                        
+
                         # Fetch gap data to temp location first
                         import tempfile
                         import shutil
                         temp_dir = Path(tempfile.mkdtemp(prefix="eodhd_gap_"))
-                        
+
                         try:
                             gap_path = fetch_intraday_1m_to_parquet(
                                 symbol=symbol,
@@ -316,16 +316,16 @@ class IntradayStore:
                                 save_raw=True,   # Save raw data with Pre/After-Market
                                 filter_rth=True, # Filter to RTH for final output
                             )
-                            
+
                             # Merge with existing data if file exists
                             if m1_path.exists():
                                 existing_df = pd.read_parquet(m1_path)
                                 gap_df = pd.read_parquet(gap_path)
-                                
+
                                 # Merge
                                 merged_df = pd.concat([existing_df, gap_df])
                                 merged_df = merged_df.sort_index().drop_duplicates()
-                                
+
                                 # Save merged result
                                 merged_df.to_parquet(m1_path)
                                 logger.info(
@@ -336,12 +336,12 @@ class IntradayStore:
                                 # No existing file, just move gap data
                                 shutil.move(str(gap_path), str(m1_path))
                                 logger.info(f"[{symbol}] Created new M1 file with gap data")
-                        
+
                         finally:
                             # Clean up temp dir
                             if temp_dir.exists():
                                 shutil.rmtree(temp_dir)
-                    
+
                     sym_actions.append(f"gap_fill_{len(coverage['gaps'])}_gaps_{sum(g['gap_days'] for g in coverage['gaps'])}_days")
                 else:
                     # Sufficient coverage
@@ -349,7 +349,7 @@ class IntradayStore:
                         f"[{symbol}] Sufficient M1 coverage: {coverage['available_days']} days"
                     )
                     sym_actions.append("use_cached_m1")
-            
+
             elif force or not m1_path.exists():
                 # Original behavior: force rebuild or doesn't exist
                 fetch_intraday_1m_to_parquet(
@@ -382,14 +382,14 @@ class IntradayStore:
             logger.info(f"[ensure] Summary for {len(symbols)} symbol(s):")
             for sym, acts in actions.items():
                 logger.info(f"  {sym}: {' → '.join(acts)}")
-                
+
                 # Log data quality for symbols that were fetched/filled
                 if any("fetch" in act or "gap_fill" in act for act in acts):
                     m1_file = DATA_M1 / f"{sym}.parquet"
                     if m1_file.exists():
                         try:
                             df_check = pd.read_parquet(m1_file)
-                            
+
                             # Get index
                             if "timestamp" in df_check.columns:
                                 idx = pd.to_datetime(df_check["timestamp"], utc=True).dt.tz_convert(tz)
@@ -399,7 +399,7 @@ class IntradayStore:
                                     idx = pd.to_datetime(idx, utc=True).dt.tz_convert(tz)
                                 else:
                                     idx = idx.tz_convert(tz)
-                            
+
                             # Quality checks
                             ohlc_cols = [c for c in ["open", "high", "low", "close", "Open", "High", "Low", "Close"] if c in df_check.columns]
                             if ohlc_cols:
@@ -407,10 +407,10 @@ class IntradayStore:
                                 nan_pct = (nan_count / len(df_check)) * 100 if len(df_check) > 0 else 0
                             else:
                                 nan_pct = 0
-                            
+
                             is_monotonic = idx.is_monotonic_increasing
                             is_unique = not idx.duplicated().any()
-                            
+
                             logger.info(
                                 f"  {sym} M1: {len(df_check)} rows, "
                                 f"NaN={nan_pct:.1f}%, "
@@ -441,7 +441,7 @@ class IntradayStore:
 
         # Load parquet file
         frame = pd.read_parquet(path)
-        
+
         # Load and normalize OHLCV
         df = _normalize_ohlcv_frame(frame, target_tz=tz or self._default_tz, symbol=symbol)
 
@@ -451,7 +451,7 @@ class IntradayStore:
             from axiom_bt.contracts import IntradayFrameSpec
             # Contract expects TitleCase columns, but we use lowercase internally
             validation_view = df.rename(columns={
-                "open": "Open", "high": "High", "low": "Low", 
+                "open": "Open", "high": "High", "low": "Low",
                 "close": "Close", "volume": "Volume"
             })
             IntradayFrameSpec.assert_valid(validation_view, tz=tz or self._default_tz)
@@ -531,12 +531,12 @@ def _normalize_ohlcv_frame(frame: pd.DataFrame, target_tz: str, symbol: str = "U
             had_duplicates = True
             cap_count = df[cap_name].notna().sum()
             low_count = df[low_name].notna().sum()
-            
+
             series = df[cap_name].fillna(df[low_name])
             source_name = cap_name
-            
+
             merge_log.append(f"{cap_name}({cap_count})+{low_name}({low_count})→{name}")
-            
+
         elif has_cap:
             series = df[cap_name]
             source_name = cap_name
@@ -560,19 +560,19 @@ def _normalize_ohlcv_frame(frame: pd.DataFrame, target_tz: str, symbol: str = "U
         nan_count = ordered[col].isna().sum()
         nan_pct = (nan_count / len(ordered) * 100) if len(ordered) > 0 else 0
         nan_stats[col] = {'count': nan_count, 'pct': nan_pct}
-    
+
     # DEBUG LOGGING
     logger.debug(
         f"[OHLCV_NORMALIZE] symbol={symbol} rows={len(ordered)} "
         f"columns_before={original_columns} columns_after={list(ordered.columns)} "
         f"had_duplicates={had_duplicates}"
     )
-    
+
     if merge_log:
         logger.info(
             f"[OHLCV_NORMALIZE] {symbol}: Merged duplicate columns: {', '.join(merge_log)}"
         )
-    
+
     if nan_stats:
         nan_summary = ", ".join([f"{k}={v['count']}({v['pct']:.1f}%)" for k, v in nan_stats.items() if v['count'] > 0])
         if nan_summary:

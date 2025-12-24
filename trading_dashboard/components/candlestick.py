@@ -17,7 +17,7 @@ def create_candlestick_chart(
 ):
     """
     Create an interactive candlestick chart with TradingView-style features.
-    
+
     Args:
         df: DataFrame with columns: timestamp, open, high, low, close, volume
         symbol: Symbol name for title
@@ -41,7 +41,7 @@ def create_candlestick_chart(
             font=dict(color='#f0f6fc')
         )
         return fig
-    
+
     # Create subplot with volume
     fig = make_subplots(
         rows=2, cols=1,
@@ -50,7 +50,7 @@ def create_candlestick_chart(
         row_heights=[0.7, 0.3],
         subplot_titles=(f"{symbol} - M5", "Volume")
     )
-    
+
     # Main candlestick chart
     fig.add_trace(
         go.Candlestick(
@@ -65,7 +65,7 @@ def create_candlestick_chart(
         ),
         row=1, col=1
     )
-    
+
     # Overlay live data if available
     if df_live is not None and not df_live.empty:
         fig.add_trace(
@@ -83,11 +83,11 @@ def create_candlestick_chart(
             ),
             row=1, col=1
         )
-    
+
     # Volume bars
-    colors = ['#3fb950' if close >= open else '#f85149' 
+    colors = ['#3fb950' if close >= open else '#f85149'
               for close, open in zip(df['close'], df['open'])]
-    
+
     fig.add_trace(
         go.Bar(
             x=df['timestamp'],
@@ -98,14 +98,14 @@ def create_candlestick_chart(
         ),
         row=2, col=1
     )
-    
+
     # Add Inside Bar pattern overlays
     if patterns is not None and not patterns.empty:
         for _, pattern in patterns.iterrows():
             # Highlight Inside Bar with yellow rectangle
             # Pattern markers (rectangles)
             pattern_timestamp = pd.to_datetime(pattern.get('detected_at', pattern.get('created_at')))
-            
+
             fig.add_shape(
                 type="rect",
                 xref="x", yref="y",
@@ -117,7 +117,7 @@ def create_candlestick_chart(
                 fillcolor='rgba(210, 153, 34, 0.1)',
                 row=1, col=1
             )
-    
+
     # Add entry/SL/TP lines
     if entry_price:
         fig.add_hline(
@@ -125,21 +125,21 @@ def create_candlestick_chart(
             annotation_text=f"Entry: ${entry_price:.2f}",
             row=1, col=1
         )
-    
+
     if stop_loss:
         fig.add_hline(
             y=stop_loss, line=dict(color='#f85149', dash='dash', width=2),
             annotation_text=f"SL: ${stop_loss:.2f}",
             row=1, col=1
         )
-    
+
     if take_profit:
         fig.add_hline(
             y=take_profit, line=dict(color='#58a6ff', dash='dash', width=2),
             annotation_text=f"TP: ${take_profit:.2f}",
             row=1, col=1
         )
-    
+
     # Update layout with dark theme and TradingView-style interactions
     fig.update_layout(
         template="plotly_dark",
@@ -174,7 +174,7 @@ def create_candlestick_chart(
             x=1
         )
     )
-    
+
     return fig
 
 

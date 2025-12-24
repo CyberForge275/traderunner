@@ -1,7 +1,7 @@
 # BACKTESTING INTERFACE CONTRACT (axiom_bt)
 
-**Status:** Normative Contract  
-**Audience:** Strategy authors, engine implementers, audit/verification tooling, dashboard consumers  
+**Status:** Normative Contract
+**Audience:** Strategy authors, engine implementers, audit/verification tooling, dashboard consumers
 **Primary Goal:** Make backtests bullet-proof, deterministic, auditable, and timezone/session consistent.
 
 ---
@@ -35,7 +35,7 @@ This contract is **strategy-agnostic**. Strategy-specific logic (Inside Bar, etc
 - **RTH (Regular Trading Hours):** 09:30–16:00 `market_tz` (unless instrument registry says otherwise).
 - **Pre/Aftermarket:** must be excluded from candle generation and backtest history by default.
 
-> **Invariant RTH-1:** Candle generation and backtesting must use RTH-only bars (no pre/post).  
+> **Invariant RTH-1:** Candle generation and backtesting must use RTH-only bars (no pre/post).
 > **Invariant RTH-2:** Any run that uses non-RTH data must explicitly declare it (`allow_extended_hours=true`) and must mark evidence as degraded.
 
 ### 1.3 Bar timestamp semantics
@@ -45,7 +45,7 @@ For a bar series with timeframe TF:
 - `ts` represents the bar start (left-labeled) in `market_tz` (or `storage_tz` but convertible).
 - The bar covers `[ts, ts+TF)`.
 
-> **Invariant BAR-1:** All bar series must explicitly declare `label` and `closed` behavior in run metadata (recommended: `label=left`, `closed=left` or `closed=right`, but must be consistent and documented).  
+> **Invariant BAR-1:** All bar series must explicitly declare `label` and `closed` behavior in run metadata (recommended: `label=left`, `closed=left` or `closed=right`, but must be consistent and documented).
 > **Invariant BAR-2:** Signal timestamps must align to the signal grid implied by the resampling.
 
 ### 1.4 Order execution semantics (touch rules)
@@ -57,7 +57,7 @@ Unless explicitly overridden by a strategy:
 - **Short TP** is hit if `bar_low <= tp_level`
 - **Short SL** is hit if `bar_high >= sl_level`
 
-> **Invariant EXEC-1 (Earliest-touch):** Entries and exits are executed on the **earliest bar** that satisfies the touch condition on the execution timeframe.  
+> **Invariant EXEC-1 (Earliest-touch):** Entries and exits are executed on the **earliest bar** that satisfies the touch condition on the execution timeframe.
 > **Invariant EXEC-2:** Fills must be price-plausible: the fill price must be within the bar's `[low, high]` (after applying slippage model rules if the model can push beyond). Any exception must be documented and flagged in evidence.
 
 ---
@@ -81,14 +81,14 @@ Unless explicitly overridden by a strategy:
 5. Execute on `exec_tf` using earliest-touch.
 6. Persist all artifacts (orders, fills, trades, bars, steps, meta).
 
-> **Invariant INTRA-1:** If `exec_tf` is M1, fill timestamps may occur at any minute during RTH.  
+> **Invariant INTRA-1:** If `exec_tf` is M1, fill timestamps may occur at any minute during RTH.
 > **Invariant INTRA-2:** Signal timestamps must align to `signal_tf` grid.
 
 ### 2.2 DAYTRADING Mode
 
 Same as INTRADAY, plus:
 
-> **Invariant DAY-1:** No positions may remain open beyond the trading day (RTH end) unless explicitly configured.  
+> **Invariant DAY-1:** No positions may remain open beyond the trading day (RTH end) unless explicitly configured.
 > **Invariant DAY-2:** If neither TP nor SL is hit intraday, exit must occur via EOD policy (e.g., close at last exec bar or defined EOD time).
 
 ### 2.3 HYBRID Daily→Intraday Mode (Final Decision)
@@ -115,7 +115,7 @@ On day D+1 during RTH only:
 - SL/TP monitored on `exec_tf` using earliest-touch semantics.
 - **Expiry:** if entry not triggered by end of day (default), mark as expired.
 
-> **Invariant HYB-2:** Hybrid entry can only occur on the **next trading day** after signal generation (no same-day intraday entry).  
+> **Invariant HYB-2:** Hybrid entry can only occur on the **next trading day** after signal generation (no same-day intraday entry).
 > **Invariant HYB-3:** Hybrid execution timeframe is M1 preferred; M5 allowed when configured, but must be declared in metadata.
 
 ---
@@ -225,7 +225,7 @@ bars/bars_signal_<TF>_rth.parquet
 bars/bars_exec_<TF>_rth.parquet
 ```
 
-> **Invariant ART-1:** If `exec_tf` is M1, M1 exec bars must be persisted for audit ("proof").  
+> **Invariant ART-1:** If `exec_tf` is M1, M1 exec bars must be persisted for audit ("proof").
 > If M1 persistence is not available, trade evidence must be downgraded to WARN with code `NO_EXEC_BARS_M1`.
 
 ---
@@ -273,8 +273,8 @@ Define evidence codes as a stable enum-like list (do not invent ad-hoc strings i
 
 ## 7. Determinism and Auditability
 
-> **Invariant DET-1:** No usage of `now()` or wall-clock time in simulation; time is derived from data windows and run meta.  
-> **Invariant AUD-1:** `run_steps.jsonl` must include counts for orders, fills, trades, and evidence PASS/WARN/FAIL distribution.  
+> **Invariant DET-1:** No usage of `now()` or wall-clock time in simulation; time is derived from data windows and run meta.
+> **Invariant AUD-1:** `run_steps.jsonl` must include counts for orders, fills, trades, and evidence PASS/WARN/FAIL distribution.
 > **Invariant AUD-2:** All artifacts required by this contract must be listed in `run_manifest.json`.
 
 ---
@@ -410,6 +410,6 @@ trade_001,ord_a1b2c3,IONQ,LONG,2025-12-20T14:35:00Z,28.52,2025-12-20T15:42:00Z,3
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** 2025-12-24  
+**Document Version:** 1.0
+**Last Updated:** 2025-12-24
 **Maintaining Team:** Trading Platform Engineering
