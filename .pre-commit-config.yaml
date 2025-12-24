@@ -1,0 +1,51 @@
+# Pre-commit hooks for quality gates
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Check for large files
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=5120']  # 5MB limit
+        name: Check for large files (>5MB)
+      
+      - id: check-case-conflict
+        name: Check for case conflicts
+      
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      
+      - id: end-of-file-fixer
+        name: Fix end of files
+      
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+
+  # Block unwanted file patterns
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-added-large-files
+        name: Block binary files (db, sqlite, pdf)
+        exclude: '^docs/.*\.pdf$'  # Allow docs PDFs if intentional
+        files: '\.(db|sqlite|sqlite3|pdf)$'
+        args: ['--maxkb=0']  # Effectively blocks these files
+
+  # Local custom hooks
+  - repo: local
+    hooks:
+      - id: no-artifacts-tracked
+        name: Prevent tracking artifacts/
+        entry: bash -c 'if git ls-files artifacts/ | grep -q .; then echo "❌ artifacts/ files are tracked! Run: git rm -r --cached artifacts/"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: no-binaries-tracked
+        name: Prevent tracking binaries (*.db, *.sqlite, *.pdf)
+        entry: bash -c 'BINS=$(git ls-files | grep -E "\.(db|sqlite|sqlite3|pdf)$" || true); if [ -n "$BINS" ]; then echo "❌ Binary files tracked:"; echo "$BINS"; echo "Run: git rm --cached <file>"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true

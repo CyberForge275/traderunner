@@ -1,0 +1,112 @@
+name: Quality Gates (Guardrails)
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main, develop ]
+
+jobs:
+  guardrails:
+    name: Repository Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Need full history for comparison
+      
+      - name: Check for tracked artifacts
+        run: |
+          echo "🔍 Checking for tracked artifact files..."
+          ARTIFACTS=$(git ls-files artifacts/ | head -20)
+          
+          if [ -n "$ARTIFACTS" ]; then
+            echo "❌ FAIL: Artifact files are tracked in git!"
+            echo ""
+            echo "Found tracked files:"
+            echo "$ARTIFACTS"
+            echo ""
+            echo "🔧 To fix:"
+            echo "  git rm -r --cached artifacts/"
+            echo "  git commit -m 'chore: remove artifacts from tracking'"
+            echo ""
+            echo "ℹ️ artifacts/ should be gitignored, not tracked"
+            exit 1
+          fi
+          
+          echo "✅ PASS: No artifact files tracked"
+      
+      - name: Check for tracked binaries
+        run: |
+          echo "🔍 Checking for tracked binary files..."
+          BINARIES=$(git ls-files | grep -E '\.(db|sqlite|sqlite3|pdf)$' || true)
+          
+          if [ -n "$BINARIES" ]; then
+            echo "❌ FAIL: Binary files are tracked in git!"
+            echo ""
+            echo "Found tracked binaries:"
+            echo "$BINARIES"
+            echo ""
+            echo "🔧 To fix each file:"
+            while IFS= read -r file; do
+              echo "  git rm --cached '$file'"
+            done <<< "$BINARIES"
+            echo "  git add .gitignore"
+            echo "  git commit -m 'chore: remove binaries from tracking'"
+            echo ""
+            echo "ℹ️ Binary files (*.db, *.pdf) should be gitignored"
+            exit 1
+          fi
+          
+          echo "✅ PASS: No binary files tracked"
+      
+      - name: Check for large files in PR
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "🔍 Checking for large files in PR..."
+          MAX_SIZE_MB=5
+          MAX_SIZE_BYTES=$((MAX_SIZE_MB * 1024 * 1024))
+          
+          BASE_REF="${{ github.base_ref }}"
+          HEAD_SHA="${{ github.sha }}"
+          
+          # Get new/modified files in this PR
+          NEW_FILES=$(git diff --name-only origin/$BASE_REF...$HEAD_SHA)
+          
+          LARGE_FILES=""
+          for file in $NEW_FILES; do
+            if [ -f "$file" ]; then
+              SIZE=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo 0)
+              if [ "$SIZE" -gt "$MAX_SIZE_BYTES" ]; then
+                SIZE_MB=$((SIZE / 1024 / 1024))
+                LARGE_FILES="${LARGE_FILES}${file} (${SIZE_MB}MB)\n"
+              fi
+            fi
+          done
+          
+          if [ -n "$LARGE_FILES" ]; then
+            echo "❌ FAIL: Large files detected in PR!"
+            echo ""
+            echo "Files exceeding ${MAX_SIZE_MB}MB:"
+            echo -e "$LARGE_FILES"
+            echo ""
+            echo "🔧 Options:"
+            echo "  1. Remove file from tracking: git rm --cached <file>"
+            echo "  2. Use Git LFS: git lfs track <pattern>"
+            echo "  3. Store externally (S3, artifact storage)"
+            echo ""
+            echo "ℹ️ Large files slow down clones and increase repo size"
+            exit 1
+          fi
+          
+          echo "✅ PASS: No large files in PR"
+      
+      - name: Summary
+        if: success()
+        run: |
+          echo "✅ All quality gates PASSED"
+          echo "  - No artifact files tracked"
+          echo "  - No binary files tracked"
+          echo "  - No files > ${MAX_SIZE_MB:-5}MB in PR"
