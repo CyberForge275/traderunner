@@ -271,6 +271,9 @@ def run_backtest_full(
             # Convert timeframe string to enum
             tf_enum = Timeframe[timeframe.upper()] if isinstance(timeframe, str) else timeframe
 
+            # Extract session_mode from strategy_params (default: rth for backward compatibility)
+            session_mode_cfg = strategy_params.get("session_mode", "rth")
+
             # Create spec
             spec = IntradaySpec(
                 symbols=[symbol],
@@ -278,7 +281,9 @@ def run_backtest_full(
                 end=end_ts.date().isoformat(),
                 timeframe=tf_enum,
                 tz=market_tz,
+                session_mode=session_mode_cfg,
             )
+
 
             # Call ensure with auto_fill_gaps
             store = IntradayStore(default_tz=market_tz)
@@ -349,7 +354,9 @@ def run_backtest_full(
 
                 store = IntradayStore(default_tz=market_tz)
                 tf_enum = Timeframe(timeframe.upper())
-                ohlcv = store.load(symbol, timeframe=tf_enum, tz=market_tz)
+                session_mode_cfg = strategy_params.get("session_mode", "rth")
+                ohlcv = store.load(symbol, timeframe=tf_enum, tz=market_tz, session_mode=session_mode_cfg)
+
 
                 end_ts = pd.Timestamp(requested_end, tz=market_tz)
                 start_ts = end_ts - pd.Timedelta(days=lookback_days)
