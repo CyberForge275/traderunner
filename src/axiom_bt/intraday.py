@@ -206,6 +206,8 @@ class IntradaySpec:
         Target bar timeframe (M1/M5/M15); controls which resamples are created.
     tz:
         IANA timezone name in which bars are interpreted and returned.
+    session_mode:
+        Session filtering mode: "rth" (Regular Trading Hours only) or "all" (Pre+RTH+After).
     """
 
     symbols: Iterable[str]
@@ -213,6 +215,8 @@ class IntradaySpec:
     end: str | date
     timeframe: Timeframe
     tz: str = "America/New_York"
+    session_mode: str = "rth"  # "rth" | "all"
+
 
 
 class IntradayStore:
@@ -259,7 +263,8 @@ class IntradayStore:
 
         for symbol in symbols:
             sym_actions: List[str] = []
-            m1_path = DATA_M1 / f"{symbol}.parquet"
+            m1_path = self.path_for(symbol, timeframe=Timeframe.M1, session_mode=spec.session_mode)
+
 
             # NEW: Check coverage before deciding to fetch
             if not force and auto_fill_gaps:
@@ -314,8 +319,9 @@ class IntradayStore:
                                 tz=tz,
                                 use_sample=use_sample,
                                 save_raw=True,   # Save raw data with Pre/After-Market
-                                filter_rth=True, # Filter to RTH for final output
+                                filter_rth=(spec.session_mode == "rth"),  # Dynamic based on session_mode
                             )
+
 
                             # Merge with existing data if file exists
                             if m1_path.exists():
@@ -361,8 +367,9 @@ class IntradayStore:
                     tz=tz,
                     use_sample=use_sample,
                     save_raw=True,   # Save raw data with Pre/After-Market
-                    filter_rth=True, # Filter to RTH for final output
+                    filter_rth=(spec.session_mode == "rth"),  # Dynamic based on session_mode
                 )
+
                 sym_actions.append("fetch_m1")
             else:
                 sym_actions.append("use_cached_m1")
@@ -430,20 +437,46 @@ class IntradayStore:
         *,
         timeframe: Timeframe,
         tz: Optional[str] = None,
+        session_mode: str = "rth",
     ) -> pd.DataFrame:
         """Load normalized intraday OHLCV for one symbol/timeframe."""
 
         symbol = symbol.strip().upper()
-        path = self.path_for(symbol, timeframe=timeframe)
+        path = self.path_for(symbol, timeframe=timeframe, session_mode=session_mode)
 
         if not path.exists():
             raise FileNotFoundError(f"Intraday parquet not found: {path}")
 
         # Load parquet file
         frame = pd.read_parquet(path)
+        
+        # RTH Validation Gate: Enforce RTH-only data for _rth files
+        if session_mode == "rth" and "_rth" in path.name:
+            from datetime import time
+            
+            # Extract timestamps
+            ts = frame["timestamp"] if "timestamp" in frame.columns else frame.index.to_series()
+            ts = pd.to_datetime(ts)
+            
+            # Must be tz-aware
+            if getattr(ts.dt, "tz", None) is None:
+                raise AssertionError(f"{path.name}: timestamp must be tz-aware for RTH validation")
+            
+            # Check time-of-day (09:30 <= time < 16:00 in target timezone)
+            target_tz = tz or self._default_tz
+            local_t = ts.dt.tz_convert(target_tz).dt.time
+            ok = (local_t >= time(9, 30)) & (local_t < time(16, 0))
+            violations = int((~ok).sum())
+            
+            if violations > 0:
+                raise ValueError(
+                    f"RTH Violation: {path.name} labeled '_rth' but contains {violations} non-RTH bars "
+                    f"(expected 09:30-16:00 {target_tz})"
+                )
 
         # Load and normalize OHLCV
         df = _normalize_ohlcv_frame(frame, target_tz=tz or self._default_tz, symbol=symbol)
+
 
         # v2 Data Contract Validation
         import os
@@ -462,7 +495,7 @@ class IntradayStore:
         symbol = symbol.strip().upper()
         return self.path_for(symbol, timeframe=timeframe).exists()
 
-    def path_for(self, symbol: str, *, timeframe: Timeframe) -> Path:
+    def path_for(self, symbol: str, *, timeframe: Timeframe, session_mode: str = "rth") -> Path:
         symbol = symbol.strip().upper()
         if timeframe == Timeframe.M1:
             base = DATA_M1
@@ -472,7 +505,11 @@ class IntradayStore:
             base = DATA_M15
         else:
             raise ValueError(f"Unsupported timeframe for intraday store: {timeframe}")
-        return base / f"{symbol}.parquet"
+        
+        # Separate cache files by session mode to avoid collisions
+        suffix = "rth" if session_mode == "rth" else "all"
+        return base / f"{symbol}_{suffix}.parquet"
+
 
 
 def _to_date_str(value: str | date) -> str:
