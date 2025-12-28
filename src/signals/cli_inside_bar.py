@@ -139,6 +139,12 @@ def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--stop-cap", type=float, default=None, help="Maximum stop distance; target retargeted to maintain RRR (v2)")
     parser.add_argument("--current-snapshot", default=str(SIGNALS_DIR / "current_signals_ib.csv"), help="Path for latest snapshot CSV")
     parser.add_argument("--output", default=None, help="Optional explicit output path")
+    parser.add_argument(
+        "--session-mode",
+        choices=["rth", "all"],
+        default="rth",
+        help="Data session mode: rth (RTH only) or all (Pre+RTH+After)"
+    )
     return parser.parse_args(argv)
 
 
@@ -176,7 +182,13 @@ def main(argv: List[str] | None = None) -> int:
 
     for symbol in symbols:
         try:
-            ohlcv = store.load(symbol, timeframe=Timeframe.M5, tz=args.tz)
+            # Pass session_mode to load() with safe fallback
+            ohlcv = store.load(
+                symbol, 
+                timeframe=Timeframe.M5, 
+                tz=args.tz,
+                session_mode=getattr(args, 'session_mode', 'rth')  # Safe fallback
+            )
         except FileNotFoundError:
             source = data_path / f"{symbol}.parquet"
             print(f"[ERROR] Missing data file for {symbol}: {source}")

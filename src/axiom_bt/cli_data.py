@@ -13,6 +13,7 @@ from axiom_bt.fs import (
     DATA_M5,
     ensure_layout,
 )
+from axiom_bt.intraday import IntradayStore, Timeframe
 from axiom_bt.data.eodhd_fetch import (
     fetch_eod_daily_to_parquet,
     fetch_intraday_1m_to_parquet,
@@ -44,15 +45,19 @@ def cmd_ensure_intraday(args: argparse.Namespace) -> int:
     start = args.start or (now - timedelta(days=2)).date().isoformat()
     end = args.end or now.date().isoformat()
 
+    # Session-aware store for correct cache paths
+    store = IntradayStore(default_tz=args.tz)
+
     overall_start = time.perf_counter()
     for symbol in symbols:
         symbol_start = time.perf_counter()
         fetch_duration = None
         resample_m5_duration = None
         resample_m15_duration = None
-        m1_path = DATA_M1 / f"{symbol}.parquet"
+        # Use session-aware path
+        m1_path = store.path_for(symbol, timeframe=Timeframe.M1, session_mode=args.session_mode)
         if args.force or not m1_path.exists():
-            print(f"[FETCH] {symbol} M1 {start}..{end}")
+            print(f"[FETCH] {symbol} M1 {start}..{end} (session_mode={args.session_mode})")
             fetch_start = time.perf_counter()
             try:
                 fetch_intraday_1m_to_parquet(
@@ -63,6 +68,7 @@ def cmd_ensure_intraday(args: argparse.Namespace) -> int:
                     DATA_M1,
                     tz=args.tz,
                     use_sample=args.use_sample,
+                    filter_rth=(args.session_mode == "rth"),  # Dynamic based on session_mode
                 )
                 fetch_duration = time.perf_counter() - fetch_start
             except Exception as exc:  # tolerant for symbols with no data
@@ -140,6 +146,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_intraday.add_argument("--force", action="store_true", help="Refetch existing M1 files")
     p_intraday.add_argument("--generate-m15", action="store_true", help="Resample to M15 in addition to M5")
     p_intraday.add_argument("--use-sample", action="store_true", help="Use synthetic data instead of live fetch")
+    p_intraday.add_argument(
+        "--session-mode",
+        choices=["rth", "all"],
+        default="rth",
+        help="Session mode: rth (Regular Trading Hours only) or all (Pre+RTH+After)"
+    )
     p_intraday.set_defaults(func=cmd_ensure_intraday)
 
     p_daily = sub.add_parser("fetch-d1", help="Fetch end-of-day data")

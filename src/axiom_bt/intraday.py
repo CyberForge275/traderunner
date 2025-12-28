@@ -78,7 +78,9 @@ def check_local_m1_coverage(
     """
     from datetime import datetime, timedelta
 
-    m1_path = DATA_M1 / f"{symbol}.parquet"
+    # Use session-aware path (default rth for backward compatibility)
+    store = IntradayStore(default_tz="America/New_York")
+    m1_path = store.path_for(symbol, timeframe=Timeframe.M1, session_mode="rth")
 
     requested_start = datetime.fromisoformat(start).date()
     requested_end = datetime.fromisoformat(end).date()

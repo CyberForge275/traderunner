@@ -150,7 +150,11 @@ def check_coverage(
                 error_message=f"Unknown timeframe: {timeframe}"
             )
 
-        parquet_path = data_dir / f"{symbol}.parquet"
+        # Use IntradayStore.path_for for session-aware cache paths (default rth)
+        from axiom_bt.intraday import IntradayStore, Timeframe as TF
+        tf_enum = getattr(TF, timeframe)  # Convert "M1" -> Timeframe.M1
+        store = IntradayStore()
+        parquet_path = store.path_for(symbol, timeframe=tf_enum, session_mode="rth")
 
         # Fast metadata read (O(1), no DataFrame load)
         logger.debug(f"Checking coverage for {symbol} {timeframe} (path={parquet_path})")
@@ -324,7 +328,10 @@ def _fetch_missing_range(
     )
 
     # Resample if needed
-    m1_path = DATA_M1 / f"{symbol}.parquet"
+    # Use IntradayStore.path_for for session-aware path (default rth)
+    from axiom_bt.intraday import IntradayStore, Timeframe as TF
+    store = IntradayStore()
+    m1_path = store.path_for(symbol, timeframe=TF.M1, session_mode="rth")
 
     if tf == "M5":
         logger.info(f"Resampling {symbol} M1 → M5")
