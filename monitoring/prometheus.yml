@@ -1,0 +1,47 @@
+# Prometheus Configuration for Trading System Monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'trading-system'
+    environment: 'paper'
+
+# Alert manager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Alerting rules
+rule_files:
+  - 'alert_rules.yml'
+
+# Scrape configurations
+scrape_configs:
+  # automatictrader-api metrics
+  - job_name: 'automatictrader-api'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+        labels:
+          service: 'automatictrader-api'
+    metrics_path: '/metrics'
+
+  # marketdata-stream metrics
+  - job_name: 'marketdata-stream'
+    static_configs:
+      - targets: ['host.docker.internal:8090']
+        labels:
+          service: 'marketdata-stream'
+    metrics_path: '/metrics'
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node exporter for system metrics (optional, if installed)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['host.docker.internal:9100']

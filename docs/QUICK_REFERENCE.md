@@ -1,5 +1,7 @@
 ## Rudometkin MOC – Quick Reference (Minute Data Edition)
 
+> **Last Updated**: 2025-12-05
+
 ### 1. Fast Commands
 
 From repo root:

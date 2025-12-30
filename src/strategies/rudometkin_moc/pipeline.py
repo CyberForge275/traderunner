@@ -38,11 +38,11 @@ def _show_step_message(title: str, message: str, status: str = "info") -> None:
 
 def _prepare_daily_frame(group: pd.DataFrame, target_tz: str) -> Optional[pd.DataFrame]:
     """Prepare daily OHLCV frame with timezone conversion.
-    
+
     Args:
         group: DataFrame with daily OHLCV data
         target_tz: Target timezone string
-        
+
     Returns:
         Prepared DataFrame or None if data is invalid
     """
@@ -64,24 +64,24 @@ def run_daily_scan(
     max_daily_signals: int = 10,
 ) -> List[str]:
     """Execute daily universe scan and filtering for Rudometkin strategy.
-    
+
     This function implements Stage 1 of the two-stage Rudometkin pipeline:
     1. Load universe data from parquet file
     2. Filter by date range and symbol constraints
     3. Run strategy signal generation on daily data
     4. Rank and filter signals by score
     5. Return filtered symbol list
-    
+
     Args:
         pipeline: PipelineConfig containing strategy metadata and configuration
         max_daily_signals: Maximum signals per day per direction (long/short)
-        
+
     Returns:
         List of filtered symbol strings to process in Stage 2 (intraday)
     """
     # Import here to avoid circular dependency
     from strategies import factory, registry
-    
+
     _show_step_message("0) Daily Scan", "Starting Stage 1: Daily Universe Scan & Filter")
 
     strategy_config: Dict[str, Any] = {}
@@ -168,11 +168,11 @@ def run_daily_scan(
     if requested_symbols:
         before_sym = len(universe_df)
         universe_df = universe_df[universe_df["symbol"].isin(requested_symbols)]
-        
+
         # Show only first 15 symbols to avoid UI slowdown
         symbol_preview = sorted(list(requested_symbols)[:15])
         suffix = f" … and {len(requested_symbols) - 15} more" if len(requested_symbols) > 15 else ""
-        
+
         _show_step_message(
             "0.1) symbol filter",
             f"Filtering to {len(requested_symbols)} requested symbols. "
@@ -263,7 +263,7 @@ def run_daily_scan(
     # Log summary instead of individual failures
     total_processed = len(available_symbols)
     signals_generated = len(signal_rows)
-    
+
     summary_parts = [
         f"Processed {total_processed} symbols",
         f"Generated {signals_generated} raw signals",
@@ -278,7 +278,7 @@ def run_daily_scan(
             summary_parts.append(f"Failures: {', '.join(failed_symbols)}")
         else:
             summary_parts.append(f"Failures: {', '.join(failed_symbols[:10])} ... and {len(failed_symbols)-10} more")
-    
+
     _show_step_message(
         "0.2) Signal Generation Summary",
         "; ".join(summary_parts),
@@ -445,4 +445,3 @@ except ImportError:
     # Not running in Streamlit context - hook registration can be skipped
     # (e.g., during unit tests or standalone script execution)
     pass
-

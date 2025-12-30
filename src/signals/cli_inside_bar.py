@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from axiom_bt.intraday import IntradayStore, Timeframe
+from axiom_bt.contracts.signal_schema import SignalOutputSpec
 from strategies import factory, registry
 from core.settings import (
     INSIDE_BAR_SESSIONS,
@@ -64,13 +65,14 @@ def build_config(args: argparse.Namespace) -> Dict[str, object]:
     if args.stop_cap is not None and args.stop_cap > 0:
         config["stop_distance_cap"] = float(args.stop_cap)
 
-    if args.session_filter:
-        start_hour, end_hour = args.session_filter
-        config["session_filter"] = {
-            "enabled": True,
-            "start_hour": start_hour,
-            "end_hour": end_hour,
-        }
+    # NEW: Build SessionFilter from --sessions argument
+    # This replaces the old session filtering logic in main()
+    if args.sessions:
+        from strategies.inside_bar.config import SessionFilter
+        session_strings = [s.strip() for s in args.sessions.split(",") if s.strip()]
+        if session_strings:
+            session_filter = SessionFilter.from_strings(session_strings)
+            config["session_filter"] = session_filter
 
     return config
 
@@ -89,6 +91,8 @@ def _aggregate_rows(rows: List[Dict[str, object]]) -> pd.DataFrame:
             "tp_long",
             "tp_short",
             "Symbol",
+            "strategy",
+            "strategy_version",
         ]
         return pd.DataFrame(columns=columns)
 
@@ -106,6 +110,8 @@ def _aggregate_rows(rows: List[Dict[str, object]]) -> pd.DataFrame:
             "sl_short": "first",
             "tp_long": "first",
             "tp_short": "first",
+            "strategy": "first",
+            "strategy_version": "first",
         }
     )
     merged.reset_index(inplace=True)
@@ -126,13 +132,19 @@ def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--rrr", type=float, default=1.0)
     parser.add_argument("--allow-touch-breakout", action="store_true", help="Allow breakouts on wick touch (disables close confirmation)")
     parser.add_argument("--session-filter", type=int, nargs=2, metavar=("START", "END"), help="Optional inclusive hour range for session filter")
-    parser.add_argument("--strategy", choices=["inside_bar_v1", "inside_bar_v2"], default="inside_bar_v1")
+    parser.add_argument("--strategy", choices=["inside_bar"], default="inside_bar")
     parser.add_argument("--max-master-atr-mult", type=float, default=None, help="Suppress signals if master range exceeds this multiple of ATR (v2)")
     parser.add_argument("--min-master-body-ratio", type=float, default=0.5, help="Minimum master candle body ratio (v2)")
     parser.add_argument("--execution-lag", type=int, default=0, help="Execution lag in bars before arming breakout orders (v2)")
     parser.add_argument("--stop-cap", type=float, default=None, help="Maximum stop distance; target retargeted to maintain RRR (v2)")
     parser.add_argument("--current-snapshot", default=str(SIGNALS_DIR / "current_signals_ib.csv"), help="Path for latest snapshot CSV")
     parser.add_argument("--output", default=None, help="Optional explicit output path")
+    parser.add_argument(
+        "--session-mode",
+        choices=["rth", "all"],
+        default="rth",
+        help="Data session mode: rth (RTH only) or all (Pre+RTH+After)"
+    )
     return parser.parse_args(argv)
 
 
@@ -157,17 +169,57 @@ def main(argv: List[str] | None = None) -> int:
         registry.auto_discover("strategies")
     strategy = factory.create_strategy(args.strategy, config)
 
+    # Import strategy version metadata
+    from decimal import Decimal
+    try:
+        from strategies.inside_bar.core import STRATEGY_VERSION as IB_VERSION
+    except Exception:  # pragma: no cover - defensive fallback
+        IB_VERSION = "unknown"
+
     rows: List[Dict[str, object]] = []
+    failed_symbols = []  # Track symbols with data issues
+    missing_symbols = []  # Track symbols with no data files
 
     for symbol in symbols:
         try:
-            ohlcv = store.load(symbol, timeframe=Timeframe.M5, tz=args.tz)
+            # Pass session_mode to load() with safe fallback
+            ohlcv = store.load(
+                symbol, 
+                timeframe=Timeframe.M5, 
+                tz=args.tz,
+                session_mode=getattr(args, 'session_mode', 'rth')  # Safe fallback
+            )
         except FileNotFoundError:
             source = data_path / f"{symbol}.parquet"
-            print(f"[WARN] Missing parquet for {symbol}: {source}")
+            print(f"[ERROR] Missing data file for {symbol}: {source}")
+            print(f"        This symbol was requested but no parquet file exists.")
+            missing_symbols.append(symbol)
             continue
-        except Exception as exc:
-            print(f"[WARN] Failed to load {symbol}: {exc}")
+        except Exception as exc:  # pragma: no cover - defensive
+            print(f"[ERROR] Failed to load {symbol}: {type(exc).__name__}: {exc}")
+            failed_symbols.append(f"{symbol} ({type(exc).__name__})")
+            continue
+
+        # ENHANCED: Validate data quality before processing
+        if ohlcv.empty:
+            print(f"[ERROR] {symbol}: Loaded data is empty (0 rows)")
+            print(f"        This indicates the parquet file exists but contains no data.")
+            failed_symbols.append(f"{symbol} (empty data)")
+            continue
+
+        # Check for NaN values in critical columns
+        nan_cols = []
+        for col in ['open', 'high', 'low', 'close']:
+            if col in ohlcv.columns and ohlcv[col].isna().any():
+                nan_count = ohlcv[col].isna().sum()
+                nan_cols.append(f"{col}({nan_count} NaN)")
+
+        if nan_cols:
+            print(f"[ERROR] {symbol}: Data contains NaN values in OHLC columns")
+            print(f"        Affected columns: {', '.join(nan_cols)}")
+            print(f"        Total rows: {len(ohlcv)}, Date range: {ohlcv.index[0]} to {ohlcv.index[-1]}")
+            print(f"        This violates data quality SLA 'no_nan_ohlc'.")
+            failed_symbols.append(f"{symbol} (NaN in {', '.join(nan_cols)})")
             continue
 
         input_frame = ohlcv.reset_index().rename(columns={"timestamp": "timestamp"})
@@ -175,36 +227,66 @@ def main(argv: List[str] | None = None) -> int:
 
         for sig in signals:
             ts = pd.Timestamp(sig.timestamp).tz_convert(args.tz)
+
+            # Calculate session ID for grouping (still needed for deduplication)
             session_idx = _session_id(ts, sessions)
-            if session_idx == 0:
-                continue
+
+            # NOTE: Session filtering is now handled by strategy.generate_signals()
+            # via config.session_filter parameter. The old "if session_idx == 0: continue"
+            # logic has been removed to avoid double-filtering.
+
+            # Determine entries
+            long_entry = None
+            short_entry = None
+            sl_long = None
+            sl_short = None  # FIX: Must initialize before conditional assignment
+            tp_long = None
+            tp_short = None  # FIX: Must initialize before conditional assignment
+
+            if sig.signal_type == "LONG":
+                long_entry = sig.entry_price
+                sl_long = sig.stop_loss
+                tp_long = sig.take_profit
+            elif sig.signal_type == "SHORT":
+                short_entry = sig.entry_price
+                sl_short = sig.stop_loss
+                tp_short = sig.take_profit
+
+            # Use InsideBar SSOT version
+            strategy_version = IB_VERSION
+
+            # Validate and normalize via SignalOutputSpec (ensures canonical schema)
+            spec = SignalOutputSpec(
+                symbol=symbol,
+                timestamp=ts.tz_convert("UTC"),
+                strategy=args.strategy,
+                strategy_version=strategy_version,
+                long_entry=Decimal(str(long_entry)) if long_entry is not None else None,
+                short_entry=Decimal(str(short_entry)) if short_entry is not None else None,
+                sl_long=Decimal(str(sl_long)) if sl_long is not None else None,
+                sl_short=Decimal(str(sl_short)) if sl_short is not None else None,
+                tp_long=Decimal(str(tp_long)) if tp_long is not None else None,
+                tp_short=Decimal(str(tp_short)) if tp_short is not None else None,
+                setup="inside_bar",
+                score=1.0,
+                metadata=sig.metadata,
+            )
 
             base = {
                 "ts": ts.isoformat(),
                 "session_id": session_idx,
                 "ib": True,
                 "ib_qual": True,
-                "Symbol": symbol,
-                "long_entry": np.nan,
-                "short_entry": np.nan,
-                "sl_long": np.nan,
-                "sl_short": np.nan,
-                "tp_long": np.nan,
-                "tp_short": np.nan,
+                "Symbol": spec.symbol,
+                "long_entry": float(spec.long_entry) if spec.long_entry else np.nan,
+                "short_entry": float(spec.short_entry) if spec.short_entry else np.nan,
+                "sl_long": float(spec.sl_long) if spec.sl_long else np.nan,
+                "sl_short": float(spec.sl_short) if spec.sl_short else np.nan,
+                "tp_long": float(spec.tp_long) if spec.tp_long else np.nan,
+                "tp_short": float(spec.tp_short) if spec.tp_short else np.nan,
+                "strategy": spec.strategy,
+                "strategy_version": spec.strategy_version,
             }
-
-            if sig.signal_type == "LONG":
-                base.update(
-                    long_entry=sig.entry_price,
-                    sl_long=sig.stop_loss,
-                    tp_long=sig.take_profit,
-                )
-            elif sig.signal_type == "SHORT":
-                base.update(
-                    short_entry=sig.entry_price,
-                    sl_short=sig.stop_loss,
-                    tp_short=sig.take_profit,
-                )
 
             rows.append(base)
 
@@ -222,6 +304,8 @@ def main(argv: List[str] | None = None) -> int:
             "tp_long",
             "tp_short",
             "Symbol",
+            "strategy",
+            "strategy_version",
         ]
     ]
     if not result.empty:
@@ -238,15 +322,70 @@ def main(argv: List[str] | None = None) -> int:
 
     SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+
+    # Full output (includes strategy + strategy_version for downstream
+    # metadata-aware consumers and validation tests).
     output = Path(args.output) if args.output else SIGNALS_DIR / f"signals_ib_{timestamp}.csv"
     result.to_csv(output, index=False)
 
+    # Current snapshot used by legacy pipelines expects the original
+    # column contract without strategy metadata. Trim to the legacy
+    # schema to keep existing tests and consumers stable.
+    snapshot_cols = [
+        "ts",
+        "session_id",
+        "ib",
+        "ib_qual",
+        "long_entry",
+        "short_entry",
+        "sl_long",
+        "sl_short",
+        "tp_long",
+        "tp_short",
+        "Symbol",
+    ]
+    snapshot_df = result[snapshot_cols] if not result.empty else result[snapshot_cols]
+
     current = Path(args.current_snapshot)
     current.parent.mkdir(parents=True, exist_ok=True)
-    result.to_csv(current, index=False)
+    snapshot_df.to_csv(current, index=False)
+
+    # ENHANCED: Report data issues and exit with appropriate codes
+    total_requested = len(symbols)
+    total_failed = len(failed_symbols) + len(missing_symbols)
+    total_processed = total_requested - total_failed
 
     print(f"[OK] Signals → {output} (rows={len(result)})")
-    return 0
+    print(f"[INFO] Processed {total_processed}/{total_requested} symbols")
+
+    if missing_symbols:
+        print(f"[ERROR] {len(missing_symbols)} symbol(s) had missing data files:")
+        for sym in missing_symbols[:5]:  # Show first 5
+            print(f"        - {sym}")
+        if len(missing_symbols) > 5:
+            print(f"        ... and {len(missing_symbols) - 5} more")
+
+    if failed_symbols:
+        print(f"[ERROR] {len(failed_symbols)} symbol(s) had invalid data:")
+        for sym in failed_symbols[:5]:  # Show first 5
+            print(f"        - {sym}")
+        if len(failed_symbols) > 5:
+            print(f"        ... and {len(failed_symbols) - 5} more")
+
+    # Exit codes:
+    # 0 = Success (no errors)
+    # 1 = All symbols missing/failed (complete failure)
+    # 2 = Some symbols failed but some succeeded (partial success)
+    if total_processed == 0:
+        print("[FATAL] No symbols could be processed. Check data availability.")
+        return 1  # Complete failure
+    elif total_failed > 0:
+        print(f"[WARN] Partial success: {total_failed} symbol(s) failed but {total_processed} succeeded.")
+        # Still return 0 for partial success to allow pipeline to continue
+        # Logging will show which symbols failed
+        return 0
+    else:
+        return 0  # Complete success
 
 
 if __name__ == "__main__":

@@ -1,0 +1,73 @@
+Notes:
+	Alexei Rudometkins MOC long and short system
+
+// this language is used by Realtest
+//Import:
+//	DataSource:	Norgate
+//	IncludeList:	.Russell 1000 Current & Past
+//	StartDate:	1/1/2006
+//	EndDate:	Latest
+//	SaveAs:	rudomet_short.rtd
+
+Settings:
+	DataFile:	Polygon.rtd
+	StartDate:	1/1/2007
+	EndDate:	Latest
+	BarSize:	Daily
+	UseAvailableBars:	False
+	AccountSize:	100000
+	TestName:	"poly"
+
+Parameters:
+	entry_stretch1:	0.035
+	entry_stretch2:	0.05
+	maxpos:	10
+
+Data:
+	// common indicators
+	adx5:	adx(5)
+	atr2:	atr(2)
+	atr10:	atr(10)
+	atr40:	atr(40)
+	crsi2:	CRSI(100,2,2)
+	roc5:	roc(c,5)
+	sma200:	Avg(c, 200)
+
+	// common universe
+	universe:	InRUI and C >= 10 and Avg(V, 50) >= 1000000
+
+	// LONG strategy
+	setup1:	universe and C > sma200 and adx5 > 35 and (O - C) / O > 0.03
+	score1:	atr10 / C
+	price1:	C * (1 - entry_stretch1)
+
+	// SHORT strategy
+	setup2:	universe and adx5 > 35 and crsi2 > 70 and atr40/c >= 0.01 and atr40/c <= 0.1 and  atr2/c >= 0.01 and atr2/c <= 0.2
+	score2:	roc5
+	price2:	C * (1 + entry_stretch2)
+
+Combined:
+	MaxSameSym:	1
+
+Template: common
+	Quantity:	S.Alloc * 0.5 * 0.01 / atr40
+	QtyType:	Shares
+	ExitRule:	1
+	ExitTime:	ThisClose
+	MaxPositions:	maxpos
+	//EntrySkip: 	Combined(S.Usage) >= 1
+	Commission:	Max(0.005 * Shares, 1)
+
+Strategy: moc_long
+	Using:	common
+	Side:	long
+	EntrySetup:	setup1
+	SetupScore:	score1
+	EntryLimit:	price1
+
+Strategy: moc_short
+	Using:	common
+	Side:	short
+	EntrySetup:	setup2
+	SetupScore:	score2
+	EntryLimit:	price2

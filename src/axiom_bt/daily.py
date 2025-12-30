@@ -57,7 +57,21 @@ class DailyStore:
             raise FileNotFoundError(f"Universe parquet not found: {universe_path}")
 
         raw = pd.read_parquet(universe_path)
-        return _normalize_universe_frame(raw, tz or self._default_tz)
+        df = _normalize_universe_frame(raw, tz or self._default_tz)
+
+        # v2 Data Contract Validation
+        import os
+        if os.environ.get("ENABLE_CONTRACTS", "false").lower() == "true":
+            from axiom_bt.contracts import DailyFrameSpec
+            # Contract expects TitleCase columns, but we use lowercase internally
+            # Create a view with TitleCase columns for validation
+            validation_view = df.rename(columns={
+                "open": "Open", "high": "High", "low": "Low",
+                "close": "Close", "volume": "Volume"
+            })
+            DailyFrameSpec.assert_valid(validation_view)
+
+        return df
 
     def load_window(self, spec: DailySpec, *, lookback_days: int = 0) -> pd.DataFrame:
         """Load a date-window slice of daily data for one or more symbols."""

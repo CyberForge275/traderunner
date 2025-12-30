@@ -1,0 +1,59 @@
+# Promotion Policy Configuration (v2)
+# Defines thresholds and gates for automated promotion between stages
+
+# Stage promotion thresholds
+thresholds:
+  # Minimum number of trades in backtest
+  min_num_trades: 10
+
+  # Minimum win rate (0.0 - 1.0)
+  min_win_rate: 0.55
+
+  # Maximum drawdown (in currency, e.g., -500 EUR)
+  max_drawdown: -500
+
+  # Minimum Sharpe ratio
+  min_sharpe: 0.8
+
+  # Data SLA must pass
+  data_sla_pass: true
+
+# Promotion gates (executed in order)
+gates:
+  - name: data_quality_check
+    description: "Verify all data SLAs are met"
+    blocking: true
+
+  - name: metrics_thresholds
+    description: "Check backtest metrics against thresholds"
+    blocking: true
+
+  - name: dryrun_paper_broker_check
+    description: "Send test order to paper broker"
+    blocking: false  # Warning only
+
+# Notifications
+notifications:
+  on_success:
+    - type: log
+      level: info
+
+  on_failure:
+    - type: log
+      level: error
+    # TODO: Add email/webhook notifications
+
+# Promotion stages
+stages:
+  - experiment  # Local research
+  - lab         # Local backtests
+  - paper       # Paper trading on server
+  - live        # Live trading
+
+# Auto-promotion settings
+auto_promote:
+  enabled: false  # Manual approval required by default
+  allowed_stages:
+    - experiment -> lab
+    - lab -> paper
+  # live promotion always requires manual approval

@@ -15,18 +15,18 @@ def inspect_parquet(path):
         if isinstance(df.index, pd.MultiIndex):
             print(f"Index levels: {df.index.levels}")
             print(f"Level 0 sample: {df.index.get_level_values(0)[:10]}")
-        
+
         print("\nColumns & Dtypes:")
         print(df.dtypes)
-        
+
         print("\nFirst 5 rows:")
         print(df.head())
-        
+
         print("\nSample of unique values for object/string columns:")
         for col in df.columns:
             if df[col].dtype == object or pd.api.types.is_string_dtype(df[col]):
                 print(f"Column '{col}': {df[col].dropna().unique()[:10]}")
-                
+
         print("\nChecking for hidden/categorical columns:")
         for col in df.columns:
             if isinstance(df[col].dtype, pd.CategoricalDtype):

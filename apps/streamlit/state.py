@@ -116,13 +116,13 @@ INSIDE_BAR_METADATA = StrategyMetadata(
     orders_source=ROOT / "artifacts" / "signals" / "current_signals_ib.csv",
     default_payload={
         "engine": "replay",
-        "mode": INSIDE_BAR_DEFAULTS.name,
+        "mode": "insidebar_intraday",  # Fixed: explicit mode name for replay engine
         "data": {"tz": INSIDE_BAR_TIMEZONE},
         "costs": INSIDE_BAR_DEFAULTS.costs,
         "initial_cash": INSIDE_BAR_DEFAULTS.initial_cash,
-        "strategy": "inside_bar_v1",
+        "strategy": "inside_bar",  # Fixed: CLI expects 'inside_bar' not 'inside_bar_v1'
     },
-    strategy_name="inside_bar_v1",
+    strategy_name="inside_bar",  # Fixed: match CLI argument choices
     doc_path=ROOT / "docs" / "inside_bar_strategy.pdf",
     default_sizing={
         "mode": "risk",
@@ -191,6 +191,31 @@ STRATEGY_REGISTRY: Dict[str, StrategyMetadata] = {
     meta.name: meta
     for meta in (INSIDE_BAR_METADATA, INSIDE_BAR_V2_METADATA, RUDOMETKIN_METADATA)
 }
+
+# Augment STRATEGY_REGISTRY with version-qualified keys so that
+# values emitted by dashboard version selectors (e.g.
+# "insidebar_intraday|1.00") resolve to the same StrategyMetadata
+# objects. This keeps legacy callers working while enabling
+# Strategy Lifecycle / version-awareness in the UI.
+try:  # pragma: no cover - exercised indirectly via architecture tests
+    from trading_dashboard.utils.version_loader import (
+        get_strategy_versions,
+        has_version_support,
+    )
+
+    for base_id, meta in list(STRATEGY_REGISTRY.items()):
+        if not has_version_support(base_id):
+            continue
+        for v in get_strategy_versions(base_id):
+            version = v.get("value")
+            if not version:
+                continue
+            qualified_id = f"{base_id}|{version}"
+            if qualified_id not in STRATEGY_REGISTRY:
+                STRATEGY_REGISTRY[qualified_id] = meta
+except Exception:
+    # If version loading fails we keep the base registry intact.
+    pass
 
 
 @dataclass

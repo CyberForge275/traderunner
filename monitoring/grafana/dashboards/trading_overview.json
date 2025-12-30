@@ -1,0 +1,296 @@
+{
+  "id": null,
+  "uid": "trading-overview",
+  "title": "Trading System Overview",
+  "tags": ["trading", "overview"],
+  "timezone": "browser",
+  "schemaVersion": 27,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Order Intent Flow",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "order_intents_pending",
+          "legendFormat": "Pending",
+          "refId": "A"
+        },
+        {
+          "expr": "order_intents_planned",
+          "legendFormat": "Planned",
+          "refId": "B"
+        },
+        {
+          "expr": "order_intents_ready",
+          "legendFormat": "Ready",
+          "refId": "C"
+        },
+        {
+          "expr": "order_intents_sent",
+          "legendFormat": "Sent",
+          "refId": "D"
+        }
+      ],
+      "yaxes": [
+        {"format": "short", "label": "Count"},
+        {"format": "short"}
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Order Intent Creation Rate",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {
+          "expr": "rate(order_intents_created_total[5m]) * 60",
+          "legendFormat": "Created (per minute)",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(order_intents_duplicate_total[5m]) * 60",
+          "legendFormat": "Duplicates (per minute)",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(order_intents_error_total[5m]) * 60",
+          "legendFormat": "Errors (per minute)",
+          "refId": "C"
+        }
+      ],
+      "yaxes": [
+        {"format": "ops", "label": "Rate"},
+        {"format": "short"}
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Order Intent Status Distribution",
+      "type": "piechart",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 8},
+      "targets": [
+        {
+          "expr": "order_intents_pending",
+          "legendFormat": "Pending",
+          "refId": "A"
+        },
+        {
+          "expr": "order_intents_planned",
+          "legendFormat": "Planned",
+          "refId": "B"
+        },
+        {
+          "expr": "order_intents_ready",
+          "legendFormat": "Ready",
+          "refId": "C"
+        },
+        {
+          "expr": "order_intents_sent",
+          "legendFormat": "Sent",
+          "refId": "D"
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"}
+      }
+    },
+    {
+      "id": 4,
+      "title": "API Request Duration (p95)",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 9, "x": 6, "y": 8},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(api_request_duration_seconds_bucket[5m]))",
+          "legendFormat": "{{endpoint}} - {{method}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        {"format": "s", "label": "Duration"},
+        {"format": "short"}
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Error Rate",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 3, "x": 15, "y": 8},
+      "targets": [
+        {
+          "expr": "rate(order_intents_error_total[5m]) / rate(order_intents_created_total[5m]) * 100",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": null, "color": "green"},
+              {"value": 1, "color": "yellow"},
+              {"value": 5, "color": "red"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Success Rate",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 3, "x": 18, "y": 8},
+      "targets": [
+        {
+          "expr": "(1 - rate(order_intents_error_total[5m]) / rate(order_intents_created_total[5m])) * 100",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": null, "color": "red"},
+              {"value": 95, "color": "yellow"},
+              {"value": 99, "color": "green"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Total Intents Created",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 3, "x": 15, "y": 12},
+      "targets": [
+        {
+          "expr": "order_intents_created_total",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "graphMode": "area",
+        "colorMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Worker Status",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 3, "x": 18, "y": 12},
+      "targets": [
+        {
+          "expr": "up{job=\"automatictrader-api\"}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"type": "value", "value": "0", "text": "DOWN"},
+            {"type": "value", "value": "1", "text": "UP"}
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": null, "color": "red"},
+              {"value": 1, "color": "green"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Processing Pipeline",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "targets": [
+        {
+          "expr": "order_intents_pending",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "order_intents_planned",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        },
+        {
+          "expr": "order_intents_ready",
+          "format": "table",
+          "instant": true,
+          "refId": "C"
+        },
+        {
+          "expr": "order_intents_sent",
+          "format": "table",
+          "instant": true,
+          "refId": "D"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Recent Activity Log",
+      "type": "logs",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "targets": [
+        {
+          "expr": "{job=\"automatictrader-api\"}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true
+      }
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m"]
+  }
+}

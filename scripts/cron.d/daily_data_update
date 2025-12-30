@@ -1,0 +1,10 @@
+# Cron job for daily data updates
+# Updates universe parquet files from MySQL at 4:00 AM daily
+#
+# Installation on Debian server:
+# sudo cp scripts/cron.d/daily_data_update /etc/cron.d/
+# sudo chmod 644 /etc/cron.d/daily_data_update
+# sudo systemctl restart cron
+
+# Run at 4:00 AM every day
+0 4 * * * mirko cd /opt/trading/traderunner && .venv/bin/python scripts/update_daily_data.py --auto --verify >> /var/log/trading/daily_data_update.log 2>&1

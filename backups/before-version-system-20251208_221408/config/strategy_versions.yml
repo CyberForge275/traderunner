@@ -1,0 +1,62 @@
+# Strategy Version Registry
+#
+# Central registry tracking all deployed strategy versions across environments.
+# This file serves as the single source of truth for strategy version metadata.
+
+strategies:
+  InsideBar:
+    display_name: "Inside Bar Breakout"
+    description: "Inside bar pattern with ATR-based breakouts"
+    latest_stable: "2.0.0"
+    latest_testing: null
+
+    versions:
+      "2.0.0":
+        status: production
+        released_at: "2025-12-06T23:00:00Z"
+        deployed_since: "2025-12-07T11:30:00Z"
+        deployed_to:
+          - pre-papertrading-lab
+        git_tags:
+          traderunner: "insidebar-v2.0.0"
+          marketdata_stream: "insidebar-vendor-v2.0.0"
+        checksum: "3d565178f137ebdf"
+        config_version: "1.0.0"
+        notes: |
+          Initial unified implementation with 100% parity between backtest
+          and live trading. Extracted all logic into core.py with vendored
+          copy in marketdata-stream.
+        breaking_changes: false
+        changelog:
+          - "Unified core implementation"
+          - "ATR-based position sizing"
+          - "Shared configuration (inside_bar.yaml)"
+          - "23/23 parity tests passing"
+        tested_symbols:
+          - APP
+          - TSLA
+          - PLTR
+          - HOOD
+        performance_notes: |
+          Backtested Nov 2024: Sharpe 1.8, Max DD -12%, Win Rate 68%
+
+  RudometkinMOC:
+    display_name: "Rudometkin Market-on-Close"
+    description: "Mean reversion strategy trading at market close"
+    latest_stable: null
+    latest_testing: null
+    versions: {}
+    notes: "Strategy exists but not yet migrated to unified architecture"
+
+# Version Status Definitions:
+# - development: Active development, not for production
+# - testing: Deployed to pre-papertrading or paper-trading for validation
+# - production: Approved for live trading
+# - deprecated: No longer recommended, kept for historical reference
+# - retired: Removed from all environments
+
+# Deployment Environment Definitions:
+# - explore-lab: Local development environment
+# - pre-papertrading-lab: Signal generation testing (no TWS)
+# - paper-trading-lab: Full paper trading with TWS connection
+# - live-trading: Real money trading

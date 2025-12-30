@@ -23,8 +23,20 @@ def ensure_layout() -> Dict[str, str]:
 
 
 def new_run_dir(name: str) -> Path:
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    import re
+
+    # Check if name already starts with a timestamp pattern (YYMMDD_HHMMSS)
+    # Example: "251208_114207_new13" should not get another timestamp prefix
+    timestamp_pattern = re.compile(r'^\d{6}_\d{6}')
     safe = "".join(c for c in name if c.isalnum() or c in ("_", "-")) or "run"
-    run_dir = BACKTESTS / f"run_{timestamp}_{safe}"
+
+    if timestamp_pattern.match(safe):
+        # Name already has timestamp, use it as-is with just "run_" prefix
+        run_dir = BACKTESTS / f"run_{safe}"
+    else:
+        # Name doesn't have timestamp, add one
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = BACKTESTS / f"run_{timestamp}_{safe}"
+
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir

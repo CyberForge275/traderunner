@@ -106,6 +106,8 @@ def main(argv: List[str] | None = None) -> int:
         "tp_short",
         "setup",
         "score",
+        "strategy",
+        "strategy_version",
     ]
     rows: List[Dict[str, object]] = []
 
@@ -129,25 +131,62 @@ def main(argv: List[str] | None = None) -> int:
             ts = pd.Timestamp(sig.timestamp)
             if ts.tzinfo is None:
                 ts = ts.tz_localize(args.tz)
-            else:
-                ts = ts.tz_convert(args.tz)
-            record: Dict[str, object] = {
-                "ts": ts.isoformat(),
-                "Symbol": symbol,
-                "long_entry": np.nan,
-                "short_entry": np.nan,
-                "sl_long": np.nan,
-                "sl_short": np.nan,
-                "tp_long": np.nan,
-                "tp_short": np.nan,
-                "setup": sig.metadata.get("setup"),
-                "score": sig.metadata.get("score"),
-            }
+
+            # Convert to UTC for contract validation
+            ts_utc = ts.tz_convert("UTC")
+
+            # Determine entries based on signal type
+            long_entry = None
+            short_entry = None
+            sl_long = None
+            sl_short = None
+            tp_long = None
+            tp_short = None
 
             if sig.signal_type.upper() == "LONG":
-                record["long_entry"] = sig.entry_price
+                long_entry = sig.entry_price
+                sl_long = sig.stop_loss
+                tp_long = sig.take_profit
             elif sig.signal_type.upper() == "SHORT":
-                record["short_entry"] = sig.entry_price
+                short_entry = sig.entry_price
+                sl_short = sig.stop_loss
+                tp_short = sig.take_profit
+
+            # Validate against SignalOutputSpec
+            from axiom_bt.contracts.signal_schema import SignalOutputSpec
+            from decimal import Decimal
+
+            spec = SignalOutputSpec(
+                symbol=symbol,
+                timestamp=ts_utc,
+                strategy=args.strategy,
+                strategy_version="1.0.0",
+                long_entry=Decimal(str(long_entry)) if long_entry is not None else None,
+                short_entry=Decimal(str(short_entry)) if short_entry is not None else None,
+                sl_long=Decimal(str(sl_long)) if sl_long is not None else None,
+                sl_short=Decimal(str(sl_short)) if sl_short is not None else None,
+                tp_long=Decimal(str(tp_long)) if tp_long is not None else None,
+                tp_short=Decimal(str(tp_short)) if tp_short is not None else None,
+                setup=sig.metadata.get("setup"),
+                score=sig.metadata.get("score"),
+                metadata=sig.metadata
+            )
+
+            # Map back to legacy columns for compatibility
+            record: Dict[str, object] = {
+                "ts": ts.isoformat(), # Keep original timezone in output for now if needed, or spec.timestamp.isoformat()
+                "Symbol": spec.symbol,
+                "long_entry": float(spec.long_entry) if spec.long_entry else np.nan,
+                "short_entry": float(spec.short_entry) if spec.short_entry else np.nan,
+                "sl_long": float(spec.sl_long) if spec.sl_long else np.nan,
+                "sl_short": float(spec.sl_short) if spec.sl_short else np.nan,
+                "tp_long": float(spec.tp_long) if spec.tp_long else np.nan,
+                "tp_short": float(spec.tp_short) if spec.tp_short else np.nan,
+                "setup": spec.setup,
+                "score": spec.score,
+                "strategy": spec.strategy,
+                "strategy_version": spec.strategy_version
+            }
 
             rows.append(record)
 

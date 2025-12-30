@@ -13,6 +13,12 @@ install-dev: install
 test:
 	PYTHONPATH=src pytest -q tests
 
+test-integration:
+	PYTHONPATH=src pytest tests/test_integration_*.py -v
+
+test-all:
+	PYTHONPATH=src pytest tests -v
+
 test-cov:
 	PYTHONPATH=src pytest tests --cov=src --cov-report=term-missing
 

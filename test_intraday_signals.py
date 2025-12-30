@@ -20,12 +20,12 @@ def test_intraday_triggers(
     top_shorts: list,
 ):
     """Test if top candidates trigger signals on intraday data."""
-    
+
     print(f"🔍 Testing Intraday Signal Generation for {test_date}")
     print("=" * 80)
-    
+
     strategy = RudometkinMOCStrategy()
-    
+
     # Default config
     config = {
         "min_price": 10.0,
@@ -42,14 +42,14 @@ def test_intraday_triggers(
         "entry_stretch1": 0.035,
         "entry_stretch2": 0.05,
     }
-    
+
     target_date = pd.Timestamp(test_date)
-    
+
     # Test LONG candidates
     print(f"\n{'='*80}")
     print(f"TESTING {len(top_longs)} LONG CANDIDATES")
     print("=" * 80)
-    
+
     long_signals_found = 0
     for symbol in top_longs:
         result = _test_symbol(
@@ -57,12 +57,12 @@ def test_intraday_triggers(
         )
         if result > 0:
             long_signals_found += result
-    
+
     # Test SHORT candidates
     print(f"\n{'='*80}")
     print(f"TESTING {len(top_shorts)} SHORT CANDIDATES")
     print("=" * 80)
-    
+
     short_signals_found = 0
     for symbol in top_shorts:
         result = _test_symbol(
@@ -70,7 +70,7 @@ def test_intraday_triggers(
         )
         if result > 0:
             short_signals_found += result
-    
+
     # Summary
     print(f"\n{'='*80}")
     print("SUMMARY")
@@ -91,7 +91,7 @@ def _test_symbol(
     expected_direction: str,
 ) -> int:
     """Test one symbol for intraday signals."""
-    
+
     store = IntradayStore(default_tz="America/New_York")
     try:
         df = store.load(symbol, timeframe=Timeframe.M5)
@@ -113,57 +113,57 @@ def _test_symbol(
     else:
         lookback_start = target_date - pd.Timedelta(days=300)
         target_end = target_date + pd.Timedelta(days=1)
-    
+
     df_filtered = df[
         (df.index >= lookback_start) &
         (df.index <= target_end)
     ].copy()
-    
+
     if df_filtered.empty:
         print(f"\n{symbol}: ❌ No data for date range")
         return 0
-    
+
     # Standardize columns
     df_filtered = df_filtered.reset_index().rename(columns={"timestamp": "timestamp"})
-    
+
     # Check minimum data
     if len(df_filtered) < 200:
         print(f"\n{symbol}: ❌ Not enough data ({len(df_filtered)} bars < 200)")
         return 0
-    
+
     # Generate signals
     try:
         signals = strategy.generate_signals(df_filtered, symbol, config)
     except Exception as e:
         print(f"\n{symbol}: ❌ Signal generation failed: {type(e).__name__}: {e}")
         return 0
-    
+
     if not signals:
         print(f"\n{symbol}: ⚠️  No signals generated (conditions not met on intraday data)")
         return 0
-    
+
     # Filter to target date only
     target_day_signals = [
         s for s in signals
         if pd.Timestamp(s.timestamp).date() == target_date.date()
     ]
-    
+
     if not target_day_signals:
         print(f"\n{symbol}: ⚠️  {len(signals)} signals total, but none on target date {target_date.date()}")
         return 0
-    
+
     # Show results
     print(f"\n{symbol}: ✅ {len(target_day_signals)} {expected_direction} signal(s) on {target_date.date()}")
-    
+
     for i, sig in enumerate(target_day_signals[:3], 1):  # Show first 3
         sig_time = pd.Timestamp(sig.timestamp)
         print(f"  [{i}] {sig_time.strftime('%H:%M:%S')} - "
               f"{sig.signal_type} @ ${sig.entry_price:.2f} "
               f"(score: {sig.metadata.get('score', 0):.2f})")
-    
+
     if len(target_day_signals) > 3:
         print(f"  ... and {len(target_day_signals) - 3} more")
-    
+
     return len(target_day_signals)
 
 
@@ -171,15 +171,15 @@ if __name__ == "__main__":
     # Use major stocks that have data available for testing
     # These represent what would be filtered symbols from daily scan
     TEST_SYMBOLS = ["AAPL", "TSLA", "NVDA", "GOOGL", "MSFT"]
-    
+
     print("NOTE: Testing with major stocks (AAPL, TSLA, NVDA, GOOGL, MSFT)")
     print("      These may not meet Rudometkin setup criteria, but demonstrate Stage 2 logic\n")
-    
+
     # Check for data directories
     data_m5 = ROOT / "artifacts" / "data_m5"
     data_m15 = ROOT / "artifacts" / "data_m15"
     data_m1 = ROOT / "artifacts" / "data_m1"
-    
+
     # Try M5 first, then M15, then M1
     if data_m5.exists() and any(data_m5.glob("*.parquet")):
         print(f"📁 Using M5 data from: {data_m5}")
@@ -194,7 +194,7 @@ if __name__ == "__main__":
         print("❌ No intraday data found in artifacts/data_m5, data_m15, or data_m1")
         print("   Run a data fetch first or use sample data")
         sys.exit(1)
-    
+
     test_intraday_triggers(
         data_dir=data_dir,
         test_date="2025-11-21",
