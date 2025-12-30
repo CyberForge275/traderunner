@@ -92,6 +92,8 @@ def calculate_validity_window(
     # Calculate valid_to based on validity_policy
     if validity_policy == "one_bar":
         # Order valid for one bar duration
+        # NOTE: Uses ONLY timeframe_minutes; validity_minutes parameter is IGNORED
+        # This ensures order expires after exactly one bar (e.g., 5 minutes for M5)
         valid_to = valid_from + timedelta(minutes=timeframe_minutes)
 
     elif validity_policy == "session_end":

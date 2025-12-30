@@ -205,8 +205,28 @@ class InsideBarConfig:
     tick_size: float = 0.01
 
     # === Order Validity (Critical for Replay Fills) ===
-    order_validity_policy: str = "session_end"  # or "fixed_minutes" | "one_bar"
-    order_validity_minutes: int = 60  # Only for fixed_minutes policy
+    order_validity_policy: str = "session_end"
+    """Order validity policy. Determines when orders expire.
+    
+    Options:
+    - "one_bar": Expires after 1 bar (uses timeframe_minutes, IGNORES order_validity_minutes)
+    - "fixed_minutes": Expires after N minutes (uses order_validity_minutes, IGNORES timeframe)
+    - "session_end": Expires at session close (uses session_filter, IGNORES both)
+    
+    Each policy uses EXCLUSIVE parameters - no combination/fallback.
+    """
+    
+    order_validity_minutes: int = 60
+    """Duration in minutes for 'fixed_minutes' policy.
+    
+    IMPORTANT: This parameter is ONLY used when order_validity_policy="fixed_minutes".
+    It is IGNORED when policy is "one_bar" or "session_end".
+    
+    Example:
+        policy="one_bar" + validity_minutes=60 → order expires after 5 min (M5 timeframe)
+        policy="fixed_minutes" + validity_minutes=60 → order expires after 60 min
+    """
+    
     valid_from_policy: str = "signal_ts"  # or "next_bar"
 
     # === Trailing Stop (Optional) ===
@@ -267,6 +287,14 @@ class InsideBarConfig:
             f"Invalid valid_from_policy: {self.valid_from_policy}"
         if self.order_validity_policy == "fixed_minutes":
             assert self.order_validity_minutes > 0, "order_validity_minutes must be positive"
+        
+        # Warn if order_validity_minutes is set but will be ignored
+        if self.order_validity_policy == "one_bar" and self.order_validity_minutes != 60:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"order_validity_minutes={self.order_validity_minutes} will be IGNORED "
+                f"with policy='one_bar'. Orders will expire after 1 bar (timeframe duration)."
+            )
 
         # Trailing stop
         assert self.trailing_apply_mode in ["next_bar"], \
