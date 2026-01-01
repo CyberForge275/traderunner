@@ -131,15 +131,31 @@ def _resolve_symbol_path(symbol: str, m1_dir: Optional[Path], fallback_dir: Path
     import logging
     logger = logging.getLogger(__name__)
 
+    # Prefer RTH, then RAW (all sessions), then older ALL-suffix, then legacy unsuffixed.
+    names = [
+        f"{symbol}_rth.parquet",
+        f"{symbol}_raw.parquet",
+        f"{symbol}_all.parquet",
+        f"{symbol}.parquet",
+    ]
+
+    def first_existing(base: Path) -> Optional[Path]:
+        for name in names:
+            p = base / name
+            if p.exists():
+                return p
+        return None
+
     if m1_dir is not None:
-        candidate = m1_dir / f"{symbol}.parquet"
-        if candidate.exists():
-            logger.debug(f"Resolved {symbol} → {candidate} (M1 data)")
-            return candidate, True
-    fallback = fallback_dir / f"{symbol}.parquet"
-    if fallback.exists():
-        logger.debug(f"Resolved {symbol} → {fallback} (fallback data)")
-        return fallback, False
+        p = first_existing(m1_dir)
+        if p is not None:
+            logger.debug(f"Resolved {symbol} → {p} (M1 data)")
+            return p, True
+
+    p = first_existing(fallback_dir)
+    if p is not None:
+        logger.debug(f"Resolved {symbol} → {p} (fallback data)")
+        return p, False
 
     logger.warning(f"No data file found for {symbol} (searched: {m1_dir}, {fallback_dir})")
     return None, False
