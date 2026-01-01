@@ -1,0 +1,28 @@
+    # configs/inside_bar_debug_us.yaml
+    run:
+      name: debug_insidebar_us
+      symbol: HOOD
+      date_from: "2025-12-15"
+      date_to: "2025-12-17"
+      bar_freq: "M5"                 # oder M1/M5 je nachdem, was ihr nutzt
+      data_source_backtest: "EODHD"   # wie von dir beschrieben
+    
+    session:
+      # Wichtig: Session-Fenster IMMER in market_tz evaluieren (für US Stocks: America/New_York)
+      market_tz: "America/New_York"
+      display_tz: "Europe/Berlin"     # nur fürs UI/Logs/Reports, NICHT für gating
+      mode: "custom"
+      # Zwei Trading-Fenster (NY Zeit)
+      windows:
+        - start: "10:00"
+          end: "11:00"
+        - start: "11:00"
+          end: "12:00"
+      # optional:
+      allow_premarket: false
+      allow_afterhours: false
+    
+    debug:
+      enabled: true
+      trace_session_decisions: true   # pro Signal: warum accepted/rejected
+      trace_order_rejections: true    # order builder: warum rejected
