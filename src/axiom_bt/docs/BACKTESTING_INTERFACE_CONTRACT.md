@@ -269,13 +269,121 @@ Define evidence codes as a stable enum-like list (do not invent ad-hoc strings i
 
 > **Invariant EVID-1:** Trades and fills must carry evidence codes and an `evidence_status`.
 
+### 6.1 Implementation Status
+
+> [!IMPORTANT]
+> **Evidence Code System Status**: DESIGNED but NOT YET ENFORCED
+> 
+> **Current State** (as of 2026-01-02):
+> - Evidence codes are defined and documented (above list is normative)
+> - **Code enforcement**: Planned but not yet implemented
+> - **Missing**: `EvidenceCode` enum, centralized registry, validation in run pipeline
+> 
+> **Until enforcement is implemented**:
+> - Strategies MAY emit evidence strings but there is NO validation against this canonical list
+> - Audit tools SHOULD warn on unknown evidence codes
+> - **Risk**: Ad-hoc evidence strings may leak into outputs
+> 
+> **Acceptance Criteria for "Enforced"**:
+> 1. `EvidenceCode` enum exists in `axiom_bt/contracts/evidence.py`
+> 2. All evidence-emitting functions use enum values only
+> 3. Validation in run pipeline rejects unknown codes
+> 4. Tests verify enum completeness matches contract
+
 ---
 
 ## 7. Determinism and Auditability
 
-> **Invariant DET-1:** No usage of `now()` or wall-clock time in simulation; time is derived from data windows and run meta.
-> **Invariant AUD-1:** `run_steps.jsonl` must include counts for orders, fills, trades, and evidence PASS/WARN/FAIL distribution.
-> **Invariant AUD-2:** All artifacts required by this contract must be listed in `run_manifest.json`.
+### 7.1 Determinism Guarantee
+
+> **Invariant DET-1**: No usage of `now()` or wall-clock time in simulation; time is derived from data windows and run metadata.
+
+**Definition**: A backtest is **deterministic** if:
+
+```
+Same inputs → Same outputs
+
+Where:
+- Same inputs  = identical data files + identical config + identical code (git SHA)
+- Same outputs = identical trades, fills, orders, equity curve, metrics
+```
+
+**Allowed Variances** (these MAY differ between runs):
+- `run_id` (contains timestamp component)
+- Execution time metrics (e.g., `runtime_seconds`, `wall_clock_start`)
+- Log message timestamps
+- Artifact file creation timestamps (filesystem metadata)
+
+**MUST Match Exactly**:
+| Output | Comparison Method | Tolerance |
+|--------|-------------------|-----------|
+| Trade timestamps | Exact match | 0 ms |
+| Trade prices | Exact match | 0.0 |
+| Trade quantities | Exact match | 0 |
+| Order IDs, fill IDs, trade IDs | Exact match (if deterministic ID gen implemented) | - |
+| Equity curve values | Exact match | 0.0 |
+| Performance metrics (Sharpe, DD, win rate) | Exact match | 0.0001 (rounding) |
+
+### 7.2 Reproducibility Test Procedure
+
+**To verify a run is reproducible**:
+
+1. **Record inputs**:
+   ```bash
+   RUN_1_ID="original_run_id"
+   git rev-parse HEAD > commit_sha.txt
+   cp config.yaml config_frozen.yaml
+   cp -r artifacts/data_m1_rth artifacts/data_frozen
+   ```
+
+2. **Execute run 1**:
+   ```python
+   result_1 = run_backtest_full(...)
+   # Produces: artifacts/backtests/$RUN_1_ID/
+   ```
+
+3. **Re-execute run 2 (same inputs)**:
+   ```bash
+   git checkout $(cat commit_sha.txt)
+   export DATA_PATH=artifacts/data_frozen
+   result_2 = run_backtest_full(...)  # Same params as Run 1
+   ```
+
+4. **Compare outputs**:
+   ```bash
+   diff <(sort $RUN_1_ID/trades.csv) <(sort $RUN_2_ID/trades.csv)
+   diff <(sort $RUN_1_ID/orders.csv) <(sort $RUN_2_ID/orders.csv)
+   diff $RUN_1_ID/equity_curve.csv $RUN_2_ID/equity_curve.csv
+   ```
+
+5. **Acceptance**:
+   - ✅ **PASS**: All diffs empty (except run_id, timestamps)
+   - ❌ **FAIL**: Any trade, order, fill, or equity value differs
+
+### 7.3 Deterministic ID Generation (Current Status: NOT IMPLEMENTED)
+
+**Contract Requirement**:
+- `signal_id = hash(run_id + symbol + signal_ts + side + levels)`
+- `order_id = hash(signal_id + validity + entry_level)`
+- `trade_id = hash(order_id + entry_fill_ts)`
+
+**When implemented**: IDs will be reproducible across machines and runs.  
+**Until then**: IDs may be pandas-index or UUID-based (run-specific, not reproducible).
+
+### 7.4 Audit Trail Requirements
+
+> **Invariant AUD-1**: `run_steps.jsonl` must include counts for orders, fills, trades, and evidence PASS/WARN/FAIL distribution.
+> **Invariant AUD-2**: All artifacts required by this contract must be listed in `run_manifest.json`.
+
+**Audit Checklist** (for contract compliance):
+
+- [ ] `run_meta.json` exists with: run_id, symbol, mode, timezones, git SHA, config snapshot
+- [ ] `orders.csv` row count matches `run_steps.jsonl` → `orders_generated`
+- [ ] `filled_orders.csv` row count matches `run_steps.jsonl` → `fills_executed`
+- [ ] `trades.csv` row count matches `run_steps.jsonl` → `trades_completed`
+- [ ] Evidence distribution (PASS/WARN/FAIL) matches `run_steps.jsonl`
+- [ ] Bars persisted: `bars/bars_exec_M1_rth.parquet`, `bars/bars_signal_*_rth.parquet`
+- [ ] `run_manifest.json` lists all artifacts with checksums
 
 ---
 

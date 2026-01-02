@@ -89,18 +89,18 @@ The EODHD data pipeline provides automated fetching, gap detection, RTH filterin
 ```
 1. EODHD API Call
    ↓
-2. Raw M1 Data (All Hours)
+2. Raw M1 Data (All Sessions: Pre-Market + RTH + After-Hours)
    ├─→ Save: SYMBOL_raw.parquet (100,617 rows for TSLA example)
    │
    ├─→ RTH Filter (09:30-16:00 ET)
    │   ↓
-   │   Save: SYMBOL.parquet (40,950 rows for TSLA example)
+   │   Save: SYMBOL_rth.parquet (40,950 rows for TSLA example)
    │   ↓
-   │   Resample to M5 (5-minute bars)
-   │   ├─→ Save: data_m5/SYMBOL.parquet (8,190 rows)
+   │   Resample to M5 (5-minute bars, RTH-only)
+   │   ├─→ Save: data_m5/SYMBOL_rth.parquet (8,190 rows)
    │   │
-   │   Resample to M15 (15-minute bars)
-   │   └─→ Save: data_m15/SYMBOL.parquet (2,730 rows)
+   │   Resample to M15 (15-minute bars, RTH-only)
+   │   └─→ Save: data_m15/SYMBOL_rth.parquet (2,730 rows)
    │
    └─→ (Raw data kept for debugging/analysis)
 ```
@@ -124,7 +124,7 @@ The EODHD data pipeline provides automated fetching, gap detection, RTH filterin
    └─→ .drop_duplicates()
    ↓
 5. Save Merged Result
-   └─→ SYMBOL.parquet (complete dataset)
+   └─→ SYMBOL_rth.parquet (RTH-only complete dataset)
    ↓
 6. Auto-Aggregate M5/M15
 ```

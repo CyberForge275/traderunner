@@ -19,8 +19,7 @@ Im Bar-Replay ist eine 0-Duration Order nicht “aktiv” in einer Bar → Fill 
 
 ## 2. Handelszeiten (Always-On)
 - session_timezone: `Europe/Berlin` (DST-sicher)
-- session_windows default: `15:00–16:00` und `16:00–17:00`
-- Sessionfilter ist immer aktiv (nie None / nie “aus”)
+2. **Sessions**: Parameterized via `session_windows` (production default: `["15:00-16:00", "16:00-17:00"]` Berlin time)r ist immer aktiv (nie None / nie “aus”)
 
 ## 3. Setup: Inside Bar Definition
 Inside Bar Candle i relativ zu Candle i-1:
