@@ -307,13 +307,18 @@ class InsideBarCore:
         signals_per_session: Dict[tuple, int] = {}
         max_trades = getattr(self.config, 'max_trades_per_session', 1)
         
-        # MVP: Netting enforcement - track open positions per symbol
+        # MVP: Netting enforcement - conservative position window tracking
         # When netting_mode='one_position_per_symbol', only 1 position allowed
         netting_mode = getattr(self.config, 'netting_mode', 'one_position_per_symbol')
-        has_open_position = False  # Symbol-level position tracker
-        # Note: In this MVP, we assume linear signal generation (not parallel fills)
-        # Position is considered "open" from signal generation until session end or explicit close
-        # For backtest: signal → order → (later) fill/trade lifecycle happens sequentially
+        netting_open_until: Optional[pd.Timestamp] = None
+        # Conservative approach: Position "open" until validity window ends
+        # Based on order_validity_policy (session_end/one_bar/fixed_minutes)
+        # Does NOT track actual fill→exit (no Engine coupling)
+        # Blocks overlapping positions, allows sequential positions after window
+        
+        # Get validity parameters for netting calculation
+        validity_policy = getattr(self.config, 'order_validity_policy', 'session_end')
+        validity_minutes = getattr(self.config, 'order_validity_minutes', 60)
         
         # MVP: Trigger-within-session enforcement
         trigger_must_be_in_session = getattr(self.config, 'trigger_must_be_within_session', True)
@@ -487,14 +492,19 @@ class InsideBarCore:
                     continue
                 
                 # === NETTING CHECK (MVP: 1 position per symbol) ===
-                if netting_mode == "one_position_per_symbol" and has_open_position:
-                    emit({
-                        'event': 'signal_rejected',
-                        'reason': 'netting_blocked_position_open',
-                        'netting_mode': netting_mode,
-                        'symbol': symbol
-                    })
-                    continue
+                if netting_mode == "one_position_per_symbol" and netting_open_until is not None:
+                    # Check if trigger_ts overlaps with existing position window
+                    if ts < netting_open_until:
+                        emit({
+                            'event': 'signal_rejected',
+                            'reason': 'netting_blocked_position_open',
+                            'netting_mode': netting_mode,
+                            'symbol': symbol,
+                            'trigger_ts': ts.isoformat(),
+                            'open_until': netting_open_until.isoformat()
+                        })
+                        continue
+                    # else: ts >= netting_open_until, previous position window closed
 
                 # Check LONG breakout
                 if current['close'] > entry_long:
@@ -562,7 +572,23 @@ class InsideBarCore:
                     signals.append(signal)
                     state['done'] = True
                     signals_per_session[session_key] = signals_per_session.get(session_key, 0) + 1
-                    has_open_position = True  # Mark position as open (MVP netting)
+                    
+                    # === NETTING: Calculate position open_until (conservative) ===
+                    if validity_policy == 'session_end':
+                        netting_open_until = session_filter.get_session_end(ts, session_tz)
+                    elif validity_policy == 'one_bar':
+                        # Assume M5 timeframe (5 minutes)
+                        # TODO: Make timeframe configurable if needed
+                        netting_open_until = ts + pd.Timedelta(minutes=5)
+                    elif validity_policy == 'fixed_minutes':
+                        netting_open_until = ts + pd.Timedelta(minutes=validity_minutes)
+                        # Clamp to session_end (don't extend beyond session)
+                        session_end = session_filter.get_session_end(ts, session_tz)
+                        if session_end and netting_open_until > session_end:
+                            netting_open_until = session_end
+                    else:
+                        # Fallback: session_end
+                        netting_open_until = session_filter.get_session_end(ts, session_tz)
 
                     emit({
                         'event': 'signal_generated',
@@ -639,7 +665,19 @@ class InsideBarCore:
                     signals.append(signal)
                     state['done'] = True
                     signals_per_session[session_key] = signals_per_session.get(session_key, 0) + 1
-                    has_open_position = True  # Mark position as open (MVP netting)
+                    
+                    # === NETTING: Calculate position open_until (conservative) ===
+                    if validity_policy == 'session_end':
+                        netting_open_until = session_filter.get_session_end(ts, session_tz)
+                    elif validity_policy == 'one_bar':
+                        netting_open_until = ts + pd.Timedelta(minutes=5)
+                    elif validity_policy == 'fixed_minutes':
+                        netting_open_until = ts + pd.Timedelta(minutes=validity_minutes)
+                        session_end = session_filter.get_session_end(ts, session_tz)
+                        if session_end and netting_open_until > session_end:
+                            netting_open_until = session_end
+                    else:
+                        netting_open_until = session_filter.get_session_end(ts, session_tz)
 
                     emit({
                         'event': 'signal_generated',

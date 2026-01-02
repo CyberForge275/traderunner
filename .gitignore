@@ -118,3 +118,7 @@ logs/*.log
 # Generated docs artifacts
 *.pdf
 !docs/**/*.pdf  # Allow versioned documentation PDFs
+
+# Local evidence (NEVER COMMIT)
+evidence_*/
+evidence_*.zip

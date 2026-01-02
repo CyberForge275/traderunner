@@ -261,12 +261,17 @@ def test_netting_one_position_per_symbol(base_config):
     
     signals = core.process_data(df, symbol='TEST')
     
-    # NETTING ENFORCEMENT: Only 1 signal allowed (first one wins)
-    assert len(signals) == 1, \
-        f"Expected 1 signal (netting blocks second), got {len(signals)}"
+    # NETTING ENFORCEMENT (CORRECTED): 2 signals allowed
+    # Session 1 ends at 16:00, Session 2 starts at 16:00
+    # netting_open_until (session_end) = 16:00 for signal 1
+    # Signal 2 trigger at 16:10 >= 16:00 → ALLOWED
+    assert len(signals) == 2, \
+        f"Expected 2 signals (different non-overlapping sessions), got {len(signals)}"
     
-    # Verify first signal was from session 1
+    # Verify both signals are from different sessions
+    assert signals[0].metadata['session_key'] != signals[1].metadata['session_key']
     assert signals[0].side == 'BUY'
+    assert signals[1].side == 'BUY'
 
 
 # ==============================================================================
