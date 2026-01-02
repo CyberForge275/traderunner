@@ -6,7 +6,7 @@ Diese Dokumentation beschreibt die *finale* InsideBar-Strategie als Single Sourc
 ## Standardannahmen
 - Timeframe: M5
 - Timezone für Session-Auswertung: Europe/Berlin (inkl. DST/CET/CEST automatisch)
-- Sessions (parameterized, production default "15:00-16:00", "16:00-17:00" Berlin):
+- Sessions (parameterized, example: "15:00-16:00", "16:00-17:00" Berlin):
   - 15:00–16:00
   - 16:00–17:00
 - Entry-Level Mode: mother_bar (fix)

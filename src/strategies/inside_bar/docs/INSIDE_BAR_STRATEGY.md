@@ -17,9 +17,9 @@ Im Bar-Replay ist eine 0-Duration Order nicht “aktiv” in einer Bar → Fill 
 
 **Fix-Contract:** default `order_validity_policy = session_end` und `valid_to > valid_from`.
 
-## 2. Handelszeiten (Always-On)
-- session_timezone: `Europe/Berlin` (DST-sicher)
-2. **Sessions**: Parameterized via `session_windows` (production default: `["15:00-16:00", "16:00-17:00"]` Berlin time)r ist immer aktiv (nie None / nie “aus”)
+## 2. Handelszeiten (Parameterized)
+- Session timezone: `Europe/Berlin` (DST-sicher)
+- Sessions: **Parameterized via `session_windows`** (example: `["15:00-16:00", "16:00-17:00"]` Berlin time)
 
 ## 3. Setup: Inside Bar Definition
 Inside Bar Candle i relativ zu Candle i-1:

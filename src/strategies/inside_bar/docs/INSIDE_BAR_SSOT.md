@@ -8,7 +8,7 @@ Sie gilt für **Backtest (Replay Engine)** und **Live-Ausführung**.
 - Timeframe: **M5**
 - Timezone: **Europe/Berlin**
 - Sessions: **Parameterized via `session_windows`** (e.g., `["15:00-16:00", "16:00-17:00"]` in Berlin Local Time)
-  - **Production default**: 15:00–17:00 Berlin (2 windows as shown)
+  - **Example configuration**: 15:00–17:00 Berlin (2 windows as shown)
   - **Plausibility requirement**: Session windows MUST lie within RTH if backtesting with RTH data
   - **DST handling**: Times are always local to `market_tz` (Europe/Berlin), DST-safe
 - Semantik: **Nur die erste Inside Bar pro Session wird gehandelt** (Session State Machine).
@@ -17,7 +17,7 @@ Sie gilt für **Backtest (Replay Engine)** und **Live-Ausführung**.
 - Order Validity Policy: **Parameterized via `order_validity_policy`**
   - **Options**: `session_end`, `one_bar`, `fixed_minutes`
   - **Recommended for this strategy**: `session_end` (ensures positive order duration for Replay fills)
-  - **Status**: Parameter implemented; UI configuration TODO
+  - **Implementation status**: Policy logic implemented in `trade/validity.py` (lines 93-142), parameter wired in `InsideBarConfig` (line 208); UI configuration pending
 - Max Trades per Session: **1** (Hard Limit)
 
 ## DST (Sommer-/Winterzeit)
