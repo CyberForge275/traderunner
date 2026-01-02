@@ -229,6 +229,25 @@ class InsideBarConfig:
     
     valid_from_policy: str = "signal_ts"  # or "next_bar"
 
+    # === MVP: Trigger and Netting Rules ===
+    trigger_must_be_within_session: bool = True
+    """Enforce trigger (breakout) must occur within session windows.
+    
+    When True (default): Breakout/trigger timestamp must be within session windows.
+    Signal generation does NOT guarantee trigger timing - this is an additional gate.
+    
+    When False: Allows triggers outside session (legacy behavior, not recommended).
+    """
+    
+    netting_mode: str = "one_position_per_symbol"
+    """Position netting policy.
+    
+    MVP: Only "one_position_per_symbol" is supported.
+    While a position is open for a symbol, no additional positions can be opened.
+    
+    Future: "hedging" or "pyramiding" could be added.
+    """
+
     # === Trailing Stop (Optional) ===
     trailing_enabled: bool = False
     trailing_trigger_tp_pct: float = 0.70
@@ -287,6 +306,12 @@ class InsideBarConfig:
             f"Invalid valid_from_policy: {self.valid_from_policy}"
         if self.order_validity_policy == "fixed_minutes":
             assert self.order_validity_minutes > 0, "order_validity_minutes must be positive"
+        
+        # MVP: Trigger and netting validations
+        assert isinstance(self.trigger_must_be_within_session, bool), \
+            "trigger_must_be_within_session must be bool"
+        assert self.netting_mode == "one_position_per_symbol", \
+            f"Invalid netting_mode: {self.netting_mode}. Only 'one_position_per_symbol' supported in MVP"
         
         # Warn if order_validity_minutes is set but will be ignored
         if self.order_validity_policy == "one_bar" and self.order_validity_minutes != 60:

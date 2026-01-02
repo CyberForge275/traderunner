@@ -306,6 +306,17 @@ class InsideBarCore:
         # Additional hard limit counter (belt-and-suspenders with state machine)
         signals_per_session: Dict[tuple, int] = {}
         max_trades = getattr(self.config, 'max_trades_per_session', 1)
+        
+        # MVP: Netting enforcement - track open positions per symbol
+        # When netting_mode='one_position_per_symbol', only 1 position allowed
+        netting_mode = getattr(self.config, 'netting_mode', 'one_position_per_symbol')
+        has_open_position = False  # Symbol-level position tracker
+        # Note: In this MVP, we assume linear signal generation (not parallel fills)
+        # Position is considered "open" from signal generation until session end or explicit close
+        # For backtest: signal → order → (later) fill/trade lifecycle happens sequentially
+        
+        # MVP: Trigger-within-session enforcement
+        trigger_must_be_in_session = getattr(self.config, 'trigger_must_be_within_session', True)
 
         # Entry level mode
         entry_mode = getattr(self.config, 'entry_level_mode', 'mother_bar')
@@ -474,9 +485,35 @@ class InsideBarCore:
                     })
                     state['done'] = True  # Mark session done
                     continue
+                
+                # === NETTING CHECK (MVP: 1 position per symbol) ===
+                if netting_mode == "one_position_per_symbol" and has_open_position:
+                    emit({
+                        'event': 'signal_rejected',
+                        'reason': 'netting_blocked_position_open',
+                        'netting_mode': netting_mode,
+                        'symbol': symbol
+                    })
+                    continue
 
                 # Check LONG breakout
                 if current['close'] > entry_long:
+                    # === MVP: TRIGGER MUST BE WITHIN SESSION ===
+                    if trigger_must_be_in_session:
+                        # Trigger timestamp = current bar timestamp (breakout confirmed on close)
+                        trigger_ts = ts
+                        trigger_in_session = session_filter.is_in_session(trigger_ts, session_tz)
+                        
+                        if not trigger_in_session:
+                            emit({
+                                'event': 'signal_rejected',
+                                'reason': 'trigger_outside_session',
+                                'idx': int(idx),
+                                'trigger_ts': trigger_ts.isoformat(),
+                                'trigger_ts_local': trigger_ts.tz_convert(session_tz).strftime('%H:%M'),
+                                'side': 'BUY'
+                            })
+                            continue
                     # Calculate SL with cap
                     sl = levels['mother_low']
                     initial_risk = entry_long - sl
@@ -525,6 +562,7 @@ class InsideBarCore:
                     signals.append(signal)
                     state['done'] = True
                     signals_per_session[session_key] = signals_per_session.get(session_key, 0) + 1
+                    has_open_position = True  # Mark position as open (MVP netting)
 
                     emit({
                         'event': 'signal_generated',
@@ -538,6 +576,21 @@ class InsideBarCore:
 
                 # Check SHORT breakout
                 elif current['close'] < entry_short:
+                    # === MVP: TRIGGER MUST BE WITHIN SESSION ===
+                    if trigger_must_be_in_session:
+                        trigger_ts = ts
+                        trigger_in_session = session_filter.is_in_session(trigger_ts, session_tz)
+                        
+                        if not trigger_in_session:
+                            emit({
+                                'event': 'signal_rejected',
+                                'reason': 'trigger_outside_session',
+                                'idx': int(idx),
+                                'trigger_ts': trigger_ts.isoformat(),
+                                'trigger_ts_local': trigger_ts.tz_convert(session_tz).strftime('%H:%M'),
+                                'side': 'SELL'
+                            })
+                            continue
                     # Calculate SL with cap
                     sl = levels['mother_high']
                     initial_risk = sl - entry_short
@@ -586,6 +639,7 @@ class InsideBarCore:
                     signals.append(signal)
                     state['done'] = True
                     signals_per_session[session_key] = signals_per_session.get(session_key, 0) + 1
+                    has_open_position = True  # Mark position as open (MVP netting)
 
                     emit({
                         'event': 'signal_generated',

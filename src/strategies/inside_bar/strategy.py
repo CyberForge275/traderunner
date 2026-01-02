@@ -139,13 +139,18 @@ class InsideBarStrategy(BaseStrategy):
 
             # Order validity
             'order_validity_policy': config.get('order_validity_policy', 'session_end'),
-            'order_validity_minutes': config.get('order_validity_minutes', 60),
+            'order_validity_minutes': config.get('validity_minutes')  # User-facing name
+                or config.get('order_validity_minutes', 60),  # Internal name fallback
             'valid_from_policy': config.get('valid_from_policy', 'signal_ts'),
 
             # Entry/SL sizing
             'entry_level_mode': config.get('entry_level_mode', 'mother_bar'),
             'stop_distance_cap_ticks': config.get('stop_distance_cap_ticks', 40),
             'tick_size': config.get('tick_size', 0.01),
+            
+            # MVP: Trigger and Netting
+            'trigger_must_be_within_session': config.get('trigger_must_be_within_session', True),
+            'netting_mode': config.get('netting_mode', 'one_position_per_symbol'),
 
             # Trailing (pass-through, defaults already validated)
             'trailing_enabled': config.get('trailing_enabled', False),

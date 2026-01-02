@@ -11,13 +11,16 @@ Sie gilt für **Backtest (Replay Engine)** und **Live-Ausführung**.
   - **Example configuration**: 15:00–17:00 Berlin (2 windows as shown)
   - **Plausibility requirement**: Session windows MUST lie within RTH if backtesting with RTH data
   - **DST handling**: Times are always local to `market_tz` (Europe/Berlin), DST-safe
+  - **MVP: Trigger Rule**: Breakout (trigger) MUST occur within session windows (enforced when `trigger_must_be_within_session=True`, default)
 - Semantik: **Nur die erste Inside Bar pro Session wird gehandelt** (Session State Machine).
 - Entry Default: **mother_bar**
 - Trailing: implementiert, **Default OFF**, Apply-Mode: **next_bar**
 - Order Validity Policy: **Parameterized via `order_validity_policy`**
-  - **Options**: `session_end`, `one_bar`, `fixed_minutes`
+  - **Options**: `session_end`, `one_bar`, `fixed_minutes` (NO other names - these are the exact policy identifiers)
   - **Recommended for this strategy**: `session_end` (ensures positive order duration for Replay fills)
   - **Implementation status**: Policy logic implemented in `trade/validity.py` (lines 93-142), parameter wired in `InsideBarConfig` (line 208); UI configuration pending
+  - **Note**: When using `fixed_minutes`, the `validity_minutes` parameter (or `order_validity_minutes`) determines duration
+- **MVP: Netting Assumption**: **One position per symbol** (enforced when `netting_mode='one_position_per_symbol'`, default). No multiple concurrent positions.
 - Max Trades per Session: **1** (Hard Limit)
 
 ## DST (Sommer-/Winterzeit)
