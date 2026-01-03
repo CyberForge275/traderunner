@@ -82,9 +82,17 @@ def _exit_after_entry(
     entry_ts: pd.Timestamp,
     stop_loss: Optional[float],
     take_profit: Optional[float],
-    valid_until: pd.Timestamp,
+    exit_deadline: pd.Timestamp,
 ):
-    window = df.loc[(df.index >= entry_ts) & (df.index <= valid_until)]
+    window = df.loc[(df.index >= entry_ts) & (df.index <= exit_deadline)]
+    if window.empty:
+        # Fallback if window is empty for some reason (e.g. entry at very last bar)
+        # We try to get the close of the entry bar if available
+        entry_row = df.loc[df.index == entry_ts]
+        if not entry_row.empty:
+            return entry_ts, float(entry_row.iloc[0]["Close"]), "EOD"
+        return entry_ts, 0.0, "EOD"  # Should not happen with valid data
+
     for ts, row in window.iterrows():
         low = row["Low"]
         high = row["High"]
@@ -109,6 +117,43 @@ def _exit_after_entry(
     last_ts = window.index[-1]
     last_close = float(window.iloc[-1]["Close"])
     return last_ts, last_close, "EOD"
+
+
+def _compute_market_close_deadline(
+    df: pd.DataFrame,
+    entry_ts: pd.Timestamp,
+    market_tz: str,
+    close_hhmm: str = "16:00"
+) -> pd.Timestamp:
+    """
+    Compute the last available bar on the entry day that is <= close_hhmm.
+    """
+    # Convert entry_ts to market TZ to find the day
+    local_entry = entry_ts.tz_convert(market_tz)
+    day = local_entry.date()
+    
+    # Define the target close time in market TZ
+    hh, mm = map(int, close_hhmm.split(":"))
+    target_close_local = pd.Timestamp.combine(day, pd.Series([pd.Timestamp(f"{hh:02}:{mm:02}").time()])[0])
+    target_close = pd.Timestamp(target_close_local, tz=market_tz)
+    
+    # Filter data for this day
+    day_data = df.loc[df.index.normalize() == pd.Timestamp(day).tz_localize(market_tz).tz_convert(df.index.tz)]
+    if day_data.empty:
+        # If no data for this day in normalize format, fallback to manual index slice
+        day_data = df.loc[df.index.date == day]
+        
+    # Find last bar <= target_close
+    eligible = day_data.loc[day_data.index <= target_close]
+    if not eligible.empty:
+        return eligible.index[-1]
+    
+    # Fallback to the absolute last bar of the day if target_close not reached
+    if not day_data.empty:
+        return day_data.index[-1]
+    
+    # Absolute fallback to entry_ts
+    return entry_ts
 
 
 def _derive_m1_dir(data_path: Path) -> Optional[Path]:
@@ -169,6 +214,8 @@ def simulate_insidebar_from_orders(
     initial_cash: float = DEFAULT_INITIAL_CASH,
     data_path_m1: Optional[Path] = None,
     requested_end: Optional[Union[str, pd.Timestamp]] = None,
+    market_tz: Optional[str] = None,
+    market_close_hhmm: str = "16:00",
 ) -> Dict[str, Any]:
     import logging
     logger = logging.getLogger(__name__)
@@ -298,8 +345,12 @@ def simulate_insidebar_from_orders(
                 stop_loss = float(row["stop_loss"]) if not pd.isna(row["stop_loss"]) else None
                 take_profit = float(row["take_profit"]) if not pd.isna(row["take_profit"]) else None
 
+                exit_deadline = _compute_market_close_deadline(
+                    ohlcv, entry_ts, market_tz=market_tz or tz, close_hhmm=market_close_hhmm
+                )
+
                 exit_ts, raw_exit_price, exit_reason = _exit_after_entry(
-                    ohlcv, side, entry_ts, stop_loss, take_profit, valid_to
+                    ohlcv, side, entry_ts, stop_loss, take_profit, exit_deadline
                 )
 
                 opposite_side: Side = "SELL" if side == "BUY" else "BUY"
