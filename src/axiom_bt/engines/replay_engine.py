@@ -7,6 +7,7 @@ from typing import Any, Dict, Literal, Optional, Tuple, Union
 import pandas as pd
 
 from core.settings import DEFAULT_INITIAL_CASH
+from axiom_bt.portfolio.ledger import PortfolioLedger
 
 Side = Literal["BUY", "SELL"]
 
@@ -308,6 +309,9 @@ def simulate_insidebar_from_orders(
     filled = []
     trades = []
     cash = initial_cash
+    
+    # Step 1 (Dual-Track): Mirror cash tracking in PortfolioLedger
+    ledger = PortfolioLedger(initial_cash)
     equity_points = []
     filled_indices: list[int] = []
     fill_ts_map: dict[int, pd.Timestamp] = {}
@@ -366,6 +370,20 @@ def simulate_insidebar_from_orders(
                 total_slippage = slippage_entry + slippage_exit
                 pnl -= total_fees
                 cash += pnl
+                
+                # Step 1 (Dual-Track): Apply to ledger
+                ledger.apply_trade(
+                    exit_ts=exit_ts,
+                    pnl=pnl,
+                    fees=total_fees,
+                    slippage=total_slippage,
+                    meta={"symbol": symbol, "side": side}
+                )
+                
+                # Optional parity check (gated by ENV)
+                import os
+                if os.getenv("AXIOM_BT_LEDGER_PARITY") == "1":
+                    assert abs(ledger.cash - cash) < 1e-6, f"Ledger parity failed: {ledger.cash} != {cash}"
 
                 filled.append(
                     {
@@ -559,6 +577,9 @@ def simulate_daily_moc_from_orders(
     filled = []
     trades = []
     cash = initial_cash
+    
+    # Step 1 (Dual-Track): Mirror cash tracking in PortfolioLedger
+    ledger = PortfolioLedger(initial_cash)
 
     for symbol, group in orders.groupby("symbol"):
         file_path = data_path / f"{symbol}.parquet"
@@ -601,6 +622,20 @@ def simulate_daily_moc_from_orders(
                 }
             )
             cash -= fees
+            
+            # Step 1 (Dual-Track): Apply fees to ledger (MOC fills have no realized PnL yet)
+            ledger.apply_trade(
+                exit_ts=pd.Timestamp(candle.name),
+                pnl=-fees,  # Only fees impact cash for MOC fills
+                fees=fees,
+                slippage=fill_price - close,
+                meta={"symbol": symbol, "side": side, "reason": "MOC_fill"}
+            )
+            
+            # Optional parity check (gated by ENV)
+            import os
+            if os.getenv("AXIOM_BT_LEDGER_PARITY") == "1":
+                assert abs(ledger.cash - cash) < 1e-6, f"Ledger parity failed (MOC): {ledger.cash} != {cash}"
 
     filled_df = pd.DataFrame(filled)
     trades_df = pd.DataFrame(trades)
