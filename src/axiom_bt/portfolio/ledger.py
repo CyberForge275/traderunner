@@ -6,11 +6,16 @@ in backtests. Step 1 (dual-track): mirror existing cash accounting without
 changing behavior.
 
 Hardening: Added START entry, deterministic sequencing, and optional reporting.
+Step A: Monotonic safety for multi-symbol + timestamp normalization.
 """
 
 from dataclasses import dataclass, field
 from typing import Optional
 import pandas as pd
+import logging
+import os
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -30,12 +35,34 @@ class LedgerEntry:
     meta: Optional[dict] = field(default_factory=dict)
     
     def __post_init__(self):
-        """Ensure timestamp is pandas Timestamp and tz-aware."""
+        """Ensure timestamp is pandas Timestamp and tz-aware (UTC normalized)."""
         if not isinstance(self.ts, pd.Timestamp):
             self.ts = pd.Timestamp(self.ts)
-        # Make tz-aware if not already (use UTC as default)
+        
+        # Step A2: Timestamp normalization with evidence tracking
+        ts_was_naive = False
         if self.ts.tz is None:
+            ts_was_naive = True
+            # Check if strict mode is enabled
+            if os.getenv("AXIOM_BT_LEDGER_STRICT_TIME") == "1":
+                raise ValueError(
+                    f"AXIOM_BT_LEDGER_STRICT_TIME=1: Naive timestamp not allowed. "
+                    f"Received: {self.ts}"
+                )
+            # Default: auto-convert to UTC with warning
+            logger.warning(
+                f"Portfolio ledger received naive timestamp {self.ts}, "
+                f"auto-converting to UTC. Set timezone explicitly to avoid this warning."
+            )
             self.ts = self.ts.tz_localize("UTC")
+        
+        # Normalize to UTC for consistent comparisons
+        if str(self.ts.tz) != "UTC":
+            self.ts = self.ts.tz_convert("UTC")
+        
+        # Store evidence if timestamp was naive
+        if ts_was_naive and "ts_was_naive" not in self.meta:
+            self.meta["ts_was_naive"] = True
 
 
 class PortfolioLedger:
