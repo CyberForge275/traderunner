@@ -201,7 +201,7 @@ class InsideBarConfig:
 
     # === Entry & Exit ===
     entry_level_mode: str = "mother_bar"  # or "inside_bar"
-    stop_distance_cap_ticks: int = 40
+    stop_distance_cap_ticks: int = 4000
     tick_size: float = 0.01
 
     # === Order Validity (Critical for Replay Fills) ===
@@ -380,6 +380,10 @@ def get_default_config_path() -> Path:
         FileNotFoundError: If no config file found
     """
     candidates = [
+        # 1. Local strategy directory (Strongest preference - encapsulated)
+        Path(__file__).parent / 'inside_bar.yaml',
+        
+        # 2. Global project config (Fallback/Legacy)
         Path.home() / 'data' / 'workspace' / 'droid' / 'traderunner' / 'config' / 'inside_bar.yaml',
         Path('/opt/trading/traderunner/config/inside_bar.yaml'),
         Path.home() / '.trading' / 'config' / 'inside_bar.yaml',
