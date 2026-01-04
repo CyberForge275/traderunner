@@ -91,7 +91,16 @@ def _build_args_from_params(strategy_params: Dict, market_tz: str) -> argparse.N
     initial_cash = float(strategy_params.get("initial_cash", DEFAULT_INITIAL_CASH))
     risk_pct = float(strategy_params.get("risk_pct", 1.0))
     pos_pct = float(strategy_params.get("pos_pct", 10.0))
-    max_position_pct = float(strategy_params.get("max_position_pct", 20.0))
+    max_position_pct = strategy_params.get("max_position_pct")
+    if max_position_pct is None:
+        logger.warning(
+            "Parameter 'max_position_pct' missing from strategy_params. "
+            "Using Legacy-parity default of 100.0%. "
+            "Please update your strategy configuration to include this parameter."
+        )
+        max_position_pct = 100.0
+    else:
+        max_position_pct = float(max_position_pct)
 
     sizing = str(strategy_params.get("sizing", "risk"))
     qty = float(strategy_params.get("qty", 1.0))

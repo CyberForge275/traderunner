@@ -258,6 +258,7 @@ class InsideBarConfig:
     lookback_candles: int = 50
     max_pattern_age_candles: int = 12
     max_deviation_atr: float = 3.0
+    max_position_pct: float = 100.0  # Default to 100 for Legacy parity
 
     @property
     def session_filter(self) -> SessionFilter:
@@ -297,6 +298,7 @@ class InsideBarConfig:
         assert self.max_trades_per_session > 0, "Max trades per session must be positive"
         assert self.stop_distance_cap_ticks > 0, "SL cap ticks must be positive"
         assert self.tick_size > 0, "Tick size must be positive"
+        assert 0.0 < self.max_position_pct <= 100.0, "max_position_pct must be in (0, 100]"
 
         # Order validity
         assert self.order_validity_policy in ["session_end", "fixed_minutes", "one_bar"], \

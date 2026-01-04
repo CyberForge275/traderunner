@@ -46,6 +46,9 @@ parameters:
   # Maximum price deviation from pattern (in ATR multiples)
   max_deviation_atr: 3.0
 
+  # Maximum position size as percentage of equity
+  max_position_pct: 100
+
 backtesting:
   # Execution lag in number of candles
   # 0 = enter on breakout candle close

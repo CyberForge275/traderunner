@@ -157,6 +157,8 @@ class InsideBarStrategy(BaseStrategy):
             'trailing_trigger_tp_pct': config.get('trailing_trigger_tp_pct', 0.70),
             'trailing_risk_remaining_pct': config.get('trailing_risk_remaining_pct', 0.50),
             'trailing_apply_mode': config.get('trailing_apply_mode', 'next_bar'),
+
+            'max_position_pct': config.get('max_position_pct', 100.0),
         }
 
         strategy_config = InsideBarConfig(**core_params)
