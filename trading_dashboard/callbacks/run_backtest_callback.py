@@ -203,8 +203,7 @@ def register_run_backtest_callback(app):
                 # CRITICAL: Set timezone and sessions (FIXED - now consistent!)
                 "session_timezone": session_tz,
                 "session_filter": session_windows,  # Now in session_timezone!
-                # CRITICAL: Use one_bar policy for proper validity windows
-                "order_validity_policy": "one_bar",
+                # Strategy defaults from SSOT config will be used for order_validity_policy
                 "timeframe_minutes": 5,  # Assuming M5
                 "valid_from_policy": "signal_ts",
             }
