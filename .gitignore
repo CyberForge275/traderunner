@@ -122,3 +122,4 @@ logs/*.log
 # Local evidence (NEVER COMMIT)
 evidence_*/
 evidence_*.zip
+dashboard.pid
