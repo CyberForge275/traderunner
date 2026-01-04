@@ -174,39 +174,46 @@ def register_run_backtest_callback(app):
         # Build strategy parameters dict from UI inputs
         config_params = {}
         if strategy in ["insidebar_intraday", "insidebar_intraday_v2"]:
-            # CRITICAL FIX: Auto-detect market timezone based on symbols
-            # Most US tickers (NASDAQ/NYSE) trade in America/New_York
-            # European tickers would need different detection logic
+            # Load defaults from Strategy SSOT (YAML)
+            try:
+                from src.strategies.inside_bar.config import load_default_config
+                config_params = load_default_config()
+            except Exception:
+                config_params = {}
 
-            # Simple heuristic: if all symbols look like US tickers, use US timezone
-            # TODO: Use proper instrument registry when available
+            # CRITICAL FIX: Auto-detect market timezone based on symbols
             is_us_market = True  # Default assumption for now
-            # In future: check against exchange registry
 
             if is_us_market:
                 session_tz = "America/New_York"
-                # FIXED: session_windows MUST be in session_timezone!
-                # NYSE/NASDAQ RTH = 09:30-16:00 Eastern Time
-                session_windows = ["09:30-16:00"]  # US market hours in America/New_York
+                session_windows = ["09:30-16:00"]
             else:
                 session_tz = "Europe/Berlin"
                 session_windows = ["15:00-16:00", "16:00-17:00"]
 
-            config_params = {
-                "atr_period": insidebar_atr_period or 14,
-                "min_mother_bar_size": insidebar_min_mother_bar or 0.5,
-                "breakout_confirmation": bool(insidebar_breakout_confirm and "true" in insidebar_breakout_confirm),
-                "risk_reward_ratio": insidebar_rrr or 2.0,
-                "lookback_candles": insidebar_lookback_candles or 50,
-                "max_pattern_age_candles": insidebar_max_pattern_age or 12,
-                "execution_lag": insidebar_execution_lag or 0,
-                # CRITICAL: Set timezone and sessions (FIXED - now consistent!)
+            # Merge UI Overrides (only if not None)
+            ui_overrides = {
+                "atr_period": insidebar_atr_period,
+                "min_mother_bar_size": insidebar_min_mother_bar,
+                "breakout_confirmation": bool(insidebar_breakout_confirm and "true" in insidebar_breakout_confirm) if insidebar_breakout_confirm else None,
+                "risk_reward_ratio": insidebar_rrr,
+                "lookback_candles": insidebar_lookback_candles,
+                "max_pattern_age_candles": insidebar_max_pattern_age,
+                "execution_lag": insidebar_execution_lag,
                 "session_timezone": session_tz,
-                "session_filter": session_windows,  # Now in session_timezone!
-                # Strategy defaults from SSOT config will be used for order_validity_policy
-                "timeframe_minutes": 5,  # Assuming M5
+                "session_filter": session_windows,
+                "timeframe_minutes": 5,
                 "valid_from_policy": "signal_ts",
             }
+            
+            # Update config_params with UI values that are actually provided
+            for k, v in ui_overrides.items():
+                if v is not None:
+                    config_params[k] = v
+
+            # Ensure some keys exist (safety)
+            if "session_timezone" not in config_params: config_params["session_timezone"] = session_tz
+            if "session_filter" not in config_params: config_params["session_filter"] = session_windows
 
         # Handle session filter for InsideBar strategy if provided
         if strategy == "insidebar_intraday" and session_filter_input and session_filter_input.strip():

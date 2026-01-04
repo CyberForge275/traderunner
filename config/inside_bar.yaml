@@ -49,6 +49,9 @@ parameters:
   # Maximum position size as percentage of equity
   max_position_pct: 100
 
+  # Maximum stop-loss distance in ticks
+  stop_distance_cap_ticks: 1000
+
 backtesting:
   # Execution lag in number of candles
   # 0 = enter on breakout candle close
