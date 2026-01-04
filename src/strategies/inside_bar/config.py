@@ -369,9 +369,10 @@ def get_default_config_path() -> Path:
     Get path to default config file.
 
     Searches in order:
-    1. ~/data/workspace/droid/traderunner/config/inside_bar.yaml
-    2. /opt/trading/traderunner/config/inside_bar.yaml
-    3. ~/.trading/config/inside_bar.yaml
+    1. src/strategies/inside_bar/inside_bar.yaml (local strategy directory)
+    2. ~/data/workspace/droid/traderunner/config/inside_bar.yaml (legacy global)
+    3. /opt/trading/traderunner/config/inside_bar.yaml (production)
+    4. ~/.trading/config/inside_bar.yaml (user home)
 
     Returns:
         Path to first config file found
