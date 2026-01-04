@@ -311,7 +311,9 @@ def simulate_insidebar_from_orders(
     cash = initial_cash
     
     # Step 1 (Dual-Track): Mirror cash tracking in PortfolioLedger
-    ledger = PortfolioLedger(initial_cash)
+    # Use first order timestamp as start_ts (or current time if no orders)
+    start_ts = ib_orders["valid_from"].min() if not ib_orders.empty else pd.Timestamp.now(tz=tz)
+    ledger = PortfolioLedger(initial_cash, start_ts=start_ts)
     equity_points = []
     filled_indices: list[int] = []
     fill_ts_map: dict[int, pd.Timestamp] = {}
@@ -579,7 +581,9 @@ def simulate_daily_moc_from_orders(
     cash = initial_cash
     
     # Step 1 (Dual-Track): Mirror cash tracking in PortfolioLedger
-    ledger = PortfolioLedger(initial_cash)
+    # Use first order timestamp as start_ts
+    start_ts = orders["valid_from"].min() if not orders.empty else pd.Timestamp.now(tz=tz)
+    ledger = PortfolioLedger(initial_cash, start_ts=start_ts)
 
     for symbol, group in orders.groupby("symbol"):
         file_path = data_path / f"{symbol}.parquet"
