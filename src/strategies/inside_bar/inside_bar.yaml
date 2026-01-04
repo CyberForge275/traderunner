@@ -52,6 +52,10 @@ parameters:
   # Maximum stop-loss distance in ticks
   stop_distance_cap_ticks: 1000
 
+  # Order validity policy (how long orders remain active)
+  # Options: "session_end", "one_bar", "fixed_minutes"
+  order_validity_policy: session_end
+
 backtesting:
   # Execution lag in number of candles
   # 0 = enter on breakout candle close
