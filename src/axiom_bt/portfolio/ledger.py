@@ -305,3 +305,135 @@ class PortfolioLedger:
             f"current={self._equity:.2f}, entries={len(self._entries)}, seq={self._seq})"
         )
 
+    @staticmethod
+    def replay_from_trades(
+        trades_df: pd.DataFrame,
+        initial_cash: float,
+        start_ts: Optional[pd.Timestamp] = None,
+        *,
+        sort_mode: str = "legacy"
+    ) -> "PortfolioLedger":
+        """
+        Replay ledger from trades DataFrame for audit-grade reconstruction.
+        
+        This enables post-hoc verification: load trades.csv from any run, replay
+        the ledger, and verify accounting correctness.
+        
+        Args:
+            trades_df: DataFrame with trade records (must have exit_ts, pnl columns)
+            initial_cash: Starting cash
+            start_ts: Optional start timestamp (defaults to min(entry_ts))
+            sort_mode: "legacy" for deterministic stable sort
+        
+        Returns:
+            PortfolioLedger instance with replayed trades
+        
+        Raises:
+            ValueError: If required columns missing
+        
+        Notes:
+            - pnl is net cash delta (fees already deducted in engine)
+            - fees/slippage are evidence fields (not re-applied to cash)
+            - Sort order: exit_ts, entry_ts, symbol, side, entry_price, exit_price, qty, pnl
+            - Deterministic: same trades (shuffled) → same ledger
+        """
+        # Step B1: Validate required columns
+        required = ["exit_ts", "pnl"]
+        missing = [c for c in required if c not in trades_df.columns]
+        if missing:
+            raise ValueError(f"replay_from_trades requires columns: {missing}")
+        
+        if trades_df.empty:
+            # Empty trades → just START entry
+            return PortfolioLedger(initial_cash, start_ts=start_ts, enforce_monotonic=False)
+        
+        # Step B2: Deterministic sorting (stable merge sort)
+        # Sort by trading-relevant keys for stable, deterministic order
+        sort_keys = []
+        for key in ["exit_ts", "entry_ts", "symbol", "side", "entry_price", "exit_price", "qty", "pnl"]:
+            if key in trades_df.columns:
+                sort_keys.append(key)
+        
+        # Ensure timestamps are tz-aware UTC
+        df = trades_df.copy()
+        for ts_col in ["exit_ts", "entry_ts"]:
+            if ts_col in df.columns:
+                df[ts_col] = pd.to_datetime(df[ts_col], utc=True, errors="coerce")
+        
+        # Stable sort (mergesort preserves relative order for equal keys)
+        df = df.sort_values(sort_keys, kind="mergesort").reset_index(drop=True)
+        
+        # Step B1 (cont): Determine start_ts
+        if start_ts is None:
+            # Use earliest entry_ts, or earliest exit_ts if entry_ts not available
+            if "entry_ts" in df.columns:
+                start_ts = df["entry_ts"].min()
+            else:
+                start_ts = df["exit_ts"].min()
+        
+        # Create ledger (no monotonic enforcement for replay flexibility)
+        ledger = PortfolioLedger(initial_cash, start_ts=start_ts, enforce_monotonic=False)
+        
+        # Step B1 (cont): Replay each trade
+        for idx, row in df.iterrows():
+            exit_ts = row["exit_ts"]
+            pnl = float(row["pnl"])
+            
+            # Step B1: Cost field mapping (robust)
+            fees = 0.0
+            if "fees_entry" in row and "fees_exit" in row:
+                fees = float(row.get("fees_entry", 0)) + float(row.get("fees_exit", 0))
+            elif "fees" in row:
+                fees = float(row.get("fees", 0))
+            
+            slippage = 0.0
+            if "slippage_entry" in row and "slippage_exit" in row:
+                slippage = float(row.get("slippage_entry", 0)) + float(row.get("slippage_exit", 0))
+            elif "slippage" in row:
+                slippage = float(row.get("slippage", 0))
+            
+            # Build meta dict
+            meta = {}
+            for key in ["symbol", "side", "entry_ts", "entry_price", "exit_price", "reason", "qty"]:
+                if key in row:
+                    val = row[key]
+                    # Convert timestamps to strings for JSON serialization
+                    if isinstance(val, pd.Timestamp):
+                        val = val.isoformat()
+                    meta[key] = val
+            
+            # Apply trade (pnl is net cash delta)
+            ledger.apply_trade(
+                exit_ts=exit_ts,
+                pnl=pnl,
+                fees=fees,
+                slippage=slippage,
+                meta=meta
+            )
+        
+        return ledger
+    
+    def to_equity_curve_legacy_like(self) -> pd.DataFrame:
+        """
+        Export equity curve without START entry for legacy compatibility.
+        
+        This mimics metrics.equity_from_trades() output format:
+        - Columns: [ts, equity]
+        - First row is after first trade (no initial baseline)
+        
+        Returns:
+            DataFrame with [ts, equity], excluding START entry
+        """
+        df = self.to_frame()
+        # Filter out START entry
+        df_trades = df[df["event_type"] != "START"].copy()
+        
+        if df_trades.empty:
+            # No trades → empty curve
+            return pd.DataFrame({"ts": pd.Series(dtype="datetime64[ns, UTC]"), "equity": pd.Series(dtype=float)})
+        
+        # Return only ts and equity columns
+        result = df_trades[["ts", "equity_after"]].copy()
+        result = result.rename(columns={"equity_after": "equity"})
+        return result.reset_index(drop=True)
+
