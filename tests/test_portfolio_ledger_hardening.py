@@ -153,9 +153,9 @@ def test_ledger_summary_stats():
     
     # Empty ledger (only START)
     summary = ledger.summary()
-    assert summary["initial_cash"] == 10000
-    assert summary["final_cash"] == 10000
-    assert summary["total_pnl"] == 0.0
+    assert summary["initial_cash_usd"] == 10000
+    assert summary["final_cash_usd"] == 10000
+    assert summary["total_pnl_net_usd"] == 0.0
     assert summary["num_events"] == 0
     
     # Add trades
@@ -163,11 +163,11 @@ def test_ledger_summary_stats():
     ledger.apply_trade(pd.Timestamp.now(tz="UTC") + pd.Timedelta(seconds=1), pnl=200, fees=10, slippage=2)
     
     summary = ledger.summary()
-    assert summary["initial_cash"] == 10000
-    assert summary["final_cash"] == 10300  # 10000 + 100 + 200
-    assert summary["total_pnl"] == 300
-    assert summary["total_fees"] == 15
-    assert summary["total_slippage"] == 3
+    assert summary["initial_cash_usd"] == 10000
+    assert summary["final_cash_usd"] == 10300  # 10000 + 100 + 200
+    assert summary["total_pnl_net_usd"] == 300
+    assert summary["total_fees_usd"] == 15
+    assert summary["total_slippage_usd"] == 3
     assert summary["num_events"] == 2
 
 

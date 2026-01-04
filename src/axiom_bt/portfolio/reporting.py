@@ -95,19 +95,19 @@ def _generate_markdown_report(summary: dict, ledger: PortfolioLedger) -> str:
 
 | Metric | Value |
 |:-------|:------|
-| **Initial Cash** | ${summary['initial_cash']:.2f} |
-| **Final Cash** | ${summary['final_cash']:.2f} |
-| **Total PnL** | ${summary['total_pnl']:.2f} ({summary['total_pnl']/summary['initial_cash']*100:.2f}%) |
-| **Peak Equity** | ${summary['peak_equity']:.2f} |
+| **Initial Cash** | ${summary['initial_cash_usd']:.2f} |
+| **Final Cash** | ${summary['final_cash_usd']:.2f} |
+| **Total PnL** | ${summary['total_pnl_net_usd']:.2f} ({summary['total_pnl_net_usd']/summary['initial_cash_usd']*100:.2f}%) |
+| **Peak Equity** | ${summary['peak_equity_usd']:.2f} |
 | **Max Drawdown** | {summary.get('max_drawdown', 0):.2f}% |
 
 ## Costs
 
 | Type | Amount |
 |:-----|:-------|
-| **Total Fees** | ${summary['total_fees']:.2f} |
-| **Total Slippage** | ${summary['total_slippage']:.2f} |
-| **Combined Costs** | ${summary['total_fees'] + summary['total_slippage']:.2f} |
+| **Total Fees** | ${summary['total_fees_usd']:.2f} |
+| **Total Slippage** | ${summary['total_slippage_usd']:.2f} |
+| **Combined Costs** | ${summary['total_fees_usd'] + summary['total_slippage_usd']:.2f} |
 
 ## Activity
 

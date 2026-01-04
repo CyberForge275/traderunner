@@ -198,11 +198,17 @@ class PortfolioLedger:
         """
         Apply a closed trade to the ledger.
         
+        **Cost Semantics (Step C):**
+        - `pnl` = NET cash delta (fees/slippage already deducted by engine)
+        - `fees` = evidence-only (total fees paid USD, not re-deducted from cash)
+        - `slippage` = evidence-only (execution cost USD, already in fill price)
+        - **Formula**: `cash_after = cash_before + pnl_net` (NO double-counting)
+        
         Args:
             exit_ts: Timestamp of trade exit
-            pnl: Profit/loss (positive or negative)
-            fees: Total fees paid
-            slippage: Total slippage cost
+            pnl: Net profit/loss (post-costs, direct cash impact)
+            fees: Total fees paid (USD, evidence only)
+            slippage: Total slippage cost (USD, evidence only)
             meta: Optional metadata (symbol, side, etc.)
         """
         # Capture state before update
@@ -274,12 +280,12 @@ class PortfolioLedger:
         """
         if len(self._entries) <= 1:  # Only START entry
             return {
-                "initial_cash": self._initial_cash,
-                "final_cash": self._initial_cash,
-                "total_pnl": 0.0,
-                "total_fees": 0.0,
-                "total_slippage": 0.0,
-                "peak_equity": self._initial_cash,
+                "initial_cash_usd": self._initial_cash,
+                "final_cash_usd": self._initial_cash,
+                "total_pnl_net_usd": 0.0,
+                "total_fees_usd": 0.0,
+                "total_slippage_usd": 0.0,
+                "peak_equity_usd": self._initial_cash,
                 "num_events": 0
             }
         
@@ -290,12 +296,12 @@ class PortfolioLedger:
         total_slippage = sum(e.slippage for e in trade_entries)
         
         return {
-            "initial_cash": self._initial_cash,
-            "final_cash": self._cash,
-            "total_pnl": total_pnl,
-            "total_fees": total_fees,
-            "total_slippage": total_slippage,
-            "peak_equity": self._peak_equity,
+            "initial_cash_usd": self._initial_cash,
+            "final_cash_usd": self._cash,
+            "total_pnl_net_usd": total_pnl,
+            "total_fees_usd": total_fees,
+            "total_slippage_usd": total_slippage,
+            "peak_equity_usd": self._peak_equity,
             "num_events": len(trade_entries)
         }
     
