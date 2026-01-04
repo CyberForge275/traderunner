@@ -343,35 +343,87 @@ def fetch_intraday_1m_to_parquet(
             start_dt = pd.to_datetime(start_date).tz_localize("UTC")
             end_dt = pd.to_datetime(end_date).tz_localize("UTC") + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
 
-            from_ts = int(start_dt.timestamp())
-            to_ts = int(end_dt.timestamp())
-
-            # Validate 120-day limit
+            # Check 120-day limit and chunk if necessary
             range_days = (end_dt - start_dt).days
-            if range_days > 120:
-                raise ValueError(
-                    f"Requested range ({range_days} days) exceeds EODHD limit of 120 days "
-                    f"for 1-minute interval. Split request into chunks ≤ 120 days."
+            EODHD_MAX_DAYS_1M = 120
+            
+            if range_days > EODHD_MAX_DAYS_1M:
+                # Auto-chunking for large ranges
+                logger.info(
+                    f"[{symbol}] Requested {range_days} days exceeds EODHD 120-day limit. "
+                    f"Auto-chunking into multiple requests..."
                 )
-
-            payload["from"] = from_ts
-            payload["to"] = to_ts
-        # else: No from/to → EODHD returns last 120 days by default
-
-        rows = _request(url, payload)
-        if not rows:
-            range_info = f"{start_date} to {end_date}" if start_date else "all available data"
-            raise SystemExit(f"No data from EODHD for {symbol}.{exchange} ({range_info})")
-
-        df = pd.DataFrame(rows)
-        df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s", utc=True).dt.tz_convert(tz)
-
-
-
-
-        df = df.rename(
-            columns={"open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume"}
-        ).set_index("timestamp")[["Open", "High", "Low", "Close", "Volume"]]
+                
+                # Split into chunks
+                chunks = []
+                current_start = start_dt
+                while current_start < end_dt:
+                    chunk_end = min(current_start + pd.Timedelta(days=EODHD_MAX_DAYS_1M), end_dt)
+                    chunks.append((current_start, chunk_end))
+                    current_start = chunk_end + pd.Timedelta(seconds=1)  # Avoid overlap
+                
+                logger.info(f"[{symbol}] Split into {len(chunks)} chunks")
+                
+                # Fetch each chunk
+                chunk_dfs = []
+                for i, (chunk_start, chunk_end) in enumerate(chunks, 1):
+                    chunk_days = (chunk_end - chunk_start).days
+                    logger.info(
+                        f"[{symbol}] Fetching chunk {i}/{len(chunks)}: "
+                        f"{chunk_start.date()} to {chunk_end.date()} ({chunk_days} days)"
+                    )
+                    
+                    chunk_payload = {
+                        "api_token": token,
+                        "interval": "1m",
+                        "fmt": "json",
+                        "from": int(chunk_start.timestamp()),
+                        "to": int(chunk_end.timestamp()),
+                    }
+                    
+                    chunk_rows = _request(url, chunk_payload)
+                    if not chunk_rows:
+                        logger.warning(f"[{symbol}] Chunk {i}/{len(chunks)} returned no data")
+                        continue
+                    
+                    chunk_df = pd.DataFrame(chunk_rows)
+                    chunk_df["timestamp"] = pd.to_datetime(chunk_df["timestamp"], unit="s", utc=True).dt.tz_convert(tz)
+                    chunk_df = chunk_df.rename(
+                        columns={"open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume"}
+                    ).set_index("timestamp")[["Open", "High", "Low", "Close", "Volume"]]
+                    
+                    chunk_dfs.append(chunk_df)
+                    logger.info(f"[{symbol}] Chunk {i}/{len(chunks)}: {len(chunk_df):,} rows")
+                
+                # Merge all chunks
+                if not chunk_dfs:
+                    raise SystemExit(f"No data from EODHD for {symbol}.{exchange} (all chunks empty)")
+                
+                df = pd.concat(chunk_dfs)
+                df = df.sort_index()
+                df = df[~df.index.duplicated(keep='first')]  # Remove any duplicate timestamps
+                
+                logger.info(
+                    f"[{symbol}] Merged {len(chunks)} chunks: {len(df):,} total rows "
+                    f"(deduped from {sum(len(c) for c in chunk_dfs):,})"
+                )
+            else:
+                # Single request (≤120 days)
+                from_ts = int(start_dt.timestamp())
+                to_ts = int(end_dt.timestamp())
+                payload["from"] = from_ts
+                payload["to"] = to_ts
+                
+                rows = _request(url, payload)
+                if not rows:
+                    range_info = f"{start_date} to {end_date}"
+                    raise SystemExit(f"No data from EODHD for {symbol}.{exchange} ({range_info})")
+                
+                df = pd.DataFrame(rows)
+                df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s", utc=True).dt.tz_convert(tz)
+                df = df.rename(
+                    columns={"open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume"}
+                ).set_index("timestamp")[["Open", "High", "Low", "Close", "Volume"]]
 
     # Save raw data (all hours) if requested
     if save_raw:
