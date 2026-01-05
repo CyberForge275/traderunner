@@ -1,17 +1,56 @@
 """
-Tests for Step F0: Compound Sizing Config Flag.
+Tests for Phase 2 F0: Compound Sizing Config (UPDATED).
 
-Verifies:
-- Config flag exists and defaults to false
-- Flag is read from YAML backtesting section
-- Flag appears in run_manifest.json
-- mark_to_market raises NotImplementedError when compound_sizing=true
-- 0 behavior change when flag is false
+Ensures:
+- No duplicate config (SSOT)
+- Config loaded from correct section
+- No behavior change when flag is false
 """
 
 import pytest
 import yaml
 from pathlib import Path
+
+
+def test_no_duplicate_compound_flags():
+    """
+    CHECK 1 GUARD: Compound flags should only appear once (in backtesting section).
+    
+    This prevents SSOT violations and config ambiguity.
+    """
+    config_path = Path("src/strategies/inside_bar/inside_bar.yaml")
+    
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+    
+    # Recursive count to catch duplicates anywhere
+    def count_key(d, key):
+        count = 0
+        if isinstance(d, dict):
+            if key in d:
+                count += 1
+            for v in d.values():
+                count += count_key(v, key)
+        return count
+    
+    cs_count = count_key(config, "compound_sizing")
+    ceb_count = count_key(config, "compound_equity_basis")
+    
+    # Must appear exactly once
+    assert cs_count == 1, f"compound_sizing appears {cs_count} times (expected 1)"
+    assert ceb_count == 1, f"compound_equity_basis appears {ceb_count} times (expected 1)"
+    
+    # Must be in backtesting section
+    assert "backtesting" in config
+    assert "compound_sizing" in config["backtesting"]
+    assert "compound_equity_basis" in config["backtesting"]
+    
+    # Must NOT be in live_trading
+    if "live_trading" in config:
+        assert "compound_sizing" not in config["live_trading"], \
+            "compound_sizing found in live_trading (should only be in backtesting)"
+        assert "compound_equity_basis" not in config["live_trading"], \
+            "compound_equity_basis found in live_trading (should only be in backtesting)"
 
 
 def test_compound_flag_in_yaml():
@@ -21,7 +60,7 @@ def test_compound_flag_in_yaml():
     with open(config_path) as f:
         config = yaml.safe_load(f)
     
-    # Should be under backtesting, not root or live_trading
+    # Should be under backtesting, not root  or live_trading
     assert "backtesting" in config
     assert "compound_sizing" in config["backtesting"]
     assert "compound_equity_basis" in config["backtesting"]
