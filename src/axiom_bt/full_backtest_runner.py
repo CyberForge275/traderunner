@@ -229,7 +229,29 @@ def run_backtest_full(
         # CHECK 2: Extract and validate compound config from strategy params
         compound_config = CompoundConfig.from_strategy_params(strategy_params)
         compound_config.validate()  # Raises if invalid (CHECK 4: MTM guard)
-        logger.info(f"[{run_id}] Compound config: enabled={compound_config.enabled}, basis={compound_config.equity_basis}")
+        
+        # F1-C4: Engine selection based on compound_sizing flag
+        engine_name = "event_engine" if compound_config.enabled else "legacy"
+        logger.info(
+            f"[{run_id}] Compound config: enabled={compound_config.enabled}, "
+            f"basis={compound_config.equity_basis}, engine={engine_name}"
+        )
+        
+        # F1-C4: If compound sizing enabled, use event engine path (minimal for now)
+        if compound_config.enabled:
+            logger.warning(
+                f"[{run_id}] Compound sizing enabled - using EventEngine (F1 skeleton, "
+                "no actual execution yet). This path is for development/testing only."
+            )
+            # F1 Skeleton: Return early with minimal result
+            # Full implementation comes in F2 (with qty calc, equity tracking, etc.)
+            return RunResult(
+                status=RunStatus.ERROR,
+                step="event_engine_skeleton",
+                message="EventEngine path not fully implemented (F1 skeleton only)",
+                error_details={"engine": "event_engine", "compound_enabled": True},
+            )
+
 
         # Initialize step tracker
         tracker = StepTracker(run_dir)
