@@ -68,9 +68,23 @@ backtesting:
     start_hour: 9
     end_hour: 16
 
+  # Phase 2: Compound Sizing (Optional)
+  compound_sizing: false
+  compound_equity_basis: cash_only
+
 live_trading:
   # Signal deduplication enabled
   deduplication: true
 
   # Pattern cache reset frequency
   reset_frequency: daily
+
+  # Enable compound position sizing (default: false)
+  # When true: position size calculated from equity at entry time
+  # When false: position size calculated from initial_cash
+  compound_sizing: false
+  
+  # Equity basis for compound sizing calculation
+  # Options: "cash_only" (realized PnL only), "mark_to_market" (cash + unrealized)
+  # Note: mark_to_market not yet implemented
+  compound_equity_basis: cash_only
