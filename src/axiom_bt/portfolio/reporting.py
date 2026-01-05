@@ -22,7 +22,7 @@ def generate_portfolio_artifacts(
     ledger: PortfolioLedger,
     run_dir: Path,
     trades_df: Optional[pd.DataFrame] = None
-) -> None:
+) -> list[str]:
     """
     Generate optional portfolio reporting artifacts.
     
@@ -34,7 +34,9 @@ def generate_portfolio_artifacts(
         trades_df: Optional trades DataFrame for additional stats
     """
     if not should_generate_report():
-        return  # Silently skip if flag not set
+        return []  # Silently skip if flag not set
+    
+    generated_files = []
     
     # Get summary stats
     summary = ledger.summary()
@@ -43,6 +45,7 @@ def generate_portfolio_artifacts(
     ledger_df = ledger.to_frame()
     ledger_path = run_dir / "portfolio_ledger.csv"
     ledger_df.to_csv(ledger_path, index=False)
+    generated_files.append("portfolio_ledger.csv")
     
     # 2) portfolio_summary.json
     summary_json = {
@@ -68,12 +71,20 @@ def generate_portfolio_artifacts(
     summary_path = run_dir / "portfolio_summary.json"
     with open(summary_path, 'w') as f:
         json.dump(summary_json, f, indent=2)
+    generated_files.append("portfolio_summary.json")
     
     # 3) portfolio_report.md (human readable)
     report_md = _generate_markdown_report(summary_json, ledger)
     report_path = run_dir / "portfolio_report.md"
     with open(report_path, 'w') as f:
         f.write(report_md)
+    generated_files.append("portfolio_report.md")
+    
+    return generated_files
+    generated_files.append("portfolio_report.md")
+    generated_files.append("portfolio_report.md")
+    
+    return generated_files
 
 
 def _calculate_max_drawdown(ledger_df: pd.DataFrame) -> float:
@@ -140,3 +151,4 @@ def _generate_markdown_report(summary: dict, ledger: PortfolioLedger) -> str:
 """
     
     return report
+    return generated_files

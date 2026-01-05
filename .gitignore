@@ -123,3 +123,4 @@ logs/*.log
 evidence_*/
 evidence_*.zip
 dashboard.pid
+.spyproject/
