@@ -152,3 +152,146 @@ def _generate_markdown_report(summary: dict, ledger: PortfolioLedger) -> str:
     
     return report
     return generated_files
+
+
+def _cli_main():
+    """
+    CLI entry point for standalone portfolio reporting.
+    
+    Usage:
+        PYTHONPATH=$(pwd)/src python -m axiom_bt.portfolio.reporting --run-dir <path>
+    """
+    import argparse
+    import sys
+    
+    parser = argparse.ArgumentParser(
+        description="Generate portfolio reporting artifacts from trades.csv",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Generate report for existing run
+  python -m axiom_bt.portfolio.reporting --run-dir artifacts/backtests/260105_120000_AAPL
+  
+  # Specify output directory
+  python -m axiom_bt.portfolio.reporting --run-dir <RUN_DIR> --out-dir ./reports
+  
+  # Override initial cash
+  python -m axiom_bt.portfolio.reporting --run-dir <RUN_DIR> --initial-cash 50000
+        """
+    )
+    
+    parser.add_argument(
+        "--run-dir",
+        type=Path,
+        required=True,
+        help="Path to backtest run directory (contains trades.csv)"
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=Path,
+        default=None,
+        help="Output directory (default: same as run-dir)"
+    )
+    parser.add_argument(
+        "--initial-cash",
+        type=float,
+        default=None,
+        help="Initial cash (default: auto-detect from run_meta.json or 10000)"
+    )
+    parser.add_argument(
+        "--start-ts",
+        type=str,
+        default=None,
+        help="Start timestamp ISO format (default: auto-detect from trades)"
+    )
+    
+    args = parser.parse_args()
+    
+    run_dir = args.run_dir.resolve()
+    out_dir = args.out_dir.resolve() if args.out_dir else run_dir
+    
+    # Validate run_dir exists
+    if not run_dir.exists():
+        print(f"Error: run_dir does not exist: {run_dir}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Find trades.csv
+    trades_path = run_dir / "trades.csv"
+    if not trades_path.exists():
+        print(f"Error: trades.csv not found in {run_dir}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Load trades
+    try:
+        trades_df = pd.read_csv(trades_path)
+    except Exception as e:
+        print(f"Error loading trades.csv: {e}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Determine initial_cash
+    initial_cash = args.initial_cash
+    if initial_cash is None:
+        # Try to read from run_meta.json or run_manifest.json
+        for meta_file in ["run_manifest.json", "run_meta.json"]:
+            meta_path = run_dir / meta_file
+            if meta_path.exists():
+                try:
+                    with open(meta_path) as f:
+                        meta = json.load(f)
+                        # Try various paths where initial_cash might be
+                        initial_cash = (
+                            meta.get("params", {}).get("initial_cash") or
+                            meta.get("data", {}).get("initial_cash") or
+                            None
+                        )
+                        if initial_cash:
+                            break
+                except:
+                    pass
+        
+        # Final fallback
+        if initial_cash is None:
+            initial_cash = 10000.0
+            print(f"Warning: Using default initial_cash=10000", file=sys.stderr)
+    
+    # Parse start_ts if provided
+    start_ts = None
+    if args.start_ts:
+        start_ts = pd.Timestamp(args.start_ts)
+    
+    # Create ledger via replay
+    print(f"Replaying {len(trades_df)} trades...")
+    ledger = PortfolioLedger.replay_from_trades(
+        trades_df,
+        initial_cash=initial_cash,
+        start_ts=start_ts
+    )
+    
+    # Generate artifacts (force generation regardless of env var)
+    print(f"Generating portfolio artifacts to {out_dir}...")
+    
+    # Temporarily force reporting ON
+    os.environ["AXIOM_BT_PORTFOLIO_REPORT"] = "1"
+    try:
+        generated_files = generate_portfolio_artifacts(
+            ledger=ledger,
+            run_dir=out_dir,
+            trades_df=trades_df
+        )
+    finally:
+        # Restore original env (if it wasn't set)
+        if "AXIOM_BT_PORTFOLIO_REPORT" in os.environ:
+            del os.environ["AXIOM_BT_PORTFOLIO_REPORT"]
+    
+    # Report success
+    print(f"\n✅ Generated {len(generated_files)} artifacts:")
+    for filename in generated_files:
+        filepath = out_dir / filename
+        size = filepath.stat().st_size
+        print(f"  - {filename} ({size} bytes)")
+    
+    print(f"\nOutput directory: {out_dir}")
+
+
+if __name__ == "__main__":
+    _cli_main()
