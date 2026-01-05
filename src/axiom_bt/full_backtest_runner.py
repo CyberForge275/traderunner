@@ -25,6 +25,8 @@ from axiom_bt.metrics import compose_metrics
 from axiom_bt.report import save_drawdown_png, save_equity_png
 from axiom_bt.engines import replay_engine
 from backtest.services.trade_evidence import generate_trade_evidence
+from axiom_bt.compound_config import CompoundConfig
+from axiom_bt.data.session_filter import normalize_session_filter
 
 # New pipeline components
 from backtest.services.run_status import RunResult, RunStatus, FailureReason
@@ -220,6 +222,15 @@ def run_backtest_full(
             debug_dir = run_dir / "debug"
             debug_dir.mkdir(parents=True, exist_ok=True)
 
+        # Session filtering normalization (CLI/UI may send dict or list)
+        # We normalize it here to dict form for downstream consistency.
+        session_filter_normalized = normalize_session_filter(strategy_params.get("session_filter"))
+
+        # CHECK 2: Extract and validate compound config from strategy params
+        compound_config = CompoundConfig.from_strategy_params(strategy_params)
+        compound_config.validate()  # Raises if invalid (CHECK 4: MTM guard)
+        logger.info(f"[{run_id}] Compound config: enabled={compound_config.enabled}, basis={compound_config.equity_basis}")
+
         # Initialize step tracker
         tracker = StepTracker(run_dir)
         tracker._emit_event(1, "create_run_dir", "completed")
@@ -227,11 +238,16 @@ def run_backtest_full(
         # Phase 0.5: Write run_meta.json via ArtifactsManager so that the
         # manifest writer is initialized and run_manifest.json is produced.
         with tracker.step("write_run_meta"):
+            # CHECK 3: Include compound config in run metadata for manifest
+            config_with_compound = {
+                **strategy_params,
+                **compound_config.to_dict()  # Add compound_sizing, compound_equity_basis
+            }
             manager.write_run_meta(
                 strategy=strategy_key,
                 symbols=[symbol],
                 timeframe=timeframe,
-                params={"execution_mode": "full_backtest", **strategy_params},
+                params={"execution_mode": "full_backtest", **config_with_compound},
                 requested_end=requested_end,
                 lookback_days=lookback_days,
                 commit_hash=None,
