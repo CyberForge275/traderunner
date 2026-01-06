@@ -1,9 +1,9 @@
 # Phase 2: Compound Sizing Implementation - COMPLETE ✅
 
-**Status**: All deliverables complete, 76/76 tests passing  
+**Status**: All deliverables complete, 75/75 tests passing  
 **Date**: 2026-01-06  
 **Branch**: main  
-**Commits**: 13
+**Commits**: 16
 
 ---
 
@@ -15,7 +15,7 @@ Phase 2 delivered a complete **cash-only compound sizing** execution engine for 
 
 - **F0 (Configuration)**: YAML-based config, manifest integration, runtime guards (17 tests)
 - **F1 (Foundation)**: TradeTemplate datamodel, event ordering (A1 rule), EventEngine skeleton, runner integration (35 tests)
-- **F2 (Execution)**: Cash-only equity tracking, qty-at-entry calculation, fees/slippage application, template extraction (24 tests)
+- **F2 (Execution)**: Cash-only equity tracking, qty-at-entry calculation, fees/slippage application, template extraction (23 tests)
 
 ### Zero Default Behavior Change
 
