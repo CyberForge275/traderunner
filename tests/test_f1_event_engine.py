@@ -105,15 +105,18 @@ def test_engine_processes_all_events():
     ]
     
     engine = EventEngine()
-    result = engine.process(events)
+    result = engine.process(events, initial_cash=10000.0)
     
     # Should have processed events for each input
     assert len(result.processed) == 2
     
-    # All skeleton events should be accepted
+    #  F2-C1: Status changed from 'accepted' to 'filled' or 'rejected'
+    # First event (EXIT) will be rejected (no position)
+    # Second event (ENTRY) will be filled
     for proc in result.processed:
-        assert proc.status == "accepted"
         assert isinstance(proc, ProcessedEvent)
+        assert proc.status in ["filled", "rejected"]  # F2-C1: actual execution
+
 
 
 def test_engine_validates_a1_ordering():
