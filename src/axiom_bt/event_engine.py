@@ -29,6 +29,7 @@ class ProcessedEvent:
     Result of processing a single event.
     
     F2-C1: Extended with qty and cash tracking for actual execution.
+    F2-C2: Extended with effective_price and fee for slippage/commission.
     """
     timestamp: pd.Timestamp
     symbol: str
@@ -40,8 +41,12 @@ class ProcessedEvent:
     
     # F2-C1: Execution details
     qty: float = 0.0  # Quantity filled (0 if rejected)
-    price: float = 0.0  # Fill price
+    price: float = 0.0  # Fill price (nominal)
     cash_after: float = 0.0  # Cash balance after this event
+    
+    # F2-C2: Slippage and fees
+    effective_price: float = 0.0  # Price after slippage adjustment
+    fee: float = 0.0  # Commission/fee charged
     
     def to_dict(self) -> dict:
         """Export as dict for testing."""
@@ -56,7 +61,10 @@ class ProcessedEvent:
             "qty": self.qty,
             "price": self.price,
             "cash_after": self.cash_after,
+            "effective_price": self.effective_price,
+            "fee": self.fee,
         }
+
 
 
 @dataclass
@@ -193,7 +201,7 @@ class EventEngine:
         assert result.num_entries == 5
     """
     
-    def __init__(self, *, initial_cash: float = 10000.0, validate_ordering: bool = True, fixed_qty: float = 0.0):
+    def __init__(self, *, initial_cash: float = 10000.0, validate_ordering: bool = True, fixed_qty: float = 0.0, slippage_bps: float = 0.0, commission_bps: float = 0.0):
         """
         Initialize event engine.
         
@@ -201,9 +209,13 @@ class EventEngine:
             initial_cash: Starting cash balance (F2-C1)
             validate_ordering: If True, validates A1 ordering after sorting
             fixed_qty: If > 0, use fixed qty for all entries (F2-C1 policy)
+            slippage_bps: Slippage in basis points (F2-C2, default 0)
+            commission_bps: Commission in basis points (F2-C2, default 0)
         """
         self.validate_ordering = validate_ordering
         self.fixed_qty = fixed_qty  # F2-C1: simple qty policy
+        self.slippage_bps = slippage_bps  # F2-C2
+        self.commission_bps = commission_bps  # F2-C2
     
     def process(self, events: Sequence[TradeEvent], initial_cash: float = 10000.0) -> EngineResult:
         """
@@ -266,7 +278,23 @@ class EventEngine:
                 else:
                     # Fill entry
                     try:
-                        tracker.apply_fill(event.side, event.symbol, qty, event.price)
+                        # F2-C2: Calculate effective price and fee
+                        effective_price = self._apply_slippage(event.price, event.side)
+                        fee = self._calculate_fee(qty, effective_price)
+                        
+                        # Update cash with slippage + fee
+                        cost = qty * effective_price + fee
+                        if not tracker.can_afford(cost):
+                            raise ValueError(f"Insufficient cash: need {cost}, have {tracker.cash}")
+                        
+                        tracker.cash -= cost
+                        # Update position (without apply_fill, direct update for F2-C2)
+                        if event.symbol not in tracker.positions:
+                            tracker.positions[event.symbol] = Position(symbol=event.symbol, qty=qty, avg_price=effective_price)
+                        else:
+                            pos = tracker.positions[event.symbol]
+                            object.__setattr__(pos, "qty", pos.qty + qty)
+                        
                         processed_event = ProcessedEvent(
                             timestamp=event.timestamp,
                             symbol=event.symbol,
@@ -278,6 +306,8 @@ class EventEngine:
                             qty=qty,
                             price=event.price,
                             cash_after=tracker.cash,
+                            effective_price=effective_price,
+                            fee=fee,
                         )
                     except ValueError as e:
                         # Apply_fill raised error (shouldn't happen for ENTRY if qty calc correct)
@@ -315,7 +345,22 @@ class EventEngine:
                 else:
                     # Fill exit
                     try:
-                        tracker.apply_fill(event.side, event.symbol, position_qty, event.price)
+                        # F2-C2: Calculate effective price and fee
+                        effective_price = self._apply_slippage(event.price, event.side)
+                        fee = self._calculate_fee(position_qty, effective_price)
+                        
+                        # Update cash with slippage - fee
+                        proceeds = position_qty * effective_price - fee
+                        tracker.cash += proceeds
+                        
+                        # Update position (close or reduce)
+                        pos = tracker.positions[event.symbol]
+                        new_qty = pos.qty - position_qty
+                        if new_qty == 0:
+                            del tracker.positions[event.symbol]
+                        else:
+                            object.__setattr__(pos, "qty", new_qty)
+                        
                         processed_event = ProcessedEvent(
                             timestamp=event.timestamp,
                             symbol=event.symbol,
@@ -327,6 +372,8 @@ class EventEngine:
                             qty=position_qty,
                             price=event.price,
                             cash_after=tracker.cash,
+                            effective_price=effective_price,
+                            fee=fee,
                         )
                     except ValueError as e:
                         processed_event = ProcessedEvent(
@@ -379,6 +426,38 @@ class EventEngine:
         
         qty = int(cash // price)  # Floor division
         return float(qty)
+    
+    def _apply_slippage(self, price: float, side: str) -> float:
+        """
+        F2-C2: Apply slippage to price.
+        
+        BUY: price * (1 + slippage_bps/10000)
+        SELL: price * (1 - slippage_bps/10000)
+        """
+        if self.slippage_bps == 0:
+            return price
+        
+        slip_factor = self.slippage_bps / 10000.0
+        
+        if side == "BUY":
+            return price * (1.0 + slip_factor)
+        elif side == "SELL":
+            return price * (1.0 - slip_factor)
+        else:
+            return price
+    
+    def _calculate_fee(self, qty: float, price: float) -> float:
+        """
+        F2-C2: Calculate commission/fee.
+        
+        fee = notional * commission_bps/10000
+        """
+        if self.commission_bps == 0:
+            return 0.0
+        
+        notional = qty * price
+        fee = notional * (self.commission_bps / 10000.0)
+        return fee
 
     
     def _validate_ordering(self, events: Sequence[TradeEvent]) -> None:
