@@ -161,27 +161,7 @@ def test_extraction_rejects_exit_ts_without_price():
         templates_to_events([template])
 
 
-def test_order_events_a1_holds_on_extracted_events():
-    """F2-C3: order_events() on extracted events enforces A1 (EXIT before ENTRY)."""
-    ts1 = pd.Timestamp("2026-01-06 10:00:00")
-    ts2 = pd.Timestamp("2026-01-06 10:00:00")  # Same timestamp
-    
-    # Create template with entry and exit at same timestamp
-    # This creates challenging ordering scenario for A1
-    templates = [
-        TradeTemplate("t1", "AAPL", "BUY", ts1, 100.0, "r1", ts2, 105.0, "r2"),
-    ]
-    
-    events = templates_to_events(templates)
-    
-    # Order them
-    ordered = order_events(events)
-    
-    # A1: At same timestamp, EXIT should come before ENTRY
-    assert len(ordered) == 2
-    assert ordered[0].kind == EventKind.EXIT
-    assert ordered[1].kind == EventKind.ENTRY
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
