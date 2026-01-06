@@ -144,7 +144,7 @@ def test_extraction_handles_empty_templates():
 
 def test_extraction_rejects_exit_ts_without_price():
     """F2-C3: ValueError if exit_ts present but exit_price invalid."""
-    ts = pd.Timestamp("202-01-06 10:00:00")
+    ts = pd.Timestamp("2026-01-06 10:00:00")  # Fixed typo
     
     template = TradeTemplate(
         template_id="bad",
@@ -163,11 +163,13 @@ def test_extraction_rejects_exit_ts_without_price():
 
 def test_order_events_a1_holds_on_extracted_events():
     """F2-C3: order_events() on extracted events enforces A1 (EXIT before ENTRY)."""
-    ts = pd.Timestamp("2026-01-06 10:00:00")
+    ts1 = pd.Timestamp("2026-01-06 10:00:00")
+    ts2 = pd.Timestamp("2026-01-06 10:00:00")  # Same timestamp
     
-    # Create templates with same timestamp for exit and entry
+    # Create template with entry and exit at same timestamp
+    # This creates challenging ordering scenario for A1
     templates = [
-        TradeTemplate("t1", "AAPL", "BUY", ts, 100.0, "r1", ts, 105.0, "r2"),  # Same ts
+        TradeTemplate("t1", "AAPL", "BUY", ts1, 100.0, "r1", ts2, 105.0, "r2"),
     ]
     
     events = templates_to_events(templates)
@@ -175,7 +177,7 @@ def test_order_events_a1_holds_on_extracted_events():
     # Order them
     ordered = order_events(events)
     
-    # A1: EXIT should come before ENTRY at same timestamp
+    # A1: At same timestamp, EXIT should come before ENTRY
     assert len(ordered) == 2
     assert ordered[0].kind == EventKind.EXIT
     assert ordered[1].kind == EventKind.ENTRY
