@@ -237,36 +237,64 @@ def run_backtest_full(
             f"basis={compound_config.equity_basis}, engine={engine_name}"
         )
         
-        # P3-C1b: If compound sizing enabled, use event engine path with adapter
+        # P3-C2: If compound sizing enabled, use event engine path with real signals
         if compound_config.enabled:
             logger.info(
-                f"[{run_id}] Compound sizing enabled - using EventEngine with InsideBar adapter (P3-C1b)"
+                f"[{run_id}] Compound sizing enabled - using EventEngine with real InsideBar signals (P3-C2)"
             )
             
-            # P3-C1b: Use adapter to convert signals to templates
+            # P3-C2: Generate real signals from InsideBar strategy
+            from strategies.inside_bar.strategy import InsideBarStrategy
             from axiom_bt.strategy_adapters.inside_bar_to_templates import inside_bar_to_trade_templates
             from axiom_bt.template_to_events import templates_to_events
             from axiom_bt.event_ordering import order_events
             from axiom_bt.event_engine import EventEngine
             import pandas as pd
             
-            # P3-C1b: Create minimal mock signals for integration
-            # TODO (P3-C2): Use real strategy signals from InsideBar.generate_signals()
-            ts = pd.Timestamp.now(tz="America/New_York")
-            mock_signals = [
-                {
-                    'timestamp': ts,
-                    'side': 'BUY',
-                    'entry_price': 100.0,
-                    'symbol': symbol,
-                    'metadata': {'entry_reason': 'inside_bar_long'},
-                },
-            ]
+            # P3-C2: Get bars data (same as legacy path would use)
+            # For minimal implementation: use windowed bars if available, else empty
+            if windowed is not None:
+                input_frame = windowed.reset_index().rename(columns={"timestamp": "timestamp"})
+                
+                # Create strategy instance and generate signals
+                strategy_impl = InsideBarStrategy()
+                ib_config = strategy_params.get("strategy_config", strategy_params)
+                
+                # Generate signals (returns List[Signal] - backtest Signal objects)
+                raw_signals = strategy_impl.generate_signals(
+                    input_frame,
+                    symbol,
+                    ib_config,
+                    tracer=None,  # No tracer for compound path (for now)
+                )
+                
+                logger.info(f"[{run_id}] InsideBar generated {len(raw_signals)} signals")
+            else:
+                # No bars data available
+                logger.warning(f"[{run_id}] No windowed data for signal generation, using empty signals")
+                raw_signals = []
             
-            # P3-C1b: Convert signals to templates via adapter
-            templates_all = inside_bar_to_trade_templates(mock_signals)
+            # P3-C2: Convert Signal objects to dict format for adapter
+            # Signal objects have: timestamp, symbol, signal_type, entry_price, stop_loss, take_profit
+            signals_as_dicts = []
+            for sig in raw_signals:
+                sig_dict = {
+                    'timestamp': pd.to_datetime(sig.timestamp),
+                    'side': 'BUY' if sig.signal_type == 'LONG' else 'SELL',
+                    'entry_price': sig.entry_price,
+                    'symbol': sig.symbol,
+                    'metadata': {
+                        'entry_reason': f'inside_bar_{sig.signal_type.lower()}',
+                        'stop_loss': sig.stop_loss,
+                        'take_profit': sig.take_profit,
+                    }
+                }
+                signals_as_dicts.append(sig_dict)
             
-            # P3-C1b: Filter for templates with both entry AND exit (ready for full round-trip)
+            # P3-C2: Convert signals to templates via adapter
+            templates_all = inside_bar_to_trade_templates(signals_as_dicts)
+            
+            # P3-C2: Filter for templates with both entry AND exit (ready for full round-trip)
             # Entry-only templates are valid but can't create EXIT events yet
             templates_ready = [
                 t for t in templates_all
@@ -278,7 +306,7 @@ def run_backtest_full(
                 f"{len(templates_ready)} ready for events (have exit info)"
             )
             
-            # P3-C1b: Only create events from ready templates
+            # P3-C2: Only create events from ready templates
             if templates_ready:
                 events = templates_to_events(templates_ready)
                 events = order_events(events)
@@ -303,22 +331,24 @@ def run_backtest_full(
                 f"final cash: {engine_result.stats.get('final_cash', 0)}"
             )
             
-            # P3-C1b: Return success with adapter stats
+            # P3-C2: Return success with real signal stats
             return RunResult(
                 run_id=run_id,
                 status=RunStatus.SUCCESS,
                 details={
                     "engine": "event_engine",
                     "compound_enabled": True,
+                    "num_signals_raw": len(raw_signals),
                     "num_templates_total": len(templates_all),
                     "num_templates_ready": len(templates_ready),
                     "num_events": engine_result.num_events,
                     "num_processed": len(engine_result.processed),
                     "final_cash": engine_result.stats.get("final_cash", 0),
                     "final_equity": engine_result.stats.get("final_equity", 0),
-                    "note": "P3-C1b - using InsideBar adapter (entry-only templates filtered)"
+                    "note": "P3-C2 - using real InsideBar signals (entry-only templates filtered)"
                 },
             )
+
 
 
 
