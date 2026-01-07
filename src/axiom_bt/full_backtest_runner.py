@@ -237,41 +237,54 @@ def run_backtest_full(
             f"basis={compound_config.equity_basis}, engine={engine_name}"
         )
         
-        # F2-C3: If compound sizing enabled, use event engine path with template extraction
+        # P3-C1b: If compound sizing enabled, use event engine path with adapter
         if compound_config.enabled:
             logger.info(
-                f"[{run_id}] Compound sizing enabled - using EventEngine with template extraction (F2-C3)"
+                f"[{run_id}] Compound sizing enabled - using EventEngine with InsideBar adapter (P3-C1b)"
             )
             
-            # F2-C3: Extract events from trade templates
-            from axiom_bt.trade_templates import TradeTemplate
+            # P3-C1b: Use adapter to convert signals to templates
+            from axiom_bt.strategy_adapters.inside_bar_to_templates import inside_bar_to_trade_templates
             from axiom_bt.template_to_events import templates_to_events
             from axiom_bt.event_ordering import order_events
             from axiom_bt.event_engine import EventEngine
             import pandas as pd
             
-            # F2-C3: Create minimal templates from strategy context
-            # TODO (F3): Extract real templates from strategy signals
+            # P3-C1b: Create minimal mock signals for integration
+            # TODO (P3-C2): Use real strategy signals from InsideBar.generate_signals()
             ts = pd.Timestamp.now(tz="America/New_York")
-            templates = [
-                TradeTemplate(
-                    template_id="test_template_1",
-                    symbol=symbol,
-                    side="BUY",
-                    entry_ts=ts,
-                    entry_price=100.0,
-                    entry_reason="test_entry",
-                    exit_ts=ts + pd.Timedelta(minutes=5),
-                    exit_price=105.0,
-                    exit_reason="test_exit",
-                ),
+            mock_signals = [
+                {
+                    'timestamp': ts,
+                    'side': 'BUY',
+                    'entry_price': 100.0,
+                    'symbol': symbol,
+                    'metadata': {'entry_reason': 'inside_bar_long'},
+                },
             ]
             
-            # F2-C3: Extract events from templates
-            events = templates_to_events(templates)
+            # P3-C1b: Convert signals to templates via adapter
+            templates_all = inside_bar_to_trade_templates(mock_signals)
             
-            # Order events (A1-compliant)
-            events = order_events(events)
+            # P3-C1b: Filter for templates with both entry AND exit (ready for full round-trip)
+            # Entry-only templates are valid but can't create EXIT events yet
+            templates_ready = [
+                t for t in templates_all
+                if (t.exit_ts is not None and t.exit_price is not None)
+            ]
+            
+            logger.info(
+                f"[{run_id}] Adapter produced {len(templates_all)} templates, "
+                f"{len(templates_ready)} ready for events (have exit info)"
+            )
+            
+            # P3-C1b: Only create events from ready templates
+            if templates_ready:
+                events = templates_to_events(templates_ready)
+                events = order_events(events)
+            else:
+                # No ready templates → empty events list (valid)
+                events = []
             
             # Initialize EventEngine
             engine = EventEngine(
@@ -286,24 +299,27 @@ def run_backtest_full(
             engine_result = engine.process(events, initial_cash=10000.0)
             
             logger.info(
-                f"[{run_id}] EventEngine processed {engine_result.num_events} events from {len(templates)} templates, "
+                f"[{run_id}] EventEngine processed {engine_result.num_events} events, "
                 f"final cash: {engine_result.stats.get('final_cash', 0)}"
             )
             
-            # F2-C3: Return success with template/event info
+            # P3-C1b: Return success with adapter stats
             return RunResult(
                 run_id=run_id,
                 status=RunStatus.SUCCESS,
                 details={
                     "engine": "event_engine",
                     "compound_enabled": True,
-                    "num_templates": len(templates),
+                    "num_templates_total": len(templates_all),
+                    "num_templates_ready": len(templates_ready),
                     "num_events": engine_result.num_events,
+                    "num_processed": len(engine_result.processed),
                     "final_cash": engine_result.stats.get("final_cash", 0),
                     "final_equity": engine_result.stats.get("final_equity", 0),
-                    "note": "F2-C3 - using template extraction pipeline"
+                    "note": "P3-C1b - using InsideBar adapter (entry-only templates filtered)"
                 },
             )
+
 
 
 
