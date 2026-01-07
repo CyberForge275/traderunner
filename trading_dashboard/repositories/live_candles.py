@@ -44,7 +44,7 @@ class LiveCandlesRepository:
         if db_path is None:
             db_path = os.getenv(
                 'LIVE_MARKETDATA_DB',
-                '/opt/trading/marketdata-stream/data/market_data.db'
+                os.getenv('MARKETDATA_DB_PATH', 'data/market_data.db')
             )
 
         self.db_path = Path(db_path)

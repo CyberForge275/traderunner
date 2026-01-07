@@ -178,7 +178,7 @@ class BacktestService:
                 command_output = None
                 try:
                     # Assuming run_name is used to create the artifact directory
-                    run_log_path = Path(f"/home/mirko/data/workspace/droid/traderunner/artifacts/backtests/{run_name}/run_log.json")
+                    run_log_path = Path(f"artifacts/backtests/{run_name}/run_log.json")
                     if run_log_path.exists():
                         import json
                         with open(run_log_path) as f:

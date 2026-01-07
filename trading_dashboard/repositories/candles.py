@@ -548,7 +548,7 @@ def get_live_candle_data(
 
     # Try to connect to marketdata.db
     db_paths = [
-        Path("/opt/trading/marketdata-stream/data/market_data.db"),  # Production (correct filename!)
+        Path(os.getenv("MARKETDATA_DB_PATH", "data/market_data.db")),  # Production (correct filename!)
         configured_db_path # Local or configured path
     ]
 
