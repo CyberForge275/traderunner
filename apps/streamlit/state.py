@@ -192,6 +192,10 @@ STRATEGY_REGISTRY: Dict[str, StrategyMetadata] = {
     for meta in (INSIDE_BAR_METADATA, INSIDE_BAR_V2_METADATA, RUDOMETKIN_METADATA)
 }
 
+# Add strategy_name aliases for dashboard compatibility
+# Dashboard UI uses "inside_bar" while registry keys use "insidebar_intraday"
+STRATEGY_REGISTRY["inside_bar"] = INSIDE_BAR_METADATA
+
 # Augment STRATEGY_REGISTRY with version-qualified keys so that
 # values emitted by dashboard version selectors (e.g.
 # "insidebar_intraday|1.00") resolve to the same StrategyMetadata
