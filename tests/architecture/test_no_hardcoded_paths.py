@@ -1,6 +1,6 @@
 # tests/architecture/test_no_hardcoded_paths.py
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 
 # Verzeichnisse, in denen wir harte Pfade NICHT akzeptieren
@@ -32,6 +32,12 @@ ALLOWED_FILES = {
 }
 
 
+def _matches_any_glob(path: str, globs: list[str]) -> bool:
+    """Check if path matches any glob pattern."""
+    p = PurePosixPath(path)
+    return any(p.match(g) for g in globs)
+
+
 def test_no_hardcoded_paths_in_core_and_services():
     """
     Ensure there are no obvious hard-coded paths or DB file names
@@ -53,8 +59,7 @@ def test_no_hardcoded_paths_in_core_and_services():
 
         for py_file in base_dir.rglob("*.py"):
             # Skip excluded patterns (docs, sources, etc.)
-            # Check if "/docs/" is in the path
-            if "/docs/" in str(py_file):
+            if _matches_any_glob(str(py_file), EXCLUDE_GLOBS):
                 continue
             
             # Allow settings SSOT files to contain these patterns
