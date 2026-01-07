@@ -151,7 +151,7 @@ class StrategyMetadataRepository:
         Initialize repository with database path.
 
         Args:
-            db_path: Path to SQLite database (typically signals.db)
+            db_path: Path to SQLite database (typically signals database file)
         """
         self.db_path = Path(db_path)
 
@@ -487,7 +487,7 @@ def get_repository(db_path: Optional[Path] = None) -> StrategyMetadataRepository
     Get repository instance using default database path from Settings.
 
     Args:
-        db_path: Optional explicit database path (defaults to signals.db from Settings)
+        db_path: Optional explicit database path (defaults to signals database file from Settings)
 
     Returns:
         StrategyMetadataRepository instance

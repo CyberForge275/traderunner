@@ -27,7 +27,7 @@ def get_eodhd_token_with_guard() -> str:
     if not token:
         raise ValueError(
             "EODHD_API_TOKEN not found in environment. "
-            "Configure token in /opt/trading/marketdata-stream/.env"
+            "Configure token in marketdata-stream/.env"
         )
 
     if token.lower() == "demo":
