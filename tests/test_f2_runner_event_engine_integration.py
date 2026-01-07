@@ -236,6 +236,7 @@ def test_signal_to_dict_conversion_for_adapter():
         timestamp=ts_str,
         symbol="TEST",
         signal_type="LONG",
+        strategy="inside_bar",  # Required field
         confidence=0.8,
         entry_price=100.0,
         stop_loss=95.0,
