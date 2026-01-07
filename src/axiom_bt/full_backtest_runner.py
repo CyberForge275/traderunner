@@ -294,10 +294,19 @@ def run_backtest_full(
             # P3-C2: Convert signals to templates via adapter
             templates_all = inside_bar_to_trade_templates(signals_as_dicts)
             
-            # P3-C2: Filter for templates with both entry AND exit (ready for full round-trip)
+            # P3-C3: Apply exit policy to complete templates
+            from axiom_bt.exit_policies import apply_time_exit
+            templates_with_exits = apply_time_exit(templates_all, windowed, hold_bars=1)
+            
+            logger.info(
+                f"[{run_id}] Exit policy: {len(templates_all)} templates → "
+                f"{len([t for t in templates_with_exits if t.exit_ts is not None])} with exits"
+            )
+            
+            # P3-C3: Filter for templates with both entry AND exit (ready for full round-trip)
             # Entry-only templates are valid but can't create EXIT events yet
             templates_ready = [
-                t for t in templates_all
+                t for t in templates_with_exits
                 if (t.exit_ts is not None and t.exit_price is not None)
             ]
             
@@ -306,7 +315,7 @@ def run_backtest_full(
                 f"{len(templates_ready)} ready for events (have exit info)"
             )
             
-            # P3-C2: Only create events from ready templates
+            # P3-C3: Only create events from ready templates
             if templates_ready:
                 events = templates_to_events(templates_ready)
                 events = order_events(events)
@@ -331,7 +340,7 @@ def run_backtest_full(
                 f"final cash: {engine_result.stats.get('final_cash', 0)}"
             )
             
-            # P3-C2: Return success with real signal stats
+            # P3-C3: Return success with exit policy stats
             return RunResult(
                 run_id=run_id,
                 status=RunStatus.SUCCESS,
@@ -340,14 +349,17 @@ def run_backtest_full(
                     "compound_enabled": True,
                     "num_signals_raw": len(raw_signals),
                     "num_templates_total": len(templates_all),
+                    "num_templates_with_exit": len([t for t in templates_with_exits if t.exit_ts is not None]),
                     "num_templates_ready": len(templates_ready),
                     "num_events": engine_result.num_events,
                     "num_processed": len(engine_result.processed),
                     "final_cash": engine_result.stats.get("final_cash", 0),
                     "final_equity": engine_result.stats.get("final_equity", 0),
-                    "note": "P3-C2 - using real InsideBar signals (entry-only templates filtered)"
+                    "exit_policy": "time_exit_1",
+                    "note": "P3-C3 - using time-based exit policy (hold_bars=1)"
                 },
             )
+
 
 
 
