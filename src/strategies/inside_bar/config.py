@@ -371,7 +371,7 @@ def get_default_config_path() -> Path:
     Searches in order:
     1. src/strategies/inside_bar/inside_bar.yaml (local strategy directory)
     2. ~/data/workspace/droid/traderunner/config/inside_bar.yaml (legacy global)
-    3. /opt/trading/traderunner/config/inside_bar.yaml (production)
+    3. config/inside_bar.yaml (production)
     4. ~/.trading/config/inside_bar.yaml (user home)
 
     Returns:
@@ -386,7 +386,7 @@ def get_default_config_path() -> Path:
         
         # 2. Global project config (Fallback/Legacy)
         Path.home() / 'data' / 'workspace' / 'droid' / 'traderunner' / 'config' / 'inside_bar.yaml',
-        Path('/opt/trading/traderunner/config/inside_bar.yaml'),
+        Path('config/inside_bar.yaml'),
         Path.home() / '.trading' / 'config' / 'inside_bar.yaml',
     ]
 
