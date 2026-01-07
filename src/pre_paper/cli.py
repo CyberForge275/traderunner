@@ -31,7 +31,7 @@ def get_service():
     
     ENV:
         MARKETDATA_PROVIDER: "fake" (default) or "real"
-        SIGNALS_DB_PATH: Path to signals.db (for real provider)
+        SIGNALS_DB_PATH: Path to signals database file (for real provider)
     
     Returns:
         MarketDataService instance

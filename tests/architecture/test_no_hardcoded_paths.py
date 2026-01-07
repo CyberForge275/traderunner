@@ -1,6 +1,6 @@
 # tests/architecture/test_no_hardcoded_paths.py
 
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import re
 
 # Verzeichnisse, in denen wir harte Pfade NICHT akzeptieren
@@ -19,9 +19,9 @@ FORBIDDEN_PATTERNS = [
     r"signals\.db",
 ]
 
-# Dateien/Pfade, die vom Scan ausgeschlossen werden (nicht runtime code)
-EXCLUDE_GLOBS = [
-    "**/docs/**",  # Documentation/analysis scripts
+# Pfad-Teile, die vom Scan ausgeschlossen werden (nicht runtime code)
+EXCLUDE_PATH_PARTS = [
+    "/docs/",  # Documentation/analysis scripts
 ]
 
 # Dateien, die als Settings-SSOT diese Patterns enthalten DÜRFEN
@@ -30,12 +30,6 @@ ALLOWED_FILES = {
     "src/settings.py",
     "src/core/settings/config.py",
 }
-
-
-def _matches_any_glob(path: str, globs: list[str]) -> bool:
-    """Check if path matches any glob pattern."""
-    p = PurePosixPath(path)
-    return any(p.match(g) for g in globs)
 
 
 def test_no_hardcoded_paths_in_core_and_services():
@@ -58,12 +52,14 @@ def test_no_hardcoded_paths_in_core_and_services():
             continue
 
         for py_file in base_dir.rglob("*.py"):
-            # Skip excluded patterns (docs, sources, etc.)
-            if _matches_any_glob(str(py_file), EXCLUDE_GLOBS):
+            file_str = str(py_file)
+            
+            # Skip excluded path parts (docs, sources, etc.)
+            if any(part in file_str for part in EXCLUDE_PATH_PARTS):
                 continue
             
             # Allow settings SSOT files to contain these patterns
-            if str(py_file) in ALLOWED_FILES:
+            if file_str in ALLOWED_FILES:
                 continue
             
             text = py_file.read_text(encoding="utf-8")
@@ -72,7 +68,7 @@ def test_no_hardcoded_paths_in_core_and_services():
             # selbst Beispiele sollten keine harten Pfade propagieren.
             for pattern in FORBIDDEN_PATTERNS:
                 if re.search(pattern, text):
-                    offending.append((str(py_file), pattern))
+                    offending.append((file_str, pattern))
 
     assert not offending, (
         "Hard-coded paths or DB names found in core/service modules. "
