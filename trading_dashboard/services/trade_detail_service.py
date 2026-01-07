@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from backtest.services.trade_evidence import generate_trade_evidence
+from src.backtest.services.trade_evidence import generate_trade_evidence
 from trading_dashboard.repositories.trade_repository import TradeRepository, RunArtifacts
 
 
