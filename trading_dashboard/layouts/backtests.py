@@ -673,6 +673,93 @@ def create_backtests_layout():
         ],
     )
 
+    # NEW: SSOT Config Viewer Card (Editable, UI-State Only)
+    ssot_config_viewer_card = html.Div(
+        className="dashboard-card",
+        children=[
+            html.H6("🔍 SSOT Config Viewer", style={"marginBottom": "15px"}),
+            
+            # Strategy ID dropdown
+            html.Label("Strategy", style={"fontSize": "0.9em", "marginTop": "4px"}),
+            dcc.Dropdown(
+                id="ssot-strategy-id",
+                options=[],  # Populated by callback
+                value="insidebar_intraday",
+                placeholder="Select strategy...",
+                clearable=False,
+                style={"marginBottom": "8px"},
+            ),
+            
+            # Version dropdown (populated based on selected strategy)
+            html.Label("Version", style={"fontSize": "0.9em", "marginTop": "4px"}),
+            dcc.Dropdown(
+                id="ssot-version",
+                options=[],  # Populated by callback based on strategy selection
+                value="1.0.0",
+                placeholder="Select version...",
+                clearable=False,
+                style={"marginBottom": "8px"},
+            ),
+            
+            # New version input (optional - only needed if finalized)
+            html.Label("New Version (optional - for finalized versions)", style={"fontSize": "0.9em", "marginTop": "8px"}),
+            dcc.Input(
+                id="ssot-new-version",
+                type="text",
+                placeholder="e.g. 1.0.1 (leave empty to save to current version)",
+                style={"width": "100%", "marginBottom": "8px"},
+            ),
+            
+            #Action buttons row
+            html.Div([
+                dbc.Button(
+                    "Load Config",
+                    id="ssot-load-button",
+                    color="primary",
+                    size="sm",
+                    style={"marginRight": "8px"},
+                ),
+                dbc.Button(
+                    "Reset",
+                    id="ssot-reset-button",
+                    color="secondary",
+                    size="sm",
+                    outline=True,
+                    style={"marginRight": "8px"},
+                ),
+                dbc.Button(
+                    "Save as New Version",
+                    id="ssot-save-version",
+                    color="success",
+                    size="sm",
+                    disabled=True,  # Enabled by callback
+                    style={"marginRight": "8px"},
+                ),
+                dbc.Button(
+                    "Mark as Finalized",
+                    id="ssot-finalize-button",
+                    color="warning",
+                    size="sm",
+                    disabled=True,  # Enabled when draft is loaded
+                    outline=True,
+                ),
+            ], style={"marginTop": "8px", "marginBottom": "12px"}),
+            
+            # Save status display
+            html.Div(id="ssot-save-status", style={"marginBottom": "8px"}),
+            
+            # Status / Error display
+            html.Div(id="ssot-load-status", style={"marginBottom": "8px"}),
+            
+            # Hidden store for loaded defaults (immutable snapshot)
+            dcc.Store(id="ssot-loaded-defaults", data=None),
+            
+            # Editable fields container (dynamically populated)
+            html.Div(id="ssot-editable-fields", children=[]),
+        ],
+        style={"marginTop": "20px"},
+    )
+
     # NEW: Strategy configuration for running new backtests
     new_backtest_card = html.Div(
         className="dashboard-card",
@@ -683,12 +770,19 @@ def create_backtests_layout():
             html.Label("Strategy", style={"fontWeight": "bold", "marginTop": "8px"}),
             dcc.Dropdown(
                 id="backtests-new-strategy",
-                options=[
-                    {"label": "Inside Bar", "value": "insidebar_intraday"},
-                    {"label": "Inside Bar V2", "value": "insidebar_intraday_v2"},
-                    {"label": "Rudometkin", "value": "rudometkin_moc_mode"},
-                ],
-                value="insidebar_intraday",
+                options=[],  # Will be populated by SSOT callback from registry
+                placeholder="Select Strategy...",
+                clearable=False,
+                style={"color": "#000", "marginBottom": "8px"},
+            ),
+
+            # NEW: Generic Version Selector
+            html.Label("Version (Required)", id="backtests-new-version-label", 
+                       style={"fontWeight": "bold", "marginTop": "8px", "color": "var(--accent-red)"}),
+            dcc.Dropdown(
+                id="backtests-new-version",
+                options=[],  # Will be populated by callback
+                placeholder="Select Version...",
                 clearable=False,
                 style={"color": "#000", "marginBottom": "8px"},
             ),
@@ -761,34 +855,6 @@ def create_backtests_layout():
                 style={"color": "#000", "marginBottom": "8px"},
             ),
 
-
-            # NEW: Session Hours Filter
-            html.Label([
-                "Session Hours ",
-                html.Span(
-                    "(Market TZ: Auto-detected)",
-                    style={"fontSize": "0.85em", "color": "#999", "fontWeight": "normal"}
-                ),
-                html.Span(" ⓘ", id="session-tz-info", style={"cursor": "help", "marginLeft": "4px"})
-            ], style={"fontWeight": "bold", "marginTop": "12px"}),
-            dbc.Tooltip(
-                "For US tickers (NASDAQ/NYSE): Enter times in America/New_York (EST/EDT). "
-                "Example: '09:30-16:00' for regular trading hours. "
-                "System auto-detects market timezone based on symbols.",
-                target="session-tz-info",
-                placement="top"
-            ),
-            dcc.Input(
-                id="backtests-session-filter",
-                type="text",
-                placeholder="09:30-16:00 (optional)",
-                value="",
-                style={"width": "100%", "marginBottom": "4px"},
-            ),
-            html.Small(
-                "Filter signals to specific time windows (in market timezone). Leave empty for all trading hours.",
-                style={"fontSize": "0.85em", "color": "var(--text-secondary)", "display": "block", "marginBottom": "8px"}
-            ),
 
             # Date selection method (Streamlit-style)
             html.Label("Date Selection", style={"fontWeight": "bold", "marginTop": "8px"}),
@@ -888,12 +954,14 @@ def create_backtests_layout():
 
             # Store current job ID for polling (hidden)
             dcc.Store(id="backtests-current-job-id", data=None),
+            # NEW: Store for current backtest configuration snapshot (SSOT driven)
+            dcc.Store(id="bt-config-store", data=None),
         ],
         style={"marginTop": "20px"},
     )
 
-    # Left pane: New backtest configuration only (removed duplicate run_select_card)
-    left_pane = html.Div([strategy_card, new_backtest_card])
+    # Left pane: SSOT viewer + New backtest configuration
+    left_pane = html.Div([strategy_card, ssot_config_viewer_card, new_backtest_card])
 
     # Right pane: dropdown selector + backtest details
     right_pane = html.Div(

@@ -3,8 +3,6 @@ Tests for CHECK 2-4: Compound config plumbing, manifest, and guards.
 """
 
 import pytest
-import yaml
-from pathlib import Path
 
 from axiom_bt.compound_config import CompoundConfig
 
@@ -76,26 +74,5 @@ def test_compound_config_to_dict():
         "compound_sizing": True,
         "compound_equity_basis": "cash_only"
     }
-
-
-def test_compound_flags_are_wired_to_yaml():
-    """CHECK 2: Verify YAML contains compound flags in correct location."""
-    config_path = Path("src/strategies/inside_bar/inside_bar.yaml")
-    
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
-    
-    # Must be in backtesting section
-    assert "backtesting" in config
-    bt = config["backtesting"]
-    
-    assert "compound_sizing" in bt
-    assert "compound_equity_basis" in bt
-    
-    # Verify defaults
-    assert bt["compound_sizing"] == False
-    assert bt["compound_equity_basis"] == "cash_only"
-
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

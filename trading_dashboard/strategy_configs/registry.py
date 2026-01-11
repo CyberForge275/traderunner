@@ -7,7 +7,6 @@ from typing import Dict, Optional, List
 from dash import html
 
 from . import StrategyConfigPlugin, create_empty_plugin
-from .inside_bar_config import InsideBarConfigPlugin
 
 
 class StrategyConfigRegistry:
@@ -19,12 +18,8 @@ class StrategyConfigRegistry:
 
     def _register_builtin_plugins(self):
         """Register all built-in strategy plugins."""
-        # Register InsideBar plugin
-        insidebar_plugin = InsideBarConfigPlugin()
-        self.register(insidebar_plugin)
-
-        # Also register for v2 variant
-        self.plugins["insidebar_intraday_v2"] = insidebar_plugin
+        # Built-in plugins registration cleared (moved to SSOT)
+        pass
 
         # Rudometkin will be added later
         # rudometkin_plugin = RudometkinConfigPlugin()

@@ -236,6 +236,36 @@ def run_backtest_full(
             f"[{run_id}] Compound config: enabled={compound_config.enabled}, "
             f"basis={compound_config.equity_basis}, engine={engine_name}"
         )
+
+        # Prepare costs early for both paths
+        if costs is None:
+            costs_dict = {"fees_bps": DEFAULT_FEE_BPS, "slippage_bps": DEFAULT_SLIPPAGE_BPS}
+        elif isinstance(costs, dict):
+            costs_dict = {
+                "fees_bps": costs.get("fees_bps", DEFAULT_FEE_BPS),
+                "slippage_bps": costs.get("slippage_bps", DEFAULT_SLIPPAGE_BPS),
+            }
+        else:
+            costs_dict = costs
+
+        # Phase 0: Write run_meta immediately to ensure manifest exists for all paths
+        config_with_compound = {
+            **strategy_params,
+            **compound_config.to_dict(),  # Add compound_sizing, compound_equity_basis
+        }
+        manager.write_run_meta(
+            strategy=strategy_key,
+            symbols=[symbol],
+            timeframe=timeframe,
+            params={"execution_mode": "full_backtest", **config_with_compound},
+            requested_end=requested_end,
+            lookback_days=lookback_days,
+            commit_hash=None,
+            market_tz=market_tz,
+            impl_version="1.0.0",
+            profile_version="default",
+        )
+        logger.info(f"[{run_id}] run_meta.json written (pre-engine selection)")
         
         # P3-C2: If compound sizing enabled, use event engine path with real signals
         if compound_config.enabled:
@@ -248,6 +278,7 @@ def run_backtest_full(
             from axiom_bt.strategy_adapters.inside_bar_to_templates import inside_bar_to_trade_templates
             from axiom_bt.template_to_events import templates_to_events
             from axiom_bt.event_ordering import order_events
+            from axiom_bt.day_partition import process_daywise
             from axiom_bt.event_engine import EventEngine
             
             # P3-C2: Get bars data (same as legacy path would use)
@@ -322,42 +353,91 @@ def run_backtest_full(
                 # No ready templates → empty events list (valid)
                 events = []
             
-            # Initialize EventEngine
+            # Inputs (no hardcodes)
+            initial_cash_used = float(initial_cash)
+            if initial_cash_used <= 0:
+                raise ValueError("initial_cash must be > 0 for compound path")
+
+            if isinstance(costs_dict, dict):
+                fees_bps = float(costs_dict.get("fees_bps", 0.0))
+                slippage_bps = float(costs_dict.get("slippage_bps", 0.0))
+            else:
+                fees_bps = float(getattr(costs_dict, "fees_bps", 0.0))
+                slippage_bps = float(getattr(costs_dict, "slippage_bps", 0.0))
+
+            # Initialize EventEngine with provided inputs
             engine = EventEngine(
-                initial_cash=10000.0,  # TODO: from strategy params
+                initial_cash=initial_cash_used,
                 validate_ordering=True,
-                fixed_qty=0.0,  # Use floor-based qty
-                slippage_bps=0.0,
-                commission_bps=0.0,
+                fixed_qty=0.0,  # Use floor-based qty (cash-only sizing)
+                slippage_bps=slippage_bps,
+                commission_bps=fees_bps,
             )
             
-            # Process events
-            engine_result = engine.process(events, initial_cash=10000.0)
-            
+            # Day-wise processing (carry cash per market day)
+            processed_events, ledger_rows, final_cash, num_partitions = process_daywise(
+                engine,
+                events,
+                market_tz,
+                initial_cash_used,
+                slippage_bps=slippage_bps,
+                commission_bps=fees_bps,
+            )
+
             logger.info(
-                f"[{run_id}] EventEngine processed {engine_result.num_events} events, "
-                f"final cash: {engine_result.stats.get('final_cash', 0)}"
+                f"[{run_id}] EventEngine processed {len(events)} events across {num_partitions} day partitions, "
+                f"final cash: {final_cash}"
             )
-            
-            # P3-C3: Return success with exit policy stats
-            return RunResult(
+
+            # ----------------------
+            # Artifact persistence (compound path)
+            # ----------------------
+            artifacts_produced: List[str] = []
+
+            # Persist processed events
+            processed_records = [pe.to_dict() for pe in processed_events]
+            events_path = run_dir / "events_processed.csv"
+            pd.DataFrame(processed_records).to_csv(events_path, index=False)
+            artifacts_produced.append("events_processed.csv")
+
+            # Ledger and equity curve (cash-only)
+            ledger_df = pd.DataFrame(ledger_rows)
+            ledger_path = run_dir / "portfolio_ledger.csv"
+            ledger_df.to_csv(ledger_path, index=False)
+            artifacts_produced.append("portfolio_ledger.csv")
+
+            equity_path = run_dir / "equity_curve.csv"
+            equity_df = ledger_df.rename(columns={"cash": "equity"})
+            equity_df.to_csv(equity_path, index=False)
+            artifacts_produced.append("equity_curve.csv")
+
+            # Write run_result + finalize manifest
+            run_result = RunResult(
                 run_id=run_id,
                 status=RunStatus.SUCCESS,
                 details={
                     "engine": "event_engine",
                     "compound_enabled": True,
+                    "compound_equity_basis": compound_config.equity_basis,
+                    "initial_cash_used": initial_cash_used,
+                    "fees_bps": fees_bps,
+                    "slippage_bps": slippage_bps,
+                    "num_days_partitions": num_partitions,
                     "num_signals_raw": len(raw_signals),
                     "num_templates_total": len(templates_all),
                     "num_templates_with_exit": len([t for t in templates_with_exits if t.exit_ts is not None]),
                     "num_templates_ready": len(templates_ready),
-                    "num_events": engine_result.num_events,
-                    "num_processed": len(engine_result.processed),
-                    "final_cash": engine_result.stats.get("final_cash", 0),
-                    "final_equity": engine_result.stats.get("final_equity", 0),
+                    "num_events": len(events),
+                    "num_processed": len(processed_events),
+                    "final_cash": final_cash,
+                    "final_equity": final_cash,
                     "exit_policy": "time_exit_1",
-                    "note": "P3-C3 - using time-based exit policy (hold_bars=1)"
+                    "note": "compound path (cash-only sizing, EventEngine)",
                 },
             )
+
+            manager.write_run_result(run_result, artifacts_produced=artifacts_produced)
+            return run_result
 
 
 
@@ -372,24 +452,21 @@ def run_backtest_full(
         # Phase 0.5: Write run_meta.json via ArtifactsManager so that the
         # manifest writer is initialized and run_manifest.json is produced.
         with tracker.step("write_run_meta"):
-            # CHECK 3: Include compound config in run metadata for manifest
-            config_with_compound = {
-                **strategy_params,
-                **compound_config.to_dict()  # Add compound_sizing, compound_equity_basis
-            }
-            manager.write_run_meta(
-                strategy=strategy_key,
-                symbols=[symbol],
-                timeframe=timeframe,
-                params={"execution_mode": "full_backtest", **config_with_compound},
-                requested_end=requested_end,
-                lookback_days=lookback_days,
-                commit_hash=None,
-                market_tz=market_tz,
-                impl_version="1.0.0",
-                profile_version="default",
-            )
-            logger.info(f"[{run_id}] run_meta.json written via ArtifactsManager (execution_mode=full_backtest)")
+            # Already written pre-engine selection; keep legacy path idempotent
+            if not compound_config.enabled:
+                manager.write_run_meta(
+                    strategy=strategy_key,
+                    symbols=[symbol],
+                    timeframe=timeframe,
+                    params={"execution_mode": "full_backtest", **strategy_params, **compound_config.to_dict()},
+                    requested_end=requested_end,
+                    lookback_days=lookback_days,
+                    commit_hash=None,
+                    market_tz=market_tz,
+                    impl_version="1.0.0",
+                    profile_version="default",
+                )
+                logger.info(f"[{run_id}] run_meta.json written via ArtifactsManager (execution_mode=full_backtest)")
 
         # Phase 0.7: Ensure Intraday Data (with warmup buffer)
         with tracker.step("ensure_intraday_data") as step:

@@ -104,7 +104,8 @@ deployment_notes="Original implementation, stable and tested",
 # InsideBar v2 (Unified Implementation)
 INSIDE_BAR_V2_PROFILE = StrategyMetadata(
     # Identity
-    strategy_id="insidebar_intraday_v2",\n    canonical_name="inside_bar",
+    strategy_id="insidebar_intraday_v2",
+    canonical_name="inside_bar",
     display_name="Inside Bar Intraday v2",
     version="2.0.0",
     description="Unified inside bar implementation with 100% parity between backtest and live trading",

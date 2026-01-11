@@ -38,6 +38,8 @@ from trading_dashboard.callbacks.freshness_callback import register_freshness_ca
 from trading_dashboard.callbacks.charts_live_callbacks import register_charts_live_callbacks
 from trading_dashboard.callbacks.charts_backtesting_callbacks import register_charts_backtesting_callbacks
 from trading_dashboard.callbacks.trade_inspector_callbacks import register_trade_inspector_callbacks
+from trading_dashboard.callbacks.ssot_config_viewer_callback import register_ssot_config_viewer_callback
+from trading_dashboard.callbacks.ssot_backtest_config_callback import register_ssot_backtest_config_callback
 
 # Setup logging FIRST
 from trading_dashboard.logging_config import setup_logging
@@ -181,22 +183,15 @@ register_freshness_callback(app)  # Data freshness indicators
 register_charts_live_callbacks(app)  # NEW: Live Charts tab
 register_charts_backtesting_callbacks(app)  # NEW: Backtesting Charts tab
 register_trade_inspector_callbacks(app)
+register_ssot_config_viewer_callback(app)  # NEW: SSOT config viewer
+register_ssot_backtest_config_callback(app)  # NEW: SSOT backtest config
 
 # Initialize strategy configuration plugins
 # MUST be before if __name__ == "__main__" so gunicorn can import it!
 from trading_dashboard.strategy_configs.registry import initialize_registry, get_registry
 initialize_registry(app)
 
-@app.callback(
-    Output('strategy-config-container', 'children'),
-    Input('backtests-new-strategy', 'value')
-)
-def update_strategy_config_ui(strategy):
-    """Dynamically load strategy-specific configuration UI."""
-    if not strategy:
-        return []
-    registry = get_registry()
-    return registry.render_config_for_strategy(strategy)
+
 
 
 @app.callback(
