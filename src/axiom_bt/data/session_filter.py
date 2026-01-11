@@ -15,6 +15,50 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
+# COMPATIBILITY SHIM: normalize_session_filter for full_backtest_runner.py
+def normalize_session_filter(session_filter):
+    """Normalize session_filter parameter to dict format (compatibility shim).
+    
+    CLI/UI may send session_filter as dict, list, or None. This function
+    normalizes to dict form for downstream consistency.
+    
+    Args:
+        session_filter: Session filter parameter (dict, list, or None)
+        
+    Returns:
+        Normalized dict or None
+        
+    Examples:
+        >>> normalize_session_filter(None)
+        None
+        >>> normalize_session_filter({"windows": ["15:00-16:00"]})
+        {047windows047: [047 15:00-16:00047]}
+        >>> normalize_session_filter(["15:00-16:00"])
+        {047windows047: [04715:00-16:00047]}
+        
+    Notes:
+        - If already dict, returns as-is
+        - If list, wraps in {"windows": list}
+        - If None, returns None
+        - This is a compatibility shim for full_backtest_runner.py
+    """
+    if session_filter is None:
+        return None
+    
+    if isinstance(session_filter, dict):
+        return session_filter
+    
+    if isinstance(session_filter, list):
+        return {"windows": session_filter}
+    
+    # Fallback: return as-is (defensive)
+    logger.warning(
+        f"normalize_session_filter: unexpected type {type(session_filter)}, "
+        f"returning as-is"
+    )
+    return session_filter
+
+
 def filter_rth_session(
     df: pd.DataFrame,
     tz: str = "America/New_York",
