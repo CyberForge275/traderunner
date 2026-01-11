@@ -32,7 +32,12 @@ def test_store_reads_inside_bar_defaults_from_yaml(temp_config_root):
                     "risk_reward_ratio": 3.0,
                     "min_mother_bar_size": 1.0,
                     "breakout_confirmation": False,
-                    "inside_bar_mode": "strict"
+                    "inside_bar_mode": "strict",
+                    "session_timezone": "America/New_York",
+                    "session_filter": ["09:30-16:00"],
+                    "timeframe_minutes": 5,
+                    "valid_from_policy": "signal_ts",
+                    "order_validity_policy": "session_end"
                 },
                 "tunable": {
                     "lookback_candles": 100,

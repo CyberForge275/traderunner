@@ -25,7 +25,12 @@ def temp_repo(tmp_path):
                     "risk_reward_ratio": 2.0,
                     "min_mother_bar_size": 0.5,
                     "breakout_confirmation": True,
-                    "inside_bar_mode": "inclusive"
+                    "inside_bar_mode": "inclusive",
+                    "session_timezone": "America/New_York",
+                    "session_filter": ["09:30-16:00"],
+                    "timeframe_minutes": 5,
+                    "valid_from_policy": "signal_ts",
+                    "order_validity_policy": "session_end"
                 },
                 "tunable": {
                     "lookback_candles": 50,
