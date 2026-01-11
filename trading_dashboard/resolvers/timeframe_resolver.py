@@ -13,8 +13,9 @@ from typing import Optional
 import pandas as pd
 import logging
 
-from axiom_bt.intraday import IntradayStore, Timeframe
 from trading_dashboard.repositories.daily_universe import DailyUniverseRepository
+from trading_dashboard.providers.ohlcv_contract import OhlcvRequest, OhlcvProvider
+from trading_dashboard.providers.axiom_bt_provider import AxiomBtProvider
 
 logger = logging.getLogger(__name__)
 
@@ -24,27 +25,29 @@ class BacktestingTimeframeResolver:
     Resolve timeframe requests to appropriate Parquet-only data source.
 
     Routing:
-    - M1/M5/M15 → IntradayStore (intraday parquet files)
+    - M1/M5/M15 → OhlcvProvider (default: AxiomBtProvider → IntradayStore)
     - D1 → DailyUniverseRepository (universe parquet)
     - H1 → Resample from M5 or M1 (if available)
 
     All data sources are Parquet-only (no SQLite, no live data).
     """
 
-    def __init__(self, universe_path: Optional[Path] = None):
+    def __init__(self, universe_path: Optional[Path] = None, ohlcv_provider: Optional[OhlcvProvider] = None):
         """
         Initialize resolver with data sources.
 
         Args:
             universe_path: Optional custom path to universe parquet
+            ohlcv_provider: Optional OHLCV provider (default: AxiomBtProvider)
         """
-        self.intraday_store = IntradayStore()
+        # Use injected provider or default to AxiomBtProvider
+        self.ohlcv_provider = ohlcv_provider or AxiomBtProvider()
         self.daily_repo = DailyUniverseRepository(universe_path=universe_path)
 
         logger.info("📍 BacktestingTimeframeResolver initialized")
-        logger.info("   M1/M5/M15 → IntradayStore (parquet)")
-        logger.info("   D1 → DailyUniverseRepository (universe parquet)")
-        logger.info("   H1 → Resample from M5")
+        logger.info(f"   Intraday: {self.ohlcv_provider.__class__.__name__}")
+        logger.info("   Daily: DailyUniverseRepository (universe parquet)")
+        logger.info("   H1: Resample from M5")
 
     def load(
         self,
@@ -95,9 +98,23 @@ class BacktestingTimeframeResolver:
         timeframe: str,
         tz: str
     ) -> pd.DataFrame:
-        """Load intraday data from IntradayStore."""
-        tf = Timeframe(timeframe)
-        return self.intraday_store.load(symbol, timeframe=tf, tz=tz)
+        """Load intraday data from OhlcvProvider.
+        
+        Creates a Full-Load request (no start/end, warmup_bars=None).
+        """
+        req = OhlcvRequest(
+            symbol=symbol,
+            timeframe=timeframe,
+            tz=tz,
+            start=None,  # Full-Load
+            end=None,
+            warmup_bars=None,  # MUST be None for Full-Load
+            session_mode=None  # Use provider default (axiom_bt: "rth")
+        )
+        
+        df, meta = self.ohlcv_provider.get_ohlcv(req)
+        logger.debug(f"Loaded {meta.row_count_total} rows via {meta.provider_id}")
+        return df
 
     def _load_daily(self, symbol: str, tz: str) -> pd.DataFrame:
         """Load daily data from DailyUniverseRepository."""
@@ -108,17 +125,22 @@ class BacktestingTimeframeResolver:
         Load H1 by resampling from M5 (or M1 if M5 unavailable).
 
         Strategy:
-        1. Try loading M5
+        1. Try loading M5 via provider
         2. Resample to 1H
         3. If M5 missing, try M1 (fallback)
         """
         try:
             # Try M5 first (faster)
-            df_m5 = self.intraday_store.load(
-                symbol,
-                timeframe=Timeframe.M5,
-                tz=tz
+            req = OhlcvRequest(
+                symbol=symbol,
+                timeframe="M5",
+                tz=tz,
+                start=None,
+                end=None,
+                warmup_bars=None,
+                session_mode=None
             )
+            df_m5, _ = self.ohlcv_provider.get_ohlcv(req)
 
             if df_m5.empty:
                 raise FileNotFoundError(f"M5 data empty for {symbol}")
@@ -140,11 +162,16 @@ class BacktestingTimeframeResolver:
             logger.debug(f"M5 not available for {symbol}, trying M1 fallback")
 
             try:
-                df_m1 = self.intraday_store.load(
-                    symbol,
-                    timeframe=Timeframe.M1,
-                    tz=tz
+                req = OhlcvRequest(
+                    symbol=symbol,
+                    timeframe="M1",
+                    tz=tz,
+                    start=None,
+                    end=None,
+                    warmup_bars=None,
+                    session_mode=None
                 )
+                df_m1, _ = self.ohlcv_provider.get_ohlcv(req)
 
                 if df_m1.empty:
                     raise FileNotFoundError(f"M1 data empty for {symbol}")
@@ -181,16 +208,26 @@ class BacktestingTimeframeResolver:
 
         try:
             if timeframe in ['M1', 'M5', 'M15']:
-                tf = Timeframe(timeframe)
-                return self.intraday_store.has_symbol(symbol, timeframe=tf)
+                # Try loading via provider
+                req = OhlcvRequest(
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    tz=None,
+                    start=None,
+                    end=None,
+                    warmup_bars=None,
+                    session_mode=None
+                )
+                df, _ = self.ohlcv_provider.get_ohlcv(req)
+                return len(df) > 0
 
             elif timeframe == 'D1':
                 return self.daily_repo.has_symbol(symbol)
 
             elif timeframe == 'H1':
                 # H1 available if M5 OR M1 exists
-                has_m5 = self.intraday_store.has_symbol(symbol, timeframe=Timeframe.M5)
-                has_m1 = self.intraday_store.has_symbol(symbol, timeframe=Timeframe.M1)
+                has_m5 = self.has_data(symbol, 'M5')
+                has_m1 = self.has_data(symbol, 'M1')
                 return has_m5 or has_m1
 
             else:
@@ -203,7 +240,7 @@ class BacktestingTimeframeResolver:
     def _get_source(self, timeframe: str) -> str:
         """Get human-readable source name for timeframe."""
         if timeframe in ['M1', 'M5', 'M15']:
-            return "IntradayStore"
+            return f"{self.ohlcv_provider.__class__.__name__}"
         elif timeframe == 'D1':
             return "DailyUniverseRepository"
         elif timeframe == 'H1':
