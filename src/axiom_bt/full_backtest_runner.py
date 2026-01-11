@@ -249,7 +249,6 @@ def run_backtest_full(
             from axiom_bt.template_to_events import templates_to_events
             from axiom_bt.event_ordering import order_events
             from axiom_bt.event_engine import EventEngine
-            import pandas as pd
             
             # P3-C2: Get bars data (same as legacy path would use)
             # For minimal implementation: use windowed bars if available, else empty
