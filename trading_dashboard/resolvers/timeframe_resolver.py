@@ -12,10 +12,12 @@ from pathlib import Path
 from typing import Optional
 import pandas as pd
 import logging
+import os
 
 from trading_dashboard.repositories.daily_universe import DailyUniverseRepository
 from trading_dashboard.providers.ohlcv_contract import OhlcvRequest, OhlcvProvider
 from trading_dashboard.providers.axiom_bt_provider import AxiomBtProvider
+from trading_dashboard.providers.marketstream_local_provider import MarketstreamLocalProvider
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,11 @@ class BacktestingTimeframeResolver:
     - H1 → Resample from M5 or M1 (if available)
 
     All data sources are Parquet-only (no SQLite, no live data).
+    
+    Provider Selection (S2a):
+    - Default: AxiomBtProvider (IntradayStore)
+    - ENV BACKTESTS_OHLCV_PROVIDER=marketstream_local → MarketstreamLocalProvider
+                                                          (requires MARKETDATA_DATA_ROOT)
     """
 
     def __init__(self, universe_path: Optional[Path] = None, ohlcv_provider: Optional[OhlcvProvider] = None):
@@ -38,10 +45,19 @@ class BacktestingTimeframeResolver:
 
         Args:
             universe_path: Optional custom path to universe parquet
-            ohlcv_provider: Optional OHLCV provider (default: AxiomBtProvider)
+            ohlcv_provider: Optional custom OHLCV provider. If None, uses ENV or default (AxiomBtProvider)
         """
-        # Use injected provider or default to AxiomBtProvider
-        self.ohlcv_provider = ohlcv_provider or AxiomBtProvider()
+        if ohlcv_provider:
+            self.ohlcv_provider = ohlcv_provider
+        else:
+            provider_env = os.getenv("BACKTESTS_OHLCV_PROVIDER")
+            if provider_env == "marketstream_local":
+                logger.info("Using MarketstreamLocalProvider (from ENV BACKTESTS_OHLCV_PROVIDER)")
+                self.ohlcv_provider = MarketstreamLocalProvider()
+            else:
+                logger.info("Using AxiomBtProvider (default)")
+                self.ohlcv_provider = AxiomBtProvider()
+
         self.daily_repo = DailyUniverseRepository(universe_path=universe_path)
 
         logger.info("📍 BacktestingTimeframeResolver initialized")
