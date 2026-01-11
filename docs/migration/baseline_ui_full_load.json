@@ -4,9 +4,9 @@
   "timeframe": "M5",
   "warmup_bars": null,
   "row_count": 800,
-  "first_ts": "2025-12-17 14:20:00-05:00",
-  "last_ts": "2026-01-02 15:55:00-05:00",
-  "data_hash": 16154985576542238852,
+  "first_ts": "2025-12-24 14:20:00-05:00",
+  "last_ts": "2026-01-09 15:55:00-05:00",
+  "data_hash": 16846454627319661150,
   "columns": [
     "open",
     "high",
@@ -16,5 +16,5 @@
   ],
   "tz_effective": "America/New_York",
   "slice_policy": "tail_800",
-  "git_commit": "48b05922"
+  "git_commit": "bc294ee"
 }
