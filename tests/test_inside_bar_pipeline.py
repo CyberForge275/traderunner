@@ -15,6 +15,11 @@ def test_pipeline_generates_orders(tmp_path, monkeypatch):
 
     # Prepare synthetic M1 → M5 data
     generate_demo_data(root=Path("artifacts/demo"), symbol="TEST", window_days=10)
+    
+    # Ensure artifacts/data_m1 exists and has the expected file for session_mode='all'
+    Path("artifacts/data_m1").mkdir(parents=True, exist_ok=True)
+    shutil.copy("artifacts/demo/data/TEST.parquet", "artifacts/data_m1/TEST_all.parquet")
+
     args = type("Args", (), {
         "symbols": "TEST",
         "universe_file": None,
@@ -22,9 +27,10 @@ def test_pipeline_generates_orders(tmp_path, monkeypatch):
         "tz": "UTC",
         "start": None,
         "end": None,
-        "force": True,
+        "force": False,
         "generate_m15": False,
         "use_sample": True,
+        "session_mode": "all",
     })
     cmd_ensure_intraday(args)
 
