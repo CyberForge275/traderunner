@@ -1,136 +1,106 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Nov 14 17:20:01 2025
-
-@author: mirko
-"""
-
 """Strategy registry for managing and discovering trading strategies."""
 
-import importlib
-import pkgutil
-import logging
-from typing import Dict, Type, List, Optional, Set
+from __future__ import annotations
 
-from .base import IStrategy
+import importlib
+import logging
+import pkgutil
+from typing import Any, Dict, List, Optional, Type, Protocol
+
 
 logger = logging.getLogger(__name__)
 
 
-class StrategyRegistry:
-    """Central registry for all trading strategies.
+class IStrategy(Protocol):
+    """Protocol for trading strategy implementations."""
 
-    This registry provides:
-    - Strategy registration and lookup
-    - Auto-discovery of strategy modules
-    - Strategy validation and metadata management
-    - Thread-safe operations for concurrent access
+    name: str = ""
+    version: str = "1.0.0"
+    description: str = ""
+    config_schema: Dict[str, Any] = {}
+
+    def generate_signals(self, bars: Any) -> Any:
+        ...
+
+    def get_required_data_columns(self) -> List[str]:
+        ...
+
+
+class StrategyRegistry:
+    """Registry for trading strategies with auto-discovery support.
+
+    This registry maintains a mapping between strategy names and their
+    implementation classes. It supports manual registration and
+    automatic discovery of strategies in specific packages.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the strategy registry."""
-        self._strategies: Dict[str, Type[IStrategy]] = {}
-        self._metadata: Dict[str, Dict] = {}
-        self._discovery_paths: Set[str] = set()
+        self._strategies: Dict[str, Type] = {}
+        self._metadata: Dict[str, Dict[str, Any]] = {}
+        self._discovery_paths: set[str] = set()
 
     def register(
-        self,
-        name: str,
-        strategy_class: Type[IStrategy],
-        metadata: Optional[Dict] = None,
+        self, name: str, strategy_class: Type, metadata: Optional[Dict] = None
     ) -> None:
-        """Register a strategy class.
+        """Register a strategy class with a name.
 
         Args:
-            name: Unique strategy name
-            strategy_class: Strategy class implementing IStrategy
-            metadata: Optional metadata about the strategy
-
-        Raises:
-            ValueError: If strategy name already exists or class is invalid
+            name: Unique name for the strategy
+            strategy_class: Strategy implementation class
+            metadata: Optional metadata (version, description, etc.)
         """
-        if not name:
-            raise ValueError("Strategy name cannot be empty")
-
         if name in self._strategies:
-            raise ValueError(f"Strategy '{name}' is already registered")
-
-        # Validate strategy class implements IStrategy protocol
-        if not self._validate_strategy_class(strategy_class):
-            raise ValueError(
-                f"Strategy class {strategy_class} does not implement IStrategy protocol"
-            )
+            logger.warning("Overwriting strategy registration for: %s", name)
 
         self._strategies[name] = strategy_class
         self._metadata[name] = metadata or {}
+        logger.debug("Registered strategy: %s (%s)", name, strategy_class.__name__)
 
-        logger.info(f"Registered strategy: {name}")
-
-    def unregister(self, name: str) -> bool:
-        """Unregister a strategy.
-
-        Args:
-            name: Strategy name to unregister
-
-        Returns:
-            True if strategy was unregistered, False if not found
-        """
-        if name in self._strategies:
-            del self._strategies[name]
-            self._metadata.pop(name, None)
-            logger.info(f"Unregistered strategy: {name}")
-            return True
-        return False
-
-    def get(self, name: str) -> Optional[Type[IStrategy]]:
-        """Get strategy class by name.
+    def get(self, name: str) -> Optional[Type]:
+        """Get a strategy class by name.
 
         Args:
             name: Strategy name
 
         Returns:
-            Strategy class or None if not found
+            Strategy class if found, None otherwise
         """
         return self._strategies.get(name)
 
     def list_strategies(self) -> List[str]:
-        """Get list of all registered strategy names.
+        """List all registered strategy names.
 
         Returns:
             List of strategy names
         """
-        return list(self._strategies.keys())
+        return sorted(list(self._strategies.keys()))
 
     def get_metadata(self, name: str) -> Optional[Dict]:
-        """Get metadata for a strategy.
+        """Get metadata for a registered strategy.
 
         Args:
             name: Strategy name
 
         Returns:
-            Strategy metadata dictionary or None if not found
+            Metadata dictionary if found, None otherwise
         """
         return self._metadata.get(name)
 
-    def clear(self) -> None:
-        """Clear all registered strategies."""
-        count = len(self._strategies)
-        self._strategies.clear()
-        self._metadata.clear()
-        logger.info(f"Cleared {count} strategies from registry")
-
     def auto_discover(self, package_path: str = "strategies") -> int:
-        """Auto-discover strategies in a package.
+        """Automatically discover strategies in a package.
 
         Args:
-            package_path: Package path to search for strategies
+            package_path: Package path to search (e.g., 'strategies')
 
         Returns:
-            Number of strategies discovered and registered
+            Number of newly discovered strategies
         """
-        discovered = 0
+        if package_path in self._discovery_paths:
+            return 0
+
         self._discovery_paths.add(package_path)
+        discovered = 0
 
         try:
             # Import the base package
@@ -349,3 +319,42 @@ class StrategyRegistry:
 
 # Global registry instance
 registry = StrategyRegistry()
+
+
+# --- DECOUPLED PIPELINE PLUGIN SUPPORT ---
+
+class StrategyPlugin(Protocol):
+    strategy_id: str
+
+    def get_schema(self, version: str):
+        ...
+
+    def extend_signal_frame(self, bars, params: dict):
+        ...
+
+
+_PLUGINS: Dict[str, StrategyPlugin] = {}
+
+# Minimaler Lazy-Import, nur um InsideBar-Verhalten NICHT zu brechen
+_AUTO_IMPORTS: Dict[str, str] = {
+    "insidebar_intraday": "strategies.inside_bar",
+}
+
+
+def register_strategy(plugin: StrategyPlugin) -> None:
+    _PLUGINS[plugin.strategy_id] = plugin
+
+
+def get_strategy(strategy_id: str) -> StrategyPlugin:
+    if strategy_id not in _PLUGINS and strategy_id in _AUTO_IMPORTS:
+        importlib.import_module(_AUTO_IMPORTS[strategy_id])
+
+    if strategy_id not in _PLUGINS:
+        raise KeyError(
+            f"Unknown strategy_id='{strategy_id}'. Registered={sorted(_PLUGINS.keys())}"
+        )
+    return _PLUGINS[strategy_id]
+
+
+def _reset_for_tests() -> None:
+    _PLUGINS.clear()

@@ -8,7 +8,7 @@ from collections.abc import Callable
 from typing import Any, Dict, Optional
 
 from .base import IStrategy, Signal, StrategyConfig
-from .registry import registry
+from .registry import registry, get_strategy, register_strategy
 
 
 DailyScanHook = Callable[[Any, int], list[str]]  # (pipeline, max_daily) -> symbols
@@ -39,6 +39,8 @@ __all__ = [
     "Signal",
     "StrategyConfig",
     "registry",
+    "get_strategy",
+    "register_strategy",
     "strategy_hooks",
     "DailyScanHook",
 ]
