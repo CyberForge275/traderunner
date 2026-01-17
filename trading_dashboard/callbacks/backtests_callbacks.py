@@ -5,15 +5,16 @@ from __future__ import annotations
 from datetime import datetime
 
 from dash import Input, Output, State
+from ..ui_ids import BT, RUN
 
 
 def register_backtests_callbacks(app):
     """Register callbacks for the Backtests tab."""
 
     @app.callback(
-        Output("version-pattern-hint", "children"),
-        Output("version-pattern-hint", "style"),
-        Input("backtests-new-version", "value")
+        Output(BT.VERSION_PATTERN_HINT, "children"),
+        Output(BT.VERSION_PATTERN_HINT, "style"),
+        Input(RUN.VERSION_DROPDOWN, "value")
     )
     def validate_version_pattern(new_version):
         """Validate new version input pattern."""
@@ -39,9 +40,9 @@ def register_backtests_callbacks(app):
             )
 
     @app.callback(
-        Output("backtests-run-dropdown", "value"),
-        Input("backtests-refresh-button", "n_clicks"),
-        State("backtests-run-dropdown", "value"),
+        Output(BT.RUN_DROPDOWN, "value"),
+        Input(BT.REFRESH_BUTTON, "n_clicks"),
+        State(BT.RUN_DROPDOWN, "value"),
         prevent_initial_call=True,
     )
     def select_latest_on_refresh(n_clicks, current_value):
@@ -75,9 +76,9 @@ def register_backtests_callbacks(app):
 
 
     @app.callback(
-        Output("backtests-detail", "children"),
-        Input("backtests-run-dropdown", "value"),
-        Input("backtests-refresh-button", "n_clicks"),
+        Output(BT.DETAIL_CONTAINER, "children"),
+        Input(BT.RUN_DROPDOWN, "value"),
+        Input(BT.REFRESH_BUTTON, "n_clicks"),
         prevent_initial_call=False,  # Allow initial render when dropdown has default value
     )
     def update_backtests_detail(run_name, n_clicks):
@@ -221,3 +222,13 @@ def register_backtests_callbacks(app):
             trades_df=orders.get("trades"),
             rk_df=rk_df,
         )
+
+    @app.callback(
+        Output(RUN.EQUITY_BASIS_DROPDOWN, "disabled"),
+        Input(RUN.COMPOUND_TOGGLE, "value")
+    )
+    def toggle_equity_basis(toggle_value):
+        """Enable equity basis dropdown only if compound sizing is enabled."""
+        # Toggle options is checked if 'enabled' is in list
+        is_enabled = "enabled" in (toggle_value or [])
+        return not is_enabled  # Disabled if NOT enabled

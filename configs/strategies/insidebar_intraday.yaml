@@ -11,6 +11,7 @@ versions:
       breakout_confirmation: true
       inside_bar_mode: inclusive
       session_timezone: America/New_York
+      session_mode: rth
       session_filter:
       - 09:30-11:00
       - 14:00-15:00
@@ -31,6 +32,7 @@ versions:
       breakout_confirmation: true
       inside_bar_mode: inclusive
       session_timezone: America/New_York
+      session_mode: rth
       session_filter:
       - 09:30-16:00
       timeframe_minutes: 5

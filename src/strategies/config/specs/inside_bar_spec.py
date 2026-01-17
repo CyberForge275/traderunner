@@ -13,6 +13,7 @@ class InsideBarSpec:
         "breakout_confirmation",
         "inside_bar_mode",
         "session_timezone",
+        "session_mode",
         "session_filter",
         "timeframe_minutes",
         "valid_from_policy",
@@ -167,6 +168,13 @@ class InsideBarSpec:
                 raise ValueError(
                     f"inside_bar v{version} invalid order_validity_policy: '{val}' "
                     f"(allowed: {', '.join(self.ORDER_VALIDITY_POLICY_OPTIONS)})"
+                )
+
+        if "session_mode" in data:
+            val = data["session_mode"]
+            if val not in {"rth", "raw"}:
+                raise ValueError(
+                    f"inside_bar v{version} invalid session_mode: {val} (allowed: rth, raw)"
                 )
 
     def get_field_specs(self) -> Dict[str, Any]:

@@ -14,6 +14,7 @@ import plotly.express as px
 import pandas as pd
 
 from ..repositories.backtests import list_backtests
+from ..ui_ids import Nav, BT, SSOT, RUN
 
 
 def _create_backtests_table(df):
@@ -44,7 +45,7 @@ def _create_backtests_table(df):
         children=[
             html.H5("Backtest Runs", style={"marginBottom": "10px"}),
             dash_table.DataTable(
-                id="backtests-table",
+                id=BT.TABLE,
                 columns=columns,
                 data=df.to_dict("records"),
                 page_size=5,  # Show 5 rows
@@ -308,7 +309,7 @@ def create_backtest_detail(
             children=[
                 html.H5("Metrics"),
                 dash_table.DataTable(
-                    id="backtests-metrics-table",
+                    id=BT.METRICS_TABLE,
                     columns=[
                         {"name": "Metric", "id": "Metric"},
                         {"name": "Value", "id": "Value"},
@@ -368,7 +369,7 @@ def create_backtest_detail(
 
     # Render log table from resolved log data (steps or legacy log_df)
     log_table = dash_table.DataTable(
-        id="backtests-log-table",
+        id=BT.LOG_TABLE,
         columns=[
             {"name": "Step", "id": "title"},
             {"name": "Kind", "id": "kind"},
@@ -407,7 +408,7 @@ def create_backtest_detail(
                 .sort_values("duration", ascending=False)
             )
             step_summary = dash_table.DataTable(
-                id="backtests-log-summary",
+                id=BT.LOG_SUMMARY,
                 columns=[
                     {"name": "Step", "id": "title"},
                     {"name": "Total Duration (s)", "id": "duration"},
@@ -460,7 +461,7 @@ def create_backtest_detail(
     if not orders_df.empty:
         display_orders = _format_numeric(orders_df, ["price", "stop_loss", "take_profit"])
         orders_content = dash_table.DataTable(
-            id="backtests-orders-table",
+            id=BT.ORDERS_TABLE,
             columns=[{"name": c, "id": c} for c in display_orders.columns],
             data=display_orders.to_dict("records"),
             page_size=20,
@@ -499,7 +500,7 @@ def create_backtest_detail(
         ]
         display_fills = _format_numeric(display_fills, fee_cols, digits=2)
         fills_content = dash_table.DataTable(
-            id="backtests-fills-table",
+            id=BT.FILLS_TABLE,
             columns=[{"name": c, "id": c} for c in display_fills.columns],
             data=display_fills.to_dict("records"),
             page_size=20,
@@ -532,7 +533,7 @@ def create_backtest_detail(
         ]
         display_trades = _format_numeric(trades_df, fee_cols, digits=2)
         trades_content = dash_table.DataTable(
-            id="backtests-trades-table",
+            id=BT.TRADES_TABLE,
             columns=[{"name": c, "id": c} for c in display_trades.columns],
             data=display_trades.to_dict("records"),
             page_size=20,
@@ -580,7 +581,7 @@ def create_backtest_detail(
             display_daily["score"] = pd.to_numeric(display_daily["score"], errors="coerce").round(4)
 
         rk_table = dash_table.DataTable(
-            id="backtests-rk-table",
+            id=BT.RK_TABLE,
             columns=[{"name": c, "id": c} for c in display_daily.columns],
             data=display_daily.to_dict("records"),
             page_size=20,
@@ -664,7 +665,7 @@ def create_backtests_layout():
             html.H6("Filter Existing Runs", style={"marginBottom": "10px"}),
             html.Label("Strategy", style={"fontSize": "0.9em", "color": "var(--text-secondary)"}),
             dcc.Dropdown(
-                id="backtests-strategy-filter",
+                id=BT.STRATEGY_FILTER,
                 options=strategy_options,
                 value="all",
                 clearable=False,
@@ -682,7 +683,7 @@ def create_backtests_layout():
             # Strategy ID dropdown
             html.Label("Strategy", style={"fontSize": "0.9em", "marginTop": "4px"}),
             dcc.Dropdown(
-                id="ssot-strategy-id",
+                id=SSOT.STRATEGY_ID,
                 options=[],  # Populated by callback
                 value="insidebar_intraday",
                 placeholder="Select strategy...",
@@ -693,7 +694,7 @@ def create_backtests_layout():
             # Version dropdown (populated based on selected strategy)
             html.Label("Version", style={"fontSize": "0.9em", "marginTop": "4px"}),
             dcc.Dropdown(
-                id="ssot-version",
+                id=SSOT.VERSION,
                 options=[],  # Populated by callback based on strategy selection
                 value="1.0.0",
                 placeholder="Select version...",
@@ -704,7 +705,7 @@ def create_backtests_layout():
             # New version input (optional - only needed if finalized)
             html.Label("New Version (optional - for finalized versions)", style={"fontSize": "0.9em", "marginTop": "8px"}),
             dcc.Input(
-                id="ssot-new-version",
+                id=SSOT.NEW_VERSION,
                 type="text",
                 placeholder="e.g. 1.0.1 (leave empty to save to current version)",
                 style={"width": "100%", "marginBottom": "8px"},
@@ -714,14 +715,14 @@ def create_backtests_layout():
             html.Div([
                 dbc.Button(
                     "Load Config",
-                    id="ssot-load-button",
+                    id=SSOT.LOAD_BUTTON,
                     color="primary",
                     size="sm",
                     style={"marginRight": "8px"},
                 ),
                 dbc.Button(
                     "Reset",
-                    id="ssot-reset-button",
+                    id=SSOT.RESET_BUTTON,
                     color="secondary",
                     size="sm",
                     outline=True,
@@ -729,7 +730,7 @@ def create_backtests_layout():
                 ),
                 dbc.Button(
                     "Save as New Version",
-                    id="ssot-save-version",
+                    id=SSOT.SAVE_VERSION_BUTTON,
                     color="success",
                     size="sm",
                     disabled=True,  # Enabled by callback
@@ -737,7 +738,7 @@ def create_backtests_layout():
                 ),
                 dbc.Button(
                     "Mark as Finalized",
-                    id="ssot-finalize-button",
+                    id=SSOT.FINALIZE_BUTTON,
                     color="warning",
                     size="sm",
                     disabled=True,  # Enabled when draft is loaded
@@ -746,16 +747,16 @@ def create_backtests_layout():
             ], style={"marginTop": "8px", "marginBottom": "12px"}),
             
             # Save status display
-            html.Div(id="ssot-save-status", style={"marginBottom": "8px"}),
+            html.Div(id=SSOT.SAVE_STATUS, style={"marginBottom": "8px"}),
             
             # Status / Error display
-            html.Div(id="ssot-load-status", style={"marginBottom": "8px"}),
+            html.Div(id=SSOT.LOAD_STATUS, style={"marginBottom": "8px"}),
             
             # Hidden store for loaded defaults (immutable snapshot)
-            dcc.Store(id="ssot-loaded-defaults", data=None),
+            dcc.Store(id=SSOT.LOADED_DEFAULTS_STORE, data=None),
             
             # Editable fields container (dynamically populated)
-            html.Div(id="ssot-editable-fields", children=[]),
+            html.Div(id=SSOT.EDITABLE_FIELDS_CONTAINER, children=[]),
         ],
         style={"marginTop": "20px"},
     )
@@ -769,28 +770,28 @@ def create_backtests_layout():
             # Strategy selector
             html.Label("Strategy", style={"fontWeight": "bold", "marginTop": "8px"}),
             dcc.Dropdown(
-                id="backtests-new-strategy",
+                id=RUN.STRATEGY_DROPDOWN,
                 options=[],  # Will be populated by SSOT callback from registry
                 placeholder="Select Strategy...",
                 clearable=False,
-                style={"color": "#000", "marginBottom": "8px"},
+                style={"color": "#fff", "marginBottom": "8px"},
             ),
 
             # NEW: Generic Version Selector
-            html.Label("Version (Required)", id="backtests-new-version-label", 
+            html.Label("Version (Required)", id=RUN.VERSION_LABEL, 
                        style={"fontWeight": "bold", "marginTop": "8px", "color": "var(--accent-red)"}),
             dcc.Dropdown(
-                id="backtests-new-version",
+                id=RUN.VERSION_DROPDOWN,
                 options=[],  # Will be populated by callback
                 placeholder="Select Version...",
                 clearable=False,
-                style={"color": "#000", "marginBottom": "8px"},
+                style={"color": "#fff", "marginBottom": "8px"},
             ),
 
 
             # Dynamic strategy configuration container (populated by plugin)
             html.Div(
-                id="strategy-config-container",
+                id=RUN.CONFIG_CONTAINER,
                 children=[],
                 style={"marginTop": "12px", "marginBottom": "12px"}
             ),
@@ -800,7 +801,7 @@ def create_backtests_layout():
             html.Label("Backtest Run Name", style={"fontWeight": "bold", "marginTop": "8px"}),
             html.Div([
                 html.Span(
-                    id="run-name-timestamp-prefix",
+                    id=RUN.RUN_NAME_PREFIX,
                     children="251207_225402_",  # Will be updated by callback
                     style={
                         "color": "#888",  # Light grey
@@ -811,7 +812,7 @@ def create_backtests_layout():
                     }
                 ),
                 dcc.Input(
-                    id="backtests-new-run-name",
+                    id=RUN.RUN_NAME_INPUT,
                     type="text",
                     placeholder="YourNameHere",
                     style={
@@ -825,14 +826,14 @@ def create_backtests_layout():
             html.Label("Symbols (comma-separated)", style={"fontWeight": "bold", "marginTop": "8px"}),
             html.Div([
                 dcc.Dropdown(
-                    id="cached-symbols-selector",
+                    id=RUN.SYMBOL_SELECTOR_CACHED,
                     options=[],  # Will be populated by callback based on timeframe
                     multi=True,
                     placeholder="Select from cached symbols...",
-                    style={"marginBottom": "4px", "color": "#000"},
+                    style={"marginBottom": "4px", "color": "#fff"},
                 ),
                 dcc.Input(
-                    id="backtests-new-symbols",
+                    id=RUN.SYMBOL_INPUT,
                     type="text",
                     placeholder="Or type: TSLA,AAPL,PLTR,HOOD",
                     value="",  # Empty by default
@@ -843,7 +844,7 @@ def create_backtests_layout():
             # Timeframe selector
             html.Label("Timeframe", style={"fontWeight": "bold", "marginTop": "8px"}),
             dcc.Dropdown(
-                id="backtests-new-timeframe",
+                id=RUN.TIMEFRAME_DROPDOWN,
                 options=[
                     {"label": "5 Min (M5)", "value": "M5"},
                     {"label": "15 Min (M15)", "value": "M15"},
@@ -852,14 +853,14 @@ def create_backtests_layout():
                 ],
                 value="M5",
                 clearable=False,
-                style={"color": "#000", "marginBottom": "8px"},
+                style={"color": "#fff", "marginBottom": "8px"},
             ),
 
 
             # Date selection method (Streamlit-style)
             html.Label("Date Selection", style={"fontWeight": "bold", "marginTop": "8px"}),
             dcc.RadioItems(
-                id="date-selection-mode",
+                id=RUN.DATE_MODE_RADIO,
                 options=[
                     {"label": "Days back from anchor", "value": "days_back"},
                     {"label": "Explicit date range", "value": "explicit"},
@@ -870,11 +871,11 @@ def create_backtests_layout():
 
             # Anchor date (for days back mode)
             html.Div(
-                id="anchor-date-container",
+                id=RUN.ANCHOR_DATE_CONTAINER,
                 children=[
                     html.Label("Anchor Date", style={"fontSize": "0.9em", "marginTop": "5px"}),
                     dcc.DatePickerSingle(
-                        id="anchor-date",
+                        id=RUN.ANCHOR_DATE_PICKER,
                         date=(datetime.utcnow() - timedelta(days=1)).date(),  # Yesterday to avoid coverage gap
                         display_format="YYYY-MM-DD",
                         style={"width": "100%", "marginBottom": "8px"},
@@ -884,11 +885,11 @@ def create_backtests_layout():
 
             # Days back (for days back mode)
             html.Div(
-                id="days-back-container",
+                id=RUN.DAYS_BACK_CONTAINER,
                 children=[
                     html.Label("Days back", style={"fontSize": "0.9em", "marginTop": "5px"}),
                     dcc.Input(
-                        id="days-back",
+                        id=RUN.DAYS_BACK_INPUT,
                         type="number",
                         value=4,  # Changed from 30 to 4
                         min=1,
@@ -901,18 +902,18 @@ def create_backtests_layout():
 
             # Explicit date range (for explicit mode)
             html.Div(
-                id="explicit-range-container",
+                id=RUN.EXPLICIT_RANGE_CONTAINER,
                 children=[
                     html.Label("Start Date", style={"fontSize": "0.9em", "marginTop": "5px"}),
                     dcc.DatePickerSingle(
-                        id="explicit-start-date",
+                        id=RUN.EXPLICIT_START_PICKER,
                         date=(datetime.utcnow() - timedelta(days=30)).date(),
                         display_format="YYYY-MM-DD",
                         style={"width": "100%", "marginBottom": "8px"},
                     ),
                     html.Label("End Date", style={"fontSize": "0.9em", "marginTop": "5px"}),
                     dcc.DatePickerSingle(
-                        id="explicit-end-date",
+                        id=RUN.EXPLICIT_END_PICKER,
                         date=(datetime.utcnow() - timedelta(days=1)).date(),  # Yesterday to avoid coverage gap
                         display_format="YYYY-MM-DD",
                         style={"width": "100%", "marginBottom": "8px"},
@@ -923,7 +924,7 @@ def create_backtests_layout():
 
             # Data window display
             html.Div(
-                id="data-window-display",
+                id=RUN.DISPLAY_WINDOW,
                 style={
                     "fontSize": "0.85em",
                     "color": "var(--text-secondary)",
@@ -933,29 +934,64 @@ def create_backtests_layout():
                     "marginBottom": "8px"},
             ),
 
+            html.Hr(style={"borderColor": "rgba(255,255,255,0.1)", "marginTop": "15px", "marginBottom": "15px"}),
+
+            # Compound / EventEngine Toggle
+            html.Div([
+                html.Label("Compound Execution (EventEngine)", style={"fontWeight": "bold", "color": "var(--accent-primary)"}),
+                dcc.Checklist(
+                    id=RUN.COMPOUND_TOGGLE,
+                    options=[
+                        {"label": " Enable Compound Sizing", "value": "enabled"}
+                    ],
+                    value=[],  # Default OFF
+                    style={"marginBottom": "8px"},
+                    inputStyle={"marginRight": "5px"}
+                ),
+                
+                # Equity Basis Selection (only valid if Compound is explicit ON)
+                html.Label("Equity Basis", style={"fontSize": "0.9em", "marginTop": "5px"}),
+                dcc.Dropdown(
+                    id=RUN.EQUITY_BASIS_DROPDOWN,
+                    options=[
+                        {"label": "Cash Only", "value": "cash_only"},
+                    ],
+                    value="cash_only",
+                    disabled=True, # Disabled by default until toggle is ON
+                    clearable=False,
+                    style={"color": "#fff", "marginBottom": "8px"},
+                ),
+            ], style={
+                "backgroundColor": "rgba(0, 200, 83, 0.05)", 
+                "padding": "10px", 
+                "borderRadius": "4px", 
+                "marginBottom": "15px",
+                "border": "1px solid rgba(0, 200, 83, 0.2)"
+            }),
+
 
             # Run button
             dbc.Button(
                 "▶ Run Backtest",
-                id="backtests-run-button",
+                id=RUN.START_BUTTON,
                 color="success",
                 className="w-100",
                 style={"marginTop": "10px", "fontWeight": "bold"},
             ),
 
             # Progress indicator
-            html.Div(id="backtests-run-progress", style={"marginTop": "12px"}),
+            html.Div(id=RUN.PROGRESS_CONTAINER, style={"marginTop": "12px"}),
 
             # Pipeline execution log (similar to Streamlit "Last run output")
             html.Div(
-                id="backtests-pipeline-log",
+                id=RUN.PIPELINE_LOG,
                 style={"marginTop": "20px"},
             ),
 
             # Store current job ID for polling (hidden)
-            dcc.Store(id="backtests-current-job-id", data=None),
+            dcc.Store(id=RUN.CURRENT_JOB_ID_STORE, data=None),
             # NEW: Store for current backtest configuration snapshot (SSOT driven)
-            dcc.Store(id="bt-config-store", data=None),
+            dcc.Store(id=RUN.CONFIG_STORE, data=None),
         ],
         style={"marginTop": "20px"},
     )
@@ -972,16 +1008,16 @@ def create_backtests_layout():
                 children=[
                     html.H5("Select Backtest Run", style={"marginBottom": "10px"}),
                     dcc.Dropdown(
-                        id="backtests-run-dropdown",
+                        id=BT.RUN_DROPDOWN,
                         options=run_options,
                         value=run_options[0]["value"] if run_options else None,
                         placeholder="Select a backtest run to view...",
                         clearable=True,
-                        style={"color": "#000"},
+                        style={"color": "#fff"},
                     ),
                     # NEW: Status Icon + Refresh Button
                     html.Div(
-                        id="backtests-status-container",
+                        id=BT.STATUS_CONTAINER,
                         style={
                             "marginTop": "12px",
                             "display": "flex",
@@ -993,13 +1029,13 @@ def create_backtests_layout():
                         },
                         children=[
                             html.Span(
-                                id="backtests-run-status-icon",
+                                id=BT.RUN_STATUS_ICON,
                                 children="",
                                 style={"flex": "1", "fontSize": "0.9em"},
                             ),
                             dbc.Button(
                                 "🔄 Refresh Results",
-                                id="backtests-refresh-button",
+                                id=BT.REFRESH_BUTTON,
                                 size="sm",
                                 color="primary",
                                 outline=True,
@@ -1009,13 +1045,13 @@ def create_backtests_layout():
                 ],
                 style={"marginBottom": "20px"}
             ),
-            html.Div(id="backtests-detail"),
+            html.Div(id=BT.DETAIL_CONTAINER),
         ]
     )
 
     # Hidden interval for auto-refresh when job completes
     refresh_interval = dcc.Interval(
-        id="backtests-refresh-interval",
+        id=Nav.REFRESH_INTERVAL,
         interval=5000,  # 5 seconds
         n_intervals=0,
         disabled=True  # Enabled via callback when job is running

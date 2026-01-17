@@ -13,6 +13,16 @@ class Nav:
     MARKET_STATUS = "nav:market-status"
     REFRESH_INTERVAL = "nav:refresh-interval"
 
+    # Tab IDs
+    TAB_LIVE_MONITOR = "live-monitor"
+    TAB_PORTFOLIO = "portfolio"
+    TAB_CHARTS_LIVE = "charts-live"
+    TAB_CHARTS_BACKTESTING = "charts-backtesting"
+    TAB_HISTORY = "history"
+    TAB_BACKTESTS = "backtests"
+    TAB_PRE_PAPERTRADE = "pre-papertrade"
+    TAB_TRADE_INSPECTOR = "trade-inspector"
+
 
 class BT:
     """Backtest Results Tab IDs"""
@@ -26,6 +36,13 @@ class BT:
     TRADES_TABLE = "bt:trades-table"
     RK_TABLE = "bt:rk-table"
     
+    RUN_DROPDOWN = "bt:run-dropdown"
+    STATUS_CONTAINER = "bt:status-container"
+    RUN_STATUS_ICON = "bt:run-status-icon"
+    REFRESH_BUTTON = "bt:refresh-button"
+    DETAIL_CONTAINER = "bt:detail-container"
+    VERSION_PATTERN_HINT = "bt:version-hint"
+    
     # Stores
     LOADED_METRICS = "bt:store:metrics"
     
@@ -33,6 +50,16 @@ class BT:
     def RESULT_ROW(run_id: str):
         """Pattern ID for a specific backtest result row."""
         return {"type": "bt:result-row", "run_id": run_id}
+
+    @staticmethod
+    def ERROR_COLLAPSE_BTN(job_id: str):
+        """Pattern ID for the error traceback collapse button."""
+        return {"type": "bt:error-collapse-btn", "job_id": job_id}
+
+    @staticmethod
+    def ERROR_COLLAPSE(job_id: str):
+        """Pattern ID for the error traceback collapse container."""
+        return {"type": "bt:error-collapse", "job_id": job_id}
 
 
 class SSOT:
@@ -49,14 +76,39 @@ class SSOT:
     LOADED_DEFAULTS_STORE = "ssot:loaded-defaults"
     EDITABLE_FIELDS_CONTAINER = "ssot:editable-fields"
 
+    @staticmethod
+    def PARAM_INPUT(section: str, key: str):
+        """Pattern ID for an editable strategy parameter input."""
+        return {"type": "ssot-param-input", "section": section, "key": key}
+
 
 class RUN:
     """Execution & New Backtest IDs"""
     STRATEGY_DROPDOWN = "run:strategy-dropdown"
     VERSION_DROPDOWN = "run:version-dropdown"
+    VERSION_LABEL = "run:version-label"
     CONFIG_CONTAINER = "run:config-container"
     RUN_NAME_INPUT = "run:name-input"
-    START_BUTTON = "run:start-button"
+    RUN_NAME_PREFIX = "run:name-prefix"
+    SYMBOL_SELECTOR_CACHED = "run:symbol-selector-cached"
+    SYMBOL_INPUT = "run:symbol-input"
+    TIMEFRAME_DROPDOWN = "run:timeframe-dropdown"
+    DATE_MODE_RADIO = "run:date-mode"
+    ANCHOR_DATE_CONTAINER = "run:anchor-date-container"
+    ANCHOR_DATE_PICKER = "run:anchor-date"
+    DAYS_BACK_CONTAINER = "run:days-back-container"
+    DAYS_BACK_INPUT = "run:days-back"
+    EXPLICIT_RANGE_CONTAINER = "run:explicit-range-container"
+    EXPLICIT_START_PICKER = "run:explicit-start"
+    EXPLICIT_END_PICKER = "run:explicit-end"
+    DISPLAY_WINDOW = "run:display-window"
+    COMPOUND_TOGGLE = "run:compound-toggle"
+    EQUITY_BASIS_DROPDOWN = "run:equity-basis"
+    START_BUTTON = "run:run-button" # Keyed to the existing backtests-run-button
+    PROGRESS_CONTAINER = "run:progress"
+    PIPELINE_LOG = "run:pipeline-log"
+    CURRENT_JOB_ID_STORE = "run:job-id"
+    CONFIG_STORE = "run:config-store"
 
 
 class Common:

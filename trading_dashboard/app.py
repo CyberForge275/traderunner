@@ -9,6 +9,7 @@ import dash_bootstrap_components as dbc
 from datetime import datetime
 
 from trading_dashboard.config import PORT, HOST, DEBUG, UPDATE_INTERVAL_MS
+from trading_dashboard.ui_ids import Nav
 from trading_dashboard.auth import add_auth_to_app
 from trading_dashboard.layouts import (
     get_live_monitor_content,
@@ -67,33 +68,33 @@ app.layout = html.Div([
                 html.Span("⚡", style={"fontSize": "1.5rem", "marginRight": "8px"}),
                 html.Span("Automatic Trading Factory", className="dashboard-title")
             ]),
-            html.Div(id="header-time", style={"color": "var(--text-secondary)"})
+            html.Div(id=Nav.HEADER_TIME, style={"color": "var(--text-secondary)"})
         ]
     ),
 
     # Navigation Tabs
     dbc.Tabs(
-        id="main-tabs",
-        active_tab="live-monitor",
+        id=Nav.MAIN_TABS,
+        active_tab=Nav.TAB_LIVE_MONITOR,
         children=[
-            dbc.Tab(label="Live Monitor", tab_id="live-monitor"),
-            dbc.Tab(label="Portfolio", tab_id="portfolio"),
-            dbc.Tab(label="📊 Charts - Live", tab_id="charts-live"),
-            dbc.Tab(label="📈 Charts - Backtesting", tab_id="charts-backtesting"),
-            dbc.Tab(label="History", tab_id="history"),
-            dbc.Tab(label="Backtests", tab_id="backtests"),
-            dbc.Tab(label="Pre-PaperTrade Lab", tab_id="pre-papertrade"),
-            dbc.Tab(label="🔍 Trade Inspector", tab_id="trade-inspector"),
+            dbc.Tab(label="Live Monitor", tab_id=Nav.TAB_LIVE_MONITOR),
+            dbc.Tab(label="Portfolio", tab_id=Nav.TAB_PORTFOLIO),
+            dbc.Tab(label="📊 Charts - Live", tab_id=Nav.TAB_CHARTS_LIVE),
+            dbc.Tab(label="📈 Charts - Backtesting", tab_id=Nav.TAB_CHARTS_BACKTESTING),
+            dbc.Tab(label="History", tab_id=Nav.TAB_HISTORY),
+            dbc.Tab(label="Backtests", tab_id=Nav.TAB_BACKTESTS),
+            dbc.Tab(label="Pre-PaperTrade Lab", tab_id=Nav.TAB_PRE_PAPERTRADE),
+            dbc.Tab(label="🔍 Trade Inspector", tab_id=Nav.TAB_TRADE_INSPECTOR),
         ],
         style={"backgroundColor": "var(--bg-secondary)"}
     ),
 
     # Tab content
-    html.Div(id="tab-content", style={"paddingBottom": "50px"}),
+    html.Div(id=Nav.TAB_CONTENT, style={"paddingBottom": "50px"}),
 
     # Auto-refresh interval (only for Live Monitor tab)
     dcc.Interval(
-        id="refresh-interval",
+        id=Nav.REFRESH_INTERVAL,
         interval=UPDATE_INTERVAL_MS,
         n_intervals=0,
         disabled=False  # Will be controlled by tab switching
@@ -104,20 +105,20 @@ app.layout = html.Div([
         className="status-bar",
         children=[
             html.Span("🟢 Connected", style={"marginRight": "24px"}),
-            html.Span(id="last-update", children="Last update: --"),
+            html.Span(id=Nav.LAST_UPDATE, children="Last update: --"),
             html.Span(" | Market: ", style={"marginLeft": "24px"}),
-            html.Span(id="market-status", children="Checking...")
+            html.Span(id=Nav.MARKET_STATUS, children="Checking...")
         ]
     )
 ])
 
 
 @app.callback(
-    Output("tab-content", "children"),
-    Output("header-time", "children"),
-    Output("last-update", "children"),
-    Input("main-tabs", "active_tab"),
-    Input("refresh-interval", "n_intervals")
+    Output(Nav.TAB_CONTENT, "children"),
+    Output(Nav.HEADER_TIME, "children"),
+    Output(Nav.LAST_UPDATE, "children"),
+    Input(Nav.MAIN_TABS, "active_tab"),
+    Input(Nav.REFRESH_INTERVAL, "n_intervals")
 )
 def update_content(active_tab, n_intervals):
     """Update tab content and timestamps."""
@@ -130,24 +131,24 @@ def update_content(active_tab, n_intervals):
     # Check what triggered this callback
     triggered_id = ctx.triggered_id if ctx.triggered else None
 
-    if active_tab == "live-monitor":
+    if active_tab == Nav.TAB_LIVE_MONITOR:
         content = get_live_monitor_content()
-    elif active_tab == "portfolio":
+    elif active_tab == Nav.TAB_PORTFOLIO:
         content = get_portfolio_content()
-    elif active_tab == "charts-live":
+    elif active_tab == Nav.TAB_CHARTS_LIVE:
         content = get_charts_live_content()
-    elif active_tab == "charts-backtesting":
+    elif active_tab == Nav.TAB_CHARTS_BACKTESTING:
         content = get_charts_backtesting_content()
     elif active_tab == "charts":
         # Legacy fallback - redirect to backtesting
         content = get_charts_backtesting_content()
-    elif active_tab == "history":
+    elif active_tab == Nav.TAB_HISTORY:
         content = get_history_content()
-    elif active_tab == "backtests":
+    elif active_tab == Nav.TAB_BACKTESTS:
         content = get_backtests_content()
-    elif active_tab == "pre-papertrade":
+    elif active_tab == Nav.TAB_PRE_PAPERTRADE:
         content = get_pre_papertrade_content()
-    elif active_tab == "trade-inspector":
+    elif active_tab == Nav.TAB_TRADE_INSPECTOR:
         content = get_trade_inspector_content()
     else:
         content = html.Div("Unknown tab")
@@ -156,8 +157,8 @@ def update_content(active_tab, n_intervals):
 
 
 @app.callback(
-    Output("refresh-interval", "disabled"),
-    Input("main-tabs", "active_tab")
+    Output(Nav.REFRESH_INTERVAL, "disabled"),
+    Input(Nav.MAIN_TABS, "active_tab")
 )
 def control_refresh_interval(active_tab):
     """Enable refresh interval only on Live Monitor tab."""
@@ -195,8 +196,8 @@ initialize_registry(app)
 
 
 @app.callback(
-    Output("market-status", "children"),
-    Input("refresh-interval", "n_intervals")
+    Output(Nav.MARKET_STATUS, "children"),
+    Input(Nav.REFRESH_INTERVAL, "n_intervals")
 )
 def update_market_status(n_intervals):
     """Check if market is open."""

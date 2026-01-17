@@ -40,7 +40,7 @@ class SignalOutputSpec(BaseModel):
     tp_short: Optional[Decimal] = Field(None, description="Take profit for short position")
 
     # Signal metadata
-    setup: Optional[str] = Field(None, description="Setup type (e.g., 'inside_bar', 'breakout')")
+    setup: Optional[str] = Field(None, description="Setup type / pattern name (strategy-specific)")
     score: Optional[float] = Field(None, ge=0.0, le=1.0, description="Confidence score (0.0-1.0)")
     score_components: Optional[Dict[str, float]] = Field(
         None,
@@ -90,18 +90,3 @@ class SignalOutputSpec(BaseModel):
             'Score': self.score if self.score is not None else '',
         }
 
-
-# Legacy compatibility - DataFrame columns format
-SIGNAL_COLUMNS = [
-    'Symbol',
-    'long_entry',
-    'short_entry',
-    'sl_long',
-    'sl_short',
-    'tp_long',
-    'tp_short',
-    'setup',
-    'score',
-    'strategy',
-    'strategy_version'
-]
