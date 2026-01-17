@@ -17,10 +17,10 @@ def register_run_backtest_callback(app):
     """
 
     @app.callback(
-        Output(RUN.PROGRESS_CONTAINER, "children"),
+        Output(RUN.PROGRESS_CONTAINER, "children", allow_duplicate=True),
         Output(RUN.RUN_NAME_INPUT, "value"),
-        Output(Nav.REFRESH_INTERVAL, "disabled"),
-        Output(RUN.PIPELINE_LOG, "children"),
+        Output("nav:refresh-policy", "data"),
+        Output(RUN.PIPELINE_LOG, "children", allow_duplicate=True),
         Output(RUN.CURRENT_JOB_ID_STORE, "data"),
         Output(BT.RUN_STATUS_ICON, "children", allow_duplicate=True),
         Input(RUN.START_BUTTON, "n_clicks"),
@@ -58,7 +58,7 @@ def register_run_backtest_callback(app):
         from datetime import datetime
 
         if not n_clicks:
-            return "", "", True, "", None, ""  # Added job_id + status_icon
+            return "", "", {"bt_job_running": False}, "", None, ""
 
         # Validate run name is provided
         if not run_name or not run_name.strip():
@@ -66,7 +66,7 @@ def register_run_backtest_callback(app):
                 "❌ Please enter a name for this backtest run",
                 style={"color": "red", "fontWeight": "bold"}
             )
-            return error_msg, run_name, True, "", None, ""
+            return error_msg, run_name, {"bt_job_running": False}, "", None, ""
 
         # Prepend timestamp to run name
         timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
@@ -83,12 +83,12 @@ def register_run_backtest_callback(app):
                     html.Span("❌ Configuration snapshot missing. ", style={"color": "red", "fontWeight": "bold"}),
                     html.Span("Please select Strategy and Version to load parameters first."),
                 ])
-                return error_msg, run_name, True, "", None, ""
+                return error_msg, run_name, {"bt_job_running": False}, "", None, ""
             
             version_to_use = bt_config_snapshot.get("version")
             if not version_to_use:
                 error_msg = html.Div("❌ Strategy version missing in snapshot", style={"color": "red"})
-                return error_msg, run_name, True, "", None, ""
+                return error_msg, run_name, {"bt_job_running": False}, "", None, ""
         
         # Legacy: Check if other strategy supports versioning (v2 is technically legacy now, or mixed)
         elif strategy in ["insidebar_intraday_v2"]:
@@ -103,12 +103,12 @@ def register_run_backtest_callback(app):
                         html.Span("❌ Invalid version format. ", style={"color": "red", "fontWeight": "bold"}),
                         html.Span(f"Use pattern v#.## (e.g., v1.01, v2.00). You entered: '{insidebar_new_version}'"),
                     ])
-                    return error_msg, run_name, True, "", None, ""
+                    return error_msg, run_name, {"bt_job_running": False}, "", None, ""
             elif insidebar_strategy_version:
                 version_to_use = insidebar_strategy_version
             else:
                 error_msg = html.Div("❌ Version required for legacy InsideBar v2 path", style={"color": "red"})
-                return error_msg, run_name, True, "", None, ""
+                return error_msg, run_name, {"bt_job_running": False}, "", None, ""
         
         # New Strategy: check if it's in registry but not migrated
         else:
@@ -118,11 +118,11 @@ def register_run_backtest_callback(app):
                     html.Span("⚠️ Strategy not migrated yet. ", style={"color": "orange", "fontWeight": "bold"}),
                     html.Span(f"Strategy '{strategy}' is registered but the runner interface is not yet updated for it."),
                 ])
-                return error_msg, run_name, True, "", None, ""
+                return error_msg, run_name, {"bt_job_running": False}, "", None, ""
 
         # Validate inputs
         if not strategy or not symbols_str or not timeframe:
-            return html.Div("❌ Please select strategy, symbols, and timeframe", style={"color": "red"}), run_name, True, "", None, ""
+            return html.Div("❌ Please select strategy, symbols, and timeframe", style={"color": "red"}), run_name, {"bt_job_running": False}, "", None, ""
 
         # Validate symbols
         if not symbols_str or not symbols_str.strip():
@@ -130,7 +130,7 @@ def register_run_backtest_callback(app):
                 html.Span("⚠️ ", style={"color": "var(--accent-yellow)"}),
                 html.Span("Error: Please enter at least one symbol"),
             ])
-            return error_msg, run_name, True, "", None, ""
+            return error_msg, run_name, {"bt_job_running": False}, "", None, ""
 
         symbols = [s.strip() for s in symbols_str.split(",") if s.strip()]
 
@@ -139,7 +139,7 @@ def register_run_backtest_callback(app):
                 html.Span("⚠️ ", style={"color": "var(--accent-yellow)"}),
                 html.Span("Error: Please enter at least one symbol"),
             ])
-            return error_msg, run_name, True, "", None, ""
+            return error_msg, run_name, {"bt_job_running": False}, "", None, ""
 
         # Calculate start/end dates based on mode
         if date_mode == "days_back":
@@ -237,10 +237,10 @@ def register_run_backtest_callback(app):
                    style={"color": "#888", "fontSize": "0.9em"})
         ])
 
-        # Enable refresh interval to poll for completion
+        # Enable refresh interval to poll for completion via Store
         # Clear run name input for next run
         # Return active_run to store (SSOT)
-        return progress_msg, "", False, initial_log, active_run, ""
+        return progress_msg, "", {"bt_job_running": True}, initial_log, active_run, ""
 
     @app.callback(
         Output(RUN.PIPELINE_LOG, "children", allow_duplicate=True),
@@ -610,7 +610,7 @@ def register_run_backtest_callback(app):
 
     @app.callback(
         Output(RUN.PROGRESS_CONTAINER, "children", allow_duplicate=True),
-        Output(Nav.REFRESH_INTERVAL, "disabled", allow_duplicate=True),
+        Output("nav:refresh-policy", "data", allow_duplicate=True),
         Output(BT.RUN_STATUS_ICON, "children"),  # NEW: Status icon
         Input(Nav.REFRESH_INTERVAL, "n_intervals"),
         prevent_initial_call=True
@@ -644,7 +644,7 @@ def register_run_backtest_callback(app):
 
         if not running_jobs and not recent_jobs:
             # No jobs to display - clear progress and icon
-            return "", True, ""
+            return "", {"bt_job_running": False}, ""
 
         # Show status of all relevant jobs
         job_statuses = []
@@ -762,7 +762,7 @@ def register_run_backtest_callback(app):
                     style={"color": "orange", "fontSize": "0.9em"}
                 )
 
-        return html.Div(job_statuses), len(running_jobs) == 0, status_icon
+        return html.Div(job_statuses), {"bt_job_running": len(running_jobs) > 0}, status_icon
 
 def build_config_params(strategy, version_to_use, bt_config_snapshot, compound_toggle_val, equity_basis_val):
     """Refactored logic to build config params for testability."""

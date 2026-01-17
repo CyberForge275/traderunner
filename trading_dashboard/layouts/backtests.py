@@ -1049,16 +1049,7 @@ def create_backtests_layout():
         ]
     )
 
-    # Hidden interval for auto-refresh when job completes
-    refresh_interval = dcc.Interval(
-        id=Nav.REFRESH_INTERVAL,
-        interval=5000,  # 5 seconds
-        n_intervals=0,
-        disabled=True  # Enabled via callback when job is running
-    )
-
     return html.Div([
-        refresh_interval,
         dbc.Row(
             [
                 dbc.Col(left_pane, width=3),

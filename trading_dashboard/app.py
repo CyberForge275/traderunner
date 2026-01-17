@@ -93,6 +93,7 @@ app.layout = html.Div([
     html.Div(id=Nav.TAB_CONTENT, style={"paddingBottom": "50px"}),
 
     # Auto-refresh interval (only for Live Monitor tab)
+    dcc.Store(id="nav:refresh-policy", data={"bt_job_running": False}),
     dcc.Interval(
         id=Nav.REFRESH_INTERVAL,
         interval=UPDATE_INTERVAL_MS,
@@ -158,12 +159,18 @@ def update_content(active_tab, n_intervals):
 
 @app.callback(
     Output(Nav.REFRESH_INTERVAL, "disabled"),
-    Input(Nav.MAIN_TABS, "active_tab")
+    [
+        Input(Nav.MAIN_TABS, "active_tab"),
+        Input("nav:refresh-policy", "data")
+    ]
 )
-def control_refresh_interval(active_tab):
-    """Enable refresh interval only on Live Monitor tab."""
-    # Only auto-refresh on live-monitor tab
-    return active_tab != "live-monitor"
+def control_refresh_interval(active_tab, policy):
+    """Enable refresh interval based on Tab and Job Status."""
+    is_live = (active_tab == Nav.TAB_LIVE_MONITOR)
+    bt_running = bool((policy or {}).get("bt_job_running", False))
+    
+    # Enabled if Live Monitor OR a Backtest Job is running
+    return not (is_live or bt_running)
 
 
 # Register chart callbacks
