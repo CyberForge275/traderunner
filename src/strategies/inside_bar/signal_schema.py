@@ -64,6 +64,7 @@ def _schema_v1_0_0() -> SignalFrameSchemaV1:
 
 SCHEMAS: Dict[str, SignalFrameSchemaV1] = {
     "1.0.0": _schema_v1_0_0(),
+    "1.0.1": _schema_v1_0_0(),  # Same schema, only tunable params differ
 }
 
 
