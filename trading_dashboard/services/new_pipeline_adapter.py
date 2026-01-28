@@ -1,14 +1,12 @@
-"""New Pipeline Adapter - Uses Phase 1-6 Robust FULL_BACKTEST pipeline.
+"""New Pipeline Adapter - Uses the SSOT modular pipeline runner.
 
-This adapter bypasses the legacy Streamlit subprocess pipeline and calls
-``run_backtest_full`` directly. The engine layer is responsible for:
+This adapter bypasses legacy runners and calls the pipeline orchestrator
+directly. The engine layer is responsible for:
 
-- Coverage Gate (FAILED_PRECONDITION on gaps)
-- Signal detection + orders generation (InsideBar via IntradayStore)
-- Full trade simulation (ReplayEngine)
-- Equity/orders/trades/metrics persistence
-- Postcondition gate (FAILED_POSTCONDITION if equity missing)
-- Structured artifacts (run_meta/run_result/run_manifest + artifacts_index.json)
+- Bars snapshot / data fetch
+- Signal detection + orders generation
+- Fills + execution + metrics
+- Structured artifacts (run_meta/run_result/run_manifest)
 """
 
 from __future__ import annotations
@@ -25,21 +23,12 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from core.settings import DEFAULT_INITIAL_CASH, DEFAULT_FEE_BPS, DEFAULT_SLIPPAGE_BPS
-from axiom_bt.full_backtest_runner import run_backtest_full
-from backtest.services.run_status import RunStatus, FailureReason
+from axiom_bt.pipeline.runner import run_pipeline, PipelineError
+from trading_dashboard.config_store.strategy_config_store import StrategyConfigStore
 
 
 class NewPipelineAdapter:
-    """
-    Adapter for FULL BACKTEST pipeline (SSOT).
-
-    Calls run_backtest_full() which enforces:
-    - Coverage Gate (FAILED_PRECONDITION if gap)
-    - Full trade simulation (ReplayEngine)
-    - Equity/orders/trades persistence
-    - Postcondition gate (FAILED_POSTCONDITION if equity missing)
-    - Proper artifacts (run_meta/run_result/run_manifest + artifacts_index.json)
-    """
+    """Adapter for the SSOT modular pipeline runner."""
 
     def __init__(self, progress_callback: Optional[Callable[[str], None]] = None):
         self.progress_callback = progress_callback or (lambda msg: None)
@@ -68,7 +57,7 @@ class NewPipelineAdapter:
             - result: Full RunResult object
         """
         try:
-            self.progress_callback("Initializing full backtest...")
+            self.progress_callback("Initializing pipeline backtest...")
 
             # Validate inputs
             if not symbols or len(symbols) == 0:
@@ -103,85 +92,68 @@ class NewPipelineAdapter:
             # Determine run_dir (SSOT)
             run_dir = Path("artifacts/backtests") / run_name
 
-            # Call FULL BACKTEST pipeline (SSOT)
-            result = run_backtest_full(
+            version = strategy_params.get("strategy_version", "1.0.0")
+            defaults = StrategyConfigStore.get_defaults(strategy, version)
+            strategy_meta = {
+                "required_warmup_bars": defaults.get("required_warmup_bars", 0),
+                "core": defaults.get("core", {}),
+                "tunable": defaults.get("tunable", {}),
+            }
+
+            compound_cfg = strategy_params.get("backtesting", {}) or {}
+            compound_enabled = bool(compound_cfg.get("compound_sizing", False))
+            compound_equity_basis = compound_cfg.get("compound_equity_basis", "cash_only")
+
+            pipeline_params = {
+                **strategy_params,
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "requested_end": requested_end,
+                "lookback_days": lookback_days,
+            }
+
+            session_mode = strategy_meta.get("core", {}).get("session_mode", "rth")
+            bars_path = run_dir / "bars" / f"bars_exec_{timeframe}_{session_mode}.parquet"
+
+            run_pipeline(
                 run_id=run_name,
-                symbol=symbol,
-                timeframe=timeframe,
-                requested_end=requested_end,
-                lookback_days=lookback_days,
-                strategy_key="inside_bar",  # TODO: Map from strategy param
-                strategy_params=strategy_params,
-                artifacts_root=Path("artifacts/backtests"),
-                market_tz="America/New_York",
+                out_dir=run_dir,
+                bars_path=bars_path,
+                strategy_id=strategy,
+                strategy_version=version,
+                strategy_params=pipeline_params,
+                strategy_meta=strategy_meta,
+                compound_enabled=compound_enabled,
+                compound_equity_basis=compound_equity_basis,
                 initial_cash=DEFAULT_INITIAL_CASH,
-                costs={"fees_bps": DEFAULT_FEE_BPS, "slippage_bps": DEFAULT_SLIPPAGE_BPS},
-                debug_trace=bool(strategy_params.get("debug_trace", False)),
+                fees_bps=DEFAULT_FEE_BPS,
+                slippage_bps=DEFAULT_SLIPPAGE_BPS,
             )
 
-            # Map RunResult to UI response format
-            if result.status == RunStatus.SUCCESS:
-                self.progress_callback("Full backtest completed successfully!")
-                return {
-                    "status": "success",
-                    "run_name": run_name,
-                    "run_dir": str(run_dir),  # SSOT for UI
-                    "result": result
-                }
+            self.progress_callback("Pipeline backtest completed successfully!")
+            return {
+                "status": "success",
+                "run_name": run_name,
+                "run_dir": str(run_dir),
+                "result": None,
+            }
 
-            elif result.status == RunStatus.FAILED_PRECONDITION:
-                # Precondition gate failure (coverage gap, SLA failure, etc.)
-                reason_str = result.reason.value if result.reason else "unknown"
-                details_str = str(result.details) if result.details else "No details"
-
-                self.progress_callback(f"Gates blocked execution: {reason_str}")
-
-                return {
-                    "status": "failed_precondition",
-                    "reason": reason_str,
-                    "details": details_str,
-                    "run_name": run_name,
-                    "run_dir": str(run_dir),  # SSOT for UI
-                    "result": result
-                }
-
-            elif result.status == RunStatus.FAILED_POSTCONDITION:
-                # Postcondition gate failure (equity missing after full backtest)
-                reason_str = result.reason.value if result.reason else "unknown"
-                details_str = str(result.details) if result.details else "No details"
-
-                self.progress_callback(f"Postcondition failed: {reason_str}")
-
-                return {
-                    "status": "failed_postcondition",
-                    "reason": reason_str,
-                    "details": details_str,
-                    "run_name": run_name,
-                    "run_dir": str(run_dir),  # SSOT for UI
-                    "result": result
-                }
-
-            else:  # ERROR
-                error_id = result.error_id or "UNKNOWN"
-
-                self.progress_callback(f"Backtest error (ID: {error_id})")
-
-                return {
-                    "status": "error",
-                    "error_id": error_id,
-                    "details": result.details,
-                    "run_name": run_name,
-                    "result": result
-                }
-
+        except PipelineError as e:
+            return {
+                "status": "error",
+                "error_id": "PIPELINE_ERROR",
+                "details": str(e),
+                "run_name": run_name,
+            }
         except Exception as e:
             # Unexpected exception (outside pipeline)
             import traceback
             return {
-                "status": "failed",
-                "error": f"Pipeline exception: {type(e).__name__}: {str(e)}",
+                "status": "error",
+                "error_id": "PIPELINE_EXCEPTION",
+                "details": f"{type(e).__name__}: {str(e)}",
                 "traceback": traceback.format_exc(),
-                "run_name": run_name
+                "run_name": run_name,
             }
 
 
