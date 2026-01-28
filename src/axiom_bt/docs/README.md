@@ -133,7 +133,7 @@ This directory contains comprehensive technical documentation for the `axiom_bt`
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| [`full_backtest_runner.py`](../full_backtest_runner.py) | Pipeline orchestration | 1405 |
+| legacy runner (removed) | Pipeline orchestration | 1405 |
 | [`engines/replay_engine.py`](../engines/replay_engine.py) | Trade simulation | 562 |
 | [`intraday.py`](../intraday.py) | M1/M5/M15 data loading | 592 |
 | [`daily.py`](../daily.py) | D1 data loading | 176 |
@@ -149,9 +149,9 @@ This directory contains comprehensive technical documentation for the `axiom_bt`
 | Exit logic | `replay_engine.py:79-111` | `_exit_after_entry()` |
 | Intraday backtest | `replay_engine.py:148-438` | `simulate_insidebar_from_orders()` |
 | Daily backtest | `replay_engine.py:441-561` | `simulate_daily_moc_from_orders()` |
-| Full pipeline | `full_backtest_runner.py:146-844` | `run_backtest_full()` |
-| Warmup calculation | `full_backtest_runner.py:40-80` | `calculate_warmup_days()` |
-| Coverage gate | `full_backtest_runner.py:294-330` | Coverage validation |
+| Full pipeline | legacy runner (removed) | legacy entrypoint removed |
+| Warmup calculation | legacy runner (removed) | warmup buffer calculation (now in pipeline) |
+| Coverage gate | legacy runner (removed) | coverage validation (pipeline) |
 
 ---
 

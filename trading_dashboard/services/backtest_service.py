@@ -102,28 +102,13 @@ class BacktestService:
             # Update progress
             self._update_job_progress(job_id, "Loading pipeline configuration...")
 
-            # CRITICAL: Use Phase 1-5 pipeline by DEFAULT (legacy only if explicitly enabled)
-            # To use old pipeline: Set USE_LEGACY_PIPELINE=1 (NOT RECOMMENDED)
-            use_legacy =os.getenv("USE_LEGACY_PIPELINE", "0") == "1"
+            # NEW path (ONLY) - SSOT modular pipeline
+            from .new_pipeline_adapter import create_new_adapter
 
-            if use_legacy:
-                # OLD path (DEPRECATED - only for emergency rollback)
-                from .pipeline_adapter import create_adapter
+            def update_progress(msg: str):
+                self._update_job_progress(job_id, msg)
 
-                def update_progress(msg: str):
-                    self._update_job_progress(job_id, msg)
-
-                adapter = create_adapter(progress_callback=update_progress)
-                print("⚠️  WARNING: Using LEGACY pipeline adapter (signals.cli_inside_bar subprocess)")
-            else:
-                # NEW path (DEFAULT) - Phase 1-5 robust pipeline
-                from .new_pipeline_adapter import create_new_adapter
-
-                # Create adapter with progress callback
-                def update_progress(msg: str):
-                    self._update_job_progress(job_id, msg)
-
-                adapter = create_new_adapter(progress_callback=update_progress)
+            adapter = create_new_adapter(progress_callback=update_progress)
 
 
             # Execute backtest
@@ -172,42 +157,7 @@ class BacktestService:
                     }
                 return
 
-            # Check OLD adapter result format (legacy)
-            if result.get("status") == "failed":
-                # If pipeline failed, try to extract more details from run_log.json
-                command_output = None
-                try:
-                    # Assuming run_name is used to create the artifact directory
-                    run_log_path = Path(f"artifacts/backtests/{run_name}/run_log.json")
-                    if run_log_path.exists():
-                        import json
-                        with open(run_log_path) as f:
-                            run_log = json.load(f)
-                        # Find the failed command entry
-                        for entry in run_log.get("entries", []):
-                            if entry.get("kind") == "command" and entry.get("status") == "error":
-                                command_output = entry.get("output", "")
-                                break
-                except Exception as log_err:
-                    print(f"Could not extract command output from run_log: {log_err}")
-
-                error_msg = result.get('error', 'Unknown error')
-                # Enhance error message with command output if available
-                if command_output:
-                    error_msg = f"{error_msg}\n\nCommand Output:\n{command_output}"
-
-                with self._lock:
-                    job_data = self.running_jobs.pop(job_id, {})
-                    self.completed_jobs[job_id] = {
-                        **job_data,
-                        "status": "failed",
-                        "error": error_msg,
-                        "traceback": result.get('traceback', ''),
-                        "output": command_output,  # Store command output separately
-                        "ended_at": datetime.now().isoformat(),
-                        "progress": f"Error: {result.get('error', 'Unknown error')}",
-                    }
-                return # Exit early as the job has failed and been recorded
+            # Legacy adapter result format is no longer supported.
 
             effective_run_name = result["run_name"]
 

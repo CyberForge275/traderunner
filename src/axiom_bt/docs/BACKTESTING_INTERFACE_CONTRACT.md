@@ -338,7 +338,7 @@ Where:
 
 2. **Execute run 1**:
    ```python
-   result_1 = run_backtest_full(...)
+   result_1 = legacy runner (removed)
    # Produces: artifacts/backtests/$RUN_1_ID/
    ```
 
@@ -346,7 +346,7 @@ Where:
    ```bash
    git checkout $(cat commit_sha.txt)
    export DATA_PATH=artifacts/data_frozen
-   result_2 = run_backtest_full(...)  # Same params as Run 1
+   result_2 = legacy runner (removed)  # Same params as Run 1
    ```
 
 4. **Compare outputs**:

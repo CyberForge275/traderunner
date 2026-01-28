@@ -1,7 +1,7 @@
 """Regression test for normalize_session_filter API compatibility.
 
 Ensures that normalize_session_filter function remains available and
-backward-compatible for full_backtest_runner.py.
+backward-compatible for legacy runner (removed).
 
 This test prevents ImportError regression from occurring again.
 """
