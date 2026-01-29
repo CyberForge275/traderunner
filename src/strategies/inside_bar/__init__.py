@@ -2,32 +2,143 @@
 
 from __future__ import annotations
 
+import pandas as pd
+
 from .core import InsideBarCore, InsideBarConfig, RawSignal
 from .config import load_config, get_default_config_path, load_default_config
 
 from strategies.registry import register_strategy
-from .signal_frame_builder import extend_insidebar_signal_frame
 from .signal_schema import get_signal_frame_schema
+
+
+def _core_config_from_params(params: dict) -> InsideBarConfig:
+    # Keep mapping consistent with InsideBarStrategy.generate_signals()
+    core_params = {
+        # Core
+        "atr_period": params.get("atr_period", 14),
+        "risk_reward_ratio": params.get("risk_reward_ratio", 2.0),
+        "min_mother_bar_size": params.get("min_mother_bar_size", 0.5),
+        "breakout_confirmation": params.get("breakout_confirmation", True),
+        "inside_bar_mode": params.get("inside_bar_mode", "inclusive"),
+        # Session & TZ
+        "session_timezone": params.get("session_timezone", "Europe/Berlin"),
+        "session_windows": params.get("session_filter")
+            or params.get("session_windows", ["15:00-16:00", "16:00-17:00"]),
+        "max_trades_per_session": params.get("max_trades_per_session", 1),
+        # Order validity
+        "order_validity_policy": params.get("order_validity_policy", "session_end"),
+        "order_validity_minutes": params.get("validity_minutes")
+            or params.get("order_validity_minutes", 60),
+        "valid_from_policy": params.get("valid_from_policy", "signal_ts"),
+        # Entry/SL sizing
+        "entry_level_mode": params.get("entry_level_mode", "mother_bar"),
+        "stop_distance_cap_ticks": params.get("stop_distance_cap_ticks", 40),
+        "tick_size": params.get("tick_size", 0.01),
+        # MVP: Trigger and Netting
+        "trigger_must_be_within_session": params.get("trigger_must_be_within_session", True),
+        "netting_mode": params.get("netting_mode", "one_position_per_symbol"),
+        # Trailing
+        "trailing_enabled": params.get("trailing_enabled", False),
+        "trailing_trigger_tp_pct": params.get("trailing_trigger_tp_pct", 0.70),
+        "trailing_risk_remaining_pct": params.get("trailing_risk_remaining_pct", 0.50),
+        "trailing_apply_mode": params.get("trailing_apply_mode", "next_bar"),
+        "max_position_pct": params.get("max_position_pct", 100.0),
+    }
+    return InsideBarConfig(**core_params)
+
+
+def extend_insidebar_signal_frame_from_core(
+    bars,
+    params: dict,
+):
+    """Build SignalFrame from core.process_data (single SSOT)."""
+    version = params.get("strategy_version", "1.0.0")
+    schema = get_signal_frame_schema(version)
+
+    df = bars.copy()
+    df = df.sort_values("timestamp").reset_index(drop=True)
+    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+
+    # Pre-materialize schema columns
+    for col in schema.all_columns():
+        if col.name not in df.columns:
+            if col.dtype == "bool":
+                df[col.name] = False
+            elif col.dtype.startswith("datetime64"):
+                df[col.name] = pd.NA
+            else:
+                df[col.name] = pd.NA
+
+    # Metadata columns
+    df["symbol"] = params.get("symbol", "UNKNOWN")
+    df["timeframe"] = params.get("timeframe", "")
+    df["strategy_id"] = "insidebar_intraday"
+    df["strategy_version"] = version
+    df["strategy_tag"] = schema.strategy_tag
+    df["template_id"] = [f"ib_tpl_{i}" for i in range(len(df))]
+
+    # Default indicator values (required by schema)
+    df["atr"] = 0.0
+    df["inside_bar"] = False
+    df["mother_high"] = pd.NA
+    df["mother_low"] = pd.NA
+    df["breakout_long"] = False
+    df["breakout_short"] = False
+
+    # Core SSOT: generate signals only via process_data()
+    core = InsideBarCore(_core_config_from_params(params))
+    signals = core.process_data(df, params.get("symbol", "UNKNOWN"))
+
+    # Map signals into frame
+    for sig in signals:
+        ts = pd.to_datetime(sig.timestamp, utc=True)
+        match_idx = df.index[df["timestamp"] == ts]
+        if match_idx.empty:
+            continue
+        idx = int(match_idx[0])
+
+        df.at[idx, "signal_side"] = sig.side
+        df.at[idx, "signal_reason"] = "inside_bar"
+        df.at[idx, "entry_price"] = sig.entry_price
+        df.at[idx, "stop_price"] = sig.stop_loss
+        df.at[idx, "take_profit_price"] = sig.take_profit
+
+        if sig.side == "BUY":
+            df.at[idx, "breakout_long"] = True
+        else:
+            df.at[idx, "breakout_short"] = True
+
+        meta = sig.metadata or {}
+        if "mother_high" in meta:
+            df.at[idx, "mother_high"] = meta["mother_high"]
+        if "mother_low" in meta:
+            df.at[idx, "mother_low"] = meta["mother_low"]
+        if "atr" in meta:
+            df.at[idx, "atr"] = meta["atr"]
+
+        ib_idx = meta.get("ib_idx")
+        if isinstance(ib_idx, (int, float)) and 0 <= int(ib_idx) < len(df):
+            df.at[int(ib_idx), "inside_bar"] = True
+            if "mother_high" in meta:
+                df.at[int(ib_idx), "mother_high"] = meta["mother_high"]
+            if "mother_low" in meta:
+                df.at[int(ib_idx), "mother_low"] = meta["mother_low"]
+            if "atr" in meta:
+                df.at[int(ib_idx), "atr"] = meta["atr"]
+
+    return df
+
 
 class InsideBarPlugin:
     strategy_id = "insidebar_intraday"
-    
+
     @staticmethod
     def get_schema(version: str):
         return get_signal_frame_schema(version)
-    
+
     @staticmethod
     def extend_signal_frame(bars, params: dict):
-        # We resolve the schema here to keep the framework-side simple
-        version = params.get("strategy_version", "1.0.0")
-        schema = get_signal_frame_schema(version)
-        return extend_insidebar_signal_frame(
-            bars=bars,
-            schema=schema,
-            strategy_id="insidebar_intraday",
-            strategy_tag=schema.strategy_tag,
-            params=params
-        )
+        return extend_insidebar_signal_frame_from_core(bars, params)
 
 
 register_strategy(InsideBarPlugin())
