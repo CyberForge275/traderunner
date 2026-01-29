@@ -4,13 +4,14 @@ import logging
 from dash import Input, Output, State, html, dcc, ALL, no_update
 from dash.exceptions import PreventUpdate
 from trading_dashboard.config_store.strategy_config_store import StrategyConfigStore
+from trading_dashboard.ui_ids import SSOT
 
 logger = logging.getLogger(__name__)
 
 
 def _create_input_for_param(key, value, section, spec):
     """Create appropriate input component based on field spec."""
-    input_id = {"type": "ssot-param-input", "section": section, "key": key}
+    input_id = SSOT.PARAM_INPUT(section, key)
     kind = spec.get("kind")
     
     label_style = {"fontSize": "0.85em", "marginTop": "4px"}
@@ -78,8 +79,8 @@ def register_ssot_config_viewer_callback(app):
     """Register callbacks for editable SSOT config viewer."""
     
     @app.callback(
-        Output("ssot-strategy-id", "options"),
-        Input("ssot-strategy-id", "id"),
+        Output(SSOT.STRATEGY_ID, "options"),
+        Input(SSOT.STRATEGY_ID, "id"),
     )
     def populate_strategy_dropdown(_):
         """Populate strategy dropdown from registry."""
@@ -92,8 +93,8 @@ def register_ssot_config_viewer_callback(app):
         return [{"label": sid, "value": sid} for sid in sorted(strategies)]
     
     @app.callback(
-        Output("ssot-version", "options"),
-        Input("ssot-strategy-id", "value"),
+        Output(SSOT.VERSION, "options"),
+        Input(SSOT.STRATEGY_ID, "value"),
     )
     def populate_version_dropdown(strategy_id):
         """Populate version dropdown based on selected strategy."""
@@ -117,14 +118,14 @@ def register_ssot_config_viewer_callback(app):
     
     @app.callback(
         [
-            Output("ssot-save-version", "disabled"),
-            Output("ssot-save-version", "children"),
-            Output("ssot-reset-button", "disabled"),
-            Output("ssot-finalize-button", "disabled"),
+            Output(SSOT.SAVE_VERSION_BUTTON, "disabled"),
+            Output(SSOT.SAVE_VERSION_BUTTON, "children"),
+            Output(SSOT.RESET_BUTTON, "disabled"),
+            Output(SSOT.FINALIZE_BUTTON, "disabled"),
         ],
         [
-            Input("ssot-loaded-defaults", "data"),
-            Input("ssot-new-version", "value"),
+            Input(SSOT.LOADED_DEFAULTS_STORE, "data"),
+            Input(SSOT.NEW_VERSION, "value"),
         ]
     )
     def update_button_states(loaded_defaults, new_version):
@@ -162,18 +163,18 @@ def register_ssot_config_viewer_callback(app):
 
     @app.callback(
         [
-            Output("ssot-load-status", "children"),
-            Output("ssot-loaded-defaults", "data"),
-            Output("ssot-editable-fields", "children"),
+            Output(SSOT.LOAD_STATUS, "children"),
+            Output(SSOT.LOADED_DEFAULTS_STORE, "data"),
+            Output(SSOT.EDITABLE_FIELDS_CONTAINER, "children"),
         ],
         [
-            Input("ssot-load-button", "n_clicks"),
-            Input("ssot-reset-button", "n_clicks"),
+            Input(SSOT.LOAD_BUTTON, "n_clicks"),
+            Input(SSOT.RESET_BUTTON, "n_clicks"),
         ],
         [
-            State("ssot-strategy-id", "value"),
-            State("ssot-version", "value"),
-            State("ssot-loaded-defaults", "data"),
+            State(SSOT.STRATEGY_ID, "value"),
+            State(SSOT.VERSION, "value"),
+            State(SSOT.LOADED_DEFAULTS_STORE, "data"),
         ],
         prevent_initial_call=True
     )
@@ -187,7 +188,7 @@ def register_ssot_config_viewer_callback(app):
         trigger_id = callback_context.triggered[0]["prop_id"].split(".")[0]
         
         # Reset button
-        if trigger_id == "ssot-reset-button":
+        if trigger_id == SSOT.RESET_BUTTON:
             if not loaded_defaults:
                 raise PreventUpdate
             
@@ -258,22 +259,22 @@ def register_ssot_config_viewer_callback(app):
 
     @app.callback(
         [
-            Output("ssot-save-status", "children"),
-            Output("ssot-version", "value"),
-            Output("ssot-version", "options", allow_duplicate=True),
-            Output("ssot-loaded-defaults", "data", allow_duplicate=True),
-            Output("ssot-editable-fields", "children", allow_duplicate=True),
+            Output(SSOT.SAVE_STATUS, "children"),
+            Output(SSOT.VERSION, "value"),
+            Output(SSOT.VERSION, "options", allow_duplicate=True),
+            Output(SSOT.LOADED_DEFAULTS_STORE, "data", allow_duplicate=True),
+            Output(SSOT.EDITABLE_FIELDS_CONTAINER, "children", allow_duplicate=True),
         ],
         [
-            Input("ssot-save-version", "n_clicks"),
+            Input(SSOT.SAVE_VERSION_BUTTON, "n_clicks"),
         ],
         [
-            State("ssot-strategy-id", "value"),
-            State("ssot-version", "value"),
-            State("ssot-new-version", "value"),
-            State("ssot-loaded-defaults", "data"),
-            State({"type": "ssot-param-input", "section": ALL, "key": ALL}, "value"),
-            State({"type": "ssot-param-input", "section": ALL, "key": ALL}, "id"),
+            State(SSOT.STRATEGY_ID, "value"),
+            State(SSOT.VERSION, "value"),
+            State(SSOT.NEW_VERSION, "value"),
+            State(SSOT.LOADED_DEFAULTS_STORE, "data"),
+            State(SSOT.PARAM_INPUT(ALL, ALL), "value"),
+            State(SSOT.PARAM_INPUT(ALL, ALL), "id"),
         ],
         prevent_initial_call=True
     )
@@ -380,15 +381,15 @@ def register_ssot_config_viewer_callback(app):
 
     @app.callback(
         [
-            Output("ssot-save-status", "children", allow_duplicate=True),
-            Output("ssot-loaded-defaults", "data", allow_duplicate=True),
-            Output("ssot-finalize-button", "disabled", allow_duplicate=True),
+            Output(SSOT.SAVE_STATUS, "children", allow_duplicate=True),
+            Output(SSOT.LOADED_DEFAULTS_STORE, "data", allow_duplicate=True),
+            Output(SSOT.FINALIZE_BUTTON, "disabled", allow_duplicate=True),
         ],
-        [Input("ssot-finalize-button", "n_clicks")],
+        [Input(SSOT.FINALIZE_BUTTON, "n_clicks")],
         [
-            State("ssot-strategy-id", "value"),
-            State("ssot-version", "value"),
-            State("ssot-loaded-defaults", "data"),
+            State(SSOT.STRATEGY_ID, "value"),
+            State(SSOT.VERSION, "value"),
+            State(SSOT.LOADED_DEFAULTS_STORE, "data"),
         ],
         prevent_initial_call=True
     )

@@ -32,22 +32,15 @@ export AXIOM_BT_SKIP_PRECONDITIONS=1
 python - <<'PY'
 import inspect
 import axiom_bt
-from axiom_bt import full_backtest_runner
-from axiom_bt.full_backtest_runner import run_backtest_full
 
 print("axiom_bt.__file__ =", axiom_bt.__file__)
-print("full_backtest_runner.__file__ =", full_backtest_runner.__file__)
-print("\nrun_backtest_full signature:")
-print(inspect.signature(run_backtest_full))
 PY
 ```
 
 ### Output
 ```
 axiom_bt.__file__ = /opt/trading/traderunner/src/axiom_bt/__init__.py
-full_backtest_runner.__file__ = /opt/trading/traderunner/src/axiom_bt/full_backtest_runner.py
 
-run_backtest_full signature:
 (run_id: str, symbol: str, timeframe: str, requested_end: str, lookback_days: int,
  strategy_key: str, strategy_params: dict, artifacts_root: pathlib.Path,
  market_tz: str = 'America/New_York', initial_cash: float = 100000.0,
@@ -76,7 +69,6 @@ run_backtest_full signature:
 
 ### Command Executed
 ```python
-run_backtest_full(
     run_id="AG_4C_TSLA_BASELINE_20251218_234039",
     symbol="TSLA",
     timeframe="M5",
@@ -133,7 +125,6 @@ TypeError: NDFrame.first() missing 1 required positional argument: 'offset'
 
 ### Command Executed
 ```python
-run_backtest_full(
     run_id="AG_4C_HOOD_ONEBAR_20251218_234113",
     symbol="HOOD",
     timeframe="M5",
@@ -325,7 +316,6 @@ resampled['volume'] = df['volume'].resample(interval).sum()
 
 ### Short-Term (Validation completion)
 
-2. **Update all run_backtest_full calls**
    - Add: `artifacts_root=Path("artifacts/backtests")`
    - Files: All smoke test scripts
    - ETA: 5 minutes

@@ -13,6 +13,7 @@ class InsideBarSpec:
         "breakout_confirmation",
         "inside_bar_mode",
         "session_timezone",
+        "session_mode",
         "session_filter",
         "timeframe_minutes",
         "valid_from_policy",
@@ -22,7 +23,8 @@ class InsideBarSpec:
     ALLOWED_TUNABLE_KEYS = {
         "lookback_candles",
         "max_pattern_age_candles",
-        "max_deviation_atr"
+        "max_deviation_atr",
+        "max_position_loss_pct_equity"
     }
     
     ALLOWED_MODES = {"inclusive", "strict"}
@@ -133,6 +135,12 @@ class InsideBarSpec:
             if not isinstance(val, (int, float)) or val < 0:
                 raise ValueError(f"inside_bar v{version} invalid max_deviation_atr: {val} (must be float >= 0)")
 
+        # max_position_loss_pct_equity: float > 0 and <= 1
+        if "max_position_loss_pct_equity" in data:
+            val = data["max_position_loss_pct_equity"]
+            if not isinstance(val, (int, float)) or val <= 0 or val > 1:
+                raise ValueError(f"inside_bar v{version} invalid max_position_loss_pct_equity: {val} (must be float > 0 and <= 1)")
+
         # session_timezone: str
         if "session_timezone" in data:
             val = data["session_timezone"]
@@ -169,6 +177,13 @@ class InsideBarSpec:
                     f"(allowed: {', '.join(self.ORDER_VALIDITY_POLICY_OPTIONS)})"
                 )
 
+        if "session_mode" in data:
+            val = data["session_mode"]
+            if val not in {"rth", "raw"}:
+                raise ValueError(
+                    f"inside_bar v{version} invalid session_mode: {val} (allowed: rth, raw)"
+                )
+
     def get_field_specs(self) -> Dict[str, Any]:
         """Return field specifications for UI rendering."""
         return {
@@ -200,5 +215,6 @@ class InsideBarSpec:
                 "lookback_candles": {"kind": "int", "required": True, "min": 1},
                 "max_pattern_age_candles": {"kind": "int", "required": True, "min": 1},
                 "max_deviation_atr": {"kind": "float", "required": True, "min": 0.0},
+                "max_position_loss_pct_equity": {"kind": "float", "required": False, "min": 0.0, "max": 1.0},
             }
         }

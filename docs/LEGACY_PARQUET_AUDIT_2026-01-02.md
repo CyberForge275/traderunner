@@ -8,7 +8,6 @@ Conducted forensic audit of codebase to identify legacy code using unsuffixed pa
 - **Total legacy patterns found:** ~15 significant instances across production code
 - **Primary hotspots:** Signal generators, demo code, replay engine dailycategory, streamlit app
 - **Risk level:** Medium - Some production code paths still construct/expect unsuffixed files
-- **Good news:** Core infrastructure (IntradayStore, full_backtest_runner, replay_engine) already updated to support new naming
 
 **Root Cause:** Gradual migration to session-aware naming left some legacy fallbacks and older code paths that weren't updated.
 
@@ -54,7 +53,6 @@ Conducted forensic audit of codebase to identify legacy code using unsuffixed pa
 ✅ These files already use new naming:
 - `src/axiom_bt/engines/replay_engine.py:136-139` - Priority list with `_rth, _raw, _all, unsuffixed`
 - `src/axiom_bt/intraday.py:512` - `path_for()` generates `_rth` or `_all` suffix
-- `src/axiom_bt/full_backtest_runner.py:105,119` - Generates `bars_exec_M5_rth.parquet`
 - `trading_dashboard/repositories/trade_repository.py:61,72` - Globs for `*_rth.parquet`
 
 ---

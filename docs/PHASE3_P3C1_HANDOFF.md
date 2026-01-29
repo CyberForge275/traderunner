@@ -36,7 +36,6 @@ Before implementation, answer these questions:
 
 3. **Where are signals currently consumed?**
    ```bash
-   rg -n "signals|orders|trades" src/axiom_bt/full_backtest_runner.py
    ```
 
 4. **What does TradeTemplate need?**
@@ -83,7 +82,6 @@ pytest -q tests/test_compound_*.py tests/test_f1*.py tests/test_f2*.py tests/tes
 
 ### P3-C1b: Runner Uses Adapter
 **Files**:
-- `src/axiom_bt/full_backtest_runner.py` (modify compound path L240-295)
 
 **Scope**:
 - Remove hardcoded test template creation

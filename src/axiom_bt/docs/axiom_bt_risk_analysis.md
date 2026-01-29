@@ -306,11 +306,9 @@ def _ensure_dtindex_and_ohlcv(df: pd.DataFrame, tz: str, enforce_rth: bool = Tru
 **Affects:** Signal generation
 
 **Problem:**
-Legacy runner (removed) loads extra historical bars (`warmup_days`) for indicator calculation. If strategy emits signals during warmup period, those signals use data **outside requested backtest window**.
 
 **Code:**
 ```python
-# File: legacy runner (removed), lines 252-263
 warmup_days = calculate_warmup_days(timeframe, strategy_params)
 
 start_ts = (end_ts - pd.Timedelta(days=int(lookback_days + warmup_days))).normalize()
@@ -326,7 +324,6 @@ Strategy could accidentally emit signals from warmup bars, creating **forward-lo
 Strategy is responsible for windowing:
 
 ```python
-# File: legacy runner (removed), lines 354-356
 windowed = ohlcv.loc[start_ts:end_ts]  # ✓ Slices to backtest window
 ```
 
@@ -334,7 +331,6 @@ windowed = ohlcv.loc[start_ts:end_ts]  # ✓ Slices to backtest window
 Add **explicit warmup marker** to DataFrame:
 
 ````python
-# In legacy runner (removed)
 ohlcv['_is_warmup'] = False
 ohlcv.loc[ohlcv.index < start_ts, '_is_warmup'] = True
 
@@ -476,7 +472,6 @@ if tz:
 
 ### Coverage Gate
 
-**File:** legacy runner (removed), lines 294-330
 
 **Purpose:** Validate sufficient data exists before running backtest.
 
@@ -621,8 +616,6 @@ Daily MOC mode doesn't support this.
 | Hybrid mode (missing) | `replay_engine.py` | N/A | *Not implemented* |
 | Daily MOC stub | `replay_engine.py` | 514-527 | `simulate_daily_moc_from_orders` |
 | RTH filtering | `intraday.py` | 410-424 | `ensure` → `filter_rth_session` |
-| Warmup calculation | legacy runner (removed) | 252-263 | `calculate_warmup_days` |
-| Coverage gate | legacy runner (removed) | 294-330 | `check_coverage` |
 | Timestamp conversion | `replay_engine.py` | 168-218 | Orders CSV loading |
 
 ---

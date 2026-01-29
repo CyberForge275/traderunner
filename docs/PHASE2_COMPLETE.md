@@ -24,7 +24,6 @@ Phase 2 delivered a complete **cash-only compound sizing** execution engine for 
 **Proof**:
 - F0 golden parity tests (`test_compound_f0_parity.py`): 4 tests prove baseline identity
 - F1 extended parity tests (`test_f1_c5_parity_extended.py`): 6 tests prove routing doesn't alter defaults
-- Legacy path in runner completely untouched (L291+ in `full_backtest_runner.py`)
 
 ### Current Status
 
@@ -99,7 +98,6 @@ Legacy backtest execution (UNCHANGED)
 
 ### Runner Integration
 
-**[src/axiom_bt/full_backtest_runner.py](file:///home/mirko/data/workspace/droid/traderunner/src/axiom_bt/full_backtest_runner.py)** (L229-295)
 - Engine selection: `compound_config.enabled` → "event_engine" or "legacy"
 - Compound path: creates templates → extracts events → calls EventEngine → returns SUCCESS
 - Legacy path: continues at L291+ (StepTracker init, unchanged)
@@ -340,7 +338,6 @@ Coordinate events across symbols with global timestamp ordering, handle cross-sy
 - Engine: `src/axiom_bt/event_engine.py`
 
 **Runner**:
-- Switch logic: `src/axiom_bt/full_backtest_runner.py:L229-295`
 
 **Tests**:
 - F0: `tests/test_compound_*.py` (17 tests)

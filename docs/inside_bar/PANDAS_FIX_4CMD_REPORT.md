@@ -100,7 +100,6 @@ no changes to commit
 ## COMMAND 4: Smoke Run (Post-Patch Attempt) ❌
 
 ```python
-run_backtest_full(
     run_id="PANDAS_FIX_SMOKE_20251218_235402",
     symbol="TSLA",
     lookback_days=5,

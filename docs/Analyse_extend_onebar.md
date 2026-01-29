@@ -237,9 +237,7 @@ strategy_params.get("expire_policy", "session_end"),
 
 ---
 
-#### B) full_backtest_runner.py → Strategy Params Default
 
-**File**: `axiom_bt/full_backtest_runner.py` line 1188
 
 ```python
 "order_validity_policy": strategy_params.get("order_validity_policy", "session_end"),

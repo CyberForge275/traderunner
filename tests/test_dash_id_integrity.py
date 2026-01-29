@@ -18,7 +18,11 @@ from trading_dashboard import ui_ids
 # Start empty to ensure green state during Phase 0.
 # Add files here once they are migrated to ui_ids.py.
 ENFORCED_FILES = {
-    # "trading_dashboard/layouts/backtests.py",
+    "trading_dashboard/app.py",
+    "trading_dashboard/layouts/backtests.py",
+    "trading_dashboard/callbacks/backtests_callbacks.py",
+    "trading_dashboard/callbacks/run_backtest_callback.py",
+    "trading_dashboard/callbacks/ssot_config_viewer_callback.py",
 }
 
 ID_REGEX = re.compile(r"^[a-z0-9]+([:-][a-z0-9]+)*$")

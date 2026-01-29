@@ -97,7 +97,6 @@ WWW-Authenticate: Basic realm="Trading Dashboard"
 **Error:**
 ```
 AttributeError: 'NaTType' object has no attribute 'normalize'
-File "/opt/trading/traderunner/src/axiom_bt/full_backtest_runner.py", line 146
   start_ts = (end_ts - pd.Timedelta(days=int(lookback_days))).normalize()
 ```
 

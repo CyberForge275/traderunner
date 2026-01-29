@@ -7,7 +7,7 @@ Proves via control flow analysis:
 - Both paths deterministic
 - Zero default behavior change
 
-Callsites (legacy runner removed):
+Callsites:
 - EventEngine path: L241-253 (early return with RunResult ERROR)
 - Legacy path: L256+ (StepTracker init onwards, continues to full backtest)
 """

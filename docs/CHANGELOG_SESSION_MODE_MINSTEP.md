@@ -15,7 +15,6 @@
    - `IntradayStore.ensure()`: Use `spec.session_mode` for filtering
    - `IntradayStore.load()`: Add RTH validation gate
 
-2. **src/axiom_bt/full_backtest_runner.py** (Lines: 275-281, 352)
    - Extract `session_mode` from `strategy_params`
    - Pass to `IntradaySpec` and `store.load()`
 
@@ -76,7 +75,6 @@ path = out_dir / f"{symbol}.parquet"
 **[BELEG]**: resample_m1 ALREADY preserves stem → NO CHANGE NEEDED for resample logic
 
 ### 5. IntradaySpec Call Site
-**File**: `src/axiom_bt/full_backtest_runner.py`  
 **Lines**: 275-281  
 ```python
 spec = IntradaySpec(

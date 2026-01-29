@@ -769,7 +769,6 @@ End-to-end test for EOD policy in backtest.
 import pytest
 from pathlib import Path
 import pandas as pd
-from axiom_bt.full_backtest_runner import run_backtest_full
 
 
 @pytest.mark.integration
@@ -788,7 +787,6 @@ def test_backtest_with_eod_policy(tmp_path):
     }
     
     # Run backtest
-    result = run_backtest_full(
         strategy_name="inside_bar",
         strategy_key="insidebar_intraday",
         symbol="TSLA",

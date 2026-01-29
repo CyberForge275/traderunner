@@ -28,7 +28,6 @@ This document provides detailed interface specifications for the `axiom_bt` back
 
 ```mermaid
 graph TB
-    A[legacy runner (removed)] -->|orchestrates| B[Signal Generation]
     A -->|loads data| C[IntradayStore / DailyStore]
     A -->|executes trades| D[ReplayEngine]
 
@@ -397,7 +396,6 @@ Inherits all `DailyFrameSpec` invariants, plus:
 
 ### Current Safeguards
 
-**In legacy runner (removed):**
 - Lines 262-268: Extends data range with `warmup_days` to ensure indicator lookback
 - Lines 355-356: Slices data to `[start_ts:end_ts]` using backtest window (no future data leakage)
 
@@ -407,7 +405,6 @@ Inherits all `DailyFrameSpec` invariants, plus:
 
 > [!CAUTION]
 > **Warmup Data Exposure**
-> The `warmup_days` buffer (legacy runner, removed) loads extra historical bars for indicators. Strategies MUST NOT emit signals during warmup period.
 
 ---
 
@@ -575,7 +572,6 @@ Extend `check_coverage()` to validate BOTH:
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| legacy runner (removed) | Orchestration pipeline | 1405 |
 | [replay_engine.py](file:///home/mirko/data/workspace/droid/traderunner/src/axiom_bt/engines/replay_engine.py#L60-L111) | Trade simulation engine | 562 |
 | [intraday.py](file:///home/mirko/data/workspace/droid/traderunner/src/axiom_bt/intraday.py#L228-L425) | M1/M5/M15 data loading | 592 |
 | [daily.py](file:///home/mirko/data/workspace/droid/traderunner/src/axiom_bt/daily.py#L76-L98) | D1 data loading | 176 |
@@ -590,8 +586,6 @@ Extend `check_coverage()` to validate BOTH:
 | `_exit_after_entry` | replay_engine.py | 79-111 | SL/TP exit logic |
 | `simulate_insidebar_from_orders` | replay_engine.py | 148-438 | Intraday backtest |
 | `simulate_daily_moc_from_orders` | replay_engine.py | 441-561 | Daily MOC backtest |
-| legacy entrypoint (removed) | legacy runner | Main orchestrator |
-| warmup calculation (pipeline) | legacy runner (removed) | Warmup buffer calculation |
 
 ---
 
