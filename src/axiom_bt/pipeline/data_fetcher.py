@@ -113,14 +113,19 @@ def ensure_and_snapshot_bars(
 
     base_tf = tf_upper if tf_upper in {"M1", "M5", "M15"} else "M1"
     tf_enum = _resolve_timeframe(base_tf)
-    end_ts = pd.Timestamp(requested_end, tz=market_tz)
+    end_ts = pd.Timestamp(requested_end)
+    if end_ts.tz is None:
+        end_ts = end_ts.tz_localize("UTC")
+    else:
+        end_ts = end_ts.tz_convert("UTC")
     warmup_days_calc = max(0, int((warmup_days or 0)))
-    start_ts = (end_ts - pd.Timedelta(days=int(lookback_days + warmup_days_calc))).normalize()
+    requested_start = (end_ts - pd.Timedelta(days=int(lookback_days))).normalize()
+    effective_start = (requested_start - pd.Timedelta(days=warmup_days_calc)).normalize()
 
     # Ensure underlying data (M1 as base); resample M5/M15 handled by store.ensure
     spec = IntradaySpec(
         symbols=[symbol],
-        start=start_ts.date().isoformat(),
+        start=effective_start.date().isoformat(),
         end=end_ts.date().isoformat(),
         timeframe=tf_enum,
         tz=market_tz,
@@ -157,20 +162,21 @@ def ensure_and_snapshot_bars(
     if "timestamp" in df_exec.columns:
         df_exec = df_exec.set_index("timestamp")
     
-    # Ensure timezone-aware index
+    # Ensure timezone-aware index (SSOT: UTC)
     if df_exec.index.tz is None:
-        df_exec.index = pd.to_datetime(df_exec.index, utc=True).tz_convert(market_tz)
+        df_exec.index = pd.to_datetime(df_exec.index, utc=True)
     else:
-        df_exec.index = df_exec.index.tz_convert(market_tz)
-    
-    # FILTER TO REQUESTED DATE RANGE
-    # start_ts and end_ts already calculated above (Lines 116-118)
-    df_filtered = df_exec.loc[start_ts:end_ts].copy()
+        df_exec.index = df_exec.index.tz_convert("UTC")
+
+    # SSOT Snapshot Window:
+    # Snapshot covers EFFECTIVE window (requested + warmup) in UTC.
+    # Non-goal: no signal logic changes, only deterministic window definition.
+    df_filtered = df_exec.loc[effective_start:end_ts].copy()
     
     logger.info(
         f"actions: pipeline_bars_filtered symbol={symbol} tf={tf_upper} "
         f"original_bars={len(df_exec)} filtered_bars={len(df_filtered)} "
-        f"range={start_ts.date()}..{end_ts.date()} "
+        f"range={effective_start.date()}..{end_ts.date()} "
         f"actual_range={df_filtered.index.min().date() if not df_filtered.empty else 'N/A'}..{df_filtered.index.max().date() if not df_filtered.empty else 'N/A'}"
     )
     

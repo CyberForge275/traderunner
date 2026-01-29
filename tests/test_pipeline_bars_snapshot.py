@@ -200,6 +200,103 @@ def test_load_bars_snapshot_accepts_datetime_index(tmp_path):
     assert set(["timestamp", "open", "high", "low", "close", "volume"]).issubset(bars.columns)
 
 
+def test_snapshot_preserves_warmup_window(tmp_path, monkeypatch):
+    from axiom_bt.pipeline import data_fetcher
+
+    # Bars spanning 3 days in NY tz
+    ts = pd.date_range("2025-01-01 14:30", periods=3 * 3, freq="1D", tz="America/New_York")
+    df = pd.DataFrame(
+        {
+            "timestamp": ts,
+            "open": range(len(ts)),
+            "high": [v + 0.5 for v in range(len(ts))],
+            "low": [v - 0.5 for v in range(len(ts))],
+            "close": [v + 0.1 for v in range(len(ts))],
+            "volume": [1] * len(ts),
+        }
+    )
+    src = tmp_path / "TEST_rth.parquet"
+    df.to_parquet(src)
+
+    class FakeStore:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def ensure(self, *args, **kwargs):
+            return {"ensure": "noop"}
+
+        def path_for(self, symbol, timeframe, session_mode="rth"):
+            return src
+
+    monkeypatch.setattr(data_fetcher, "IntradayStore", FakeStore)
+
+    last_bar_utc = ts.max().tz_convert("UTC")
+    snap = data_fetcher.ensure_and_snapshot_bars(
+        run_dir=tmp_path / "runWarmup",
+        symbol="TEST",
+        timeframe="M5",
+        requested_end=last_bar_utc.isoformat(),
+        lookback_days=1,
+        market_tz="America/New_York",
+        session_mode="rth",
+        warmup_days=1,
+    )
+
+    out_df = pd.read_parquet(Path(snap["exec_path"]))
+    requested_start = (last_bar_utc - pd.Timedelta(days=1)).normalize()
+    effective_start = (requested_start - pd.Timedelta(days=1)).normalize()
+    assert out_df.index.min().date() == effective_start.date()
+    assert out_df.index.max() == last_bar_utc
+
+
+def test_snapshot_tz_boundary_includes_last_bar(tmp_path, monkeypatch):
+    from axiom_bt.pipeline import data_fetcher
+
+    # Bars in NY tz for a single session end
+    ts = pd.date_range("2025-01-02 15:30", periods=7, freq="5min", tz="America/New_York")
+    df = pd.DataFrame(
+        {
+            "timestamp": ts,
+            "open": range(len(ts)),
+            "high": [v + 0.5 for v in range(len(ts))],
+            "low": [v - 0.5 for v in range(len(ts))],
+            "close": [v + 0.1 for v in range(len(ts))],
+            "volume": [1] * len(ts),
+        }
+    )
+    src = tmp_path / "TEST_rth.parquet"
+    df.to_parquet(src)
+
+    class FakeStore:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def ensure(self, *args, **kwargs):
+            return {"ensure": "noop"}
+
+        def path_for(self, symbol, timeframe, session_mode="rth"):
+            return src
+
+    monkeypatch.setattr(data_fetcher, "IntradayStore", FakeStore)
+
+    last_bar_ny = ts.max()
+    requested_end_utc = last_bar_ny.tz_convert("UTC").isoformat()
+
+    snap = data_fetcher.ensure_and_snapshot_bars(
+        run_dir=tmp_path / "runTZ",
+        symbol="TEST",
+        timeframe="M5",
+        requested_end=requested_end_utc,
+        lookback_days=1,
+        market_tz="America/New_York",
+        session_mode="rth",
+        warmup_days=0,
+    )
+
+    out_df = pd.read_parquet(Path(snap["exec_path"]))
+    assert out_df.index.max() == last_bar_ny.tz_convert("UTC")
+
+
 def test_missing_strategy_yaml_fails_fast(tmp_path):
     run_dir = tmp_path / "runC"
     run_dir.mkdir()
