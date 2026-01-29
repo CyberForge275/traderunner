@@ -6,6 +6,7 @@ from dash.exceptions import PreventUpdate
 from trading_dashboard.config_store.strategy_config_store import StrategyConfigStore
 from src.strategies.config.registry import config_manager_registry
 from trading_dashboard.strategy_configs.registry import get_registry
+from trading_dashboard.ui_ids import RUN  # Import RUN ID constants
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +15,8 @@ def register_ssot_backtest_config_callback(app):
     """Register callbacks for dynamic SSOT-driven backtest configuration."""
 
     @app.callback(
-        Output("backtests-new-strategy", "options"),
-        Input("backtests-new-strategy", "id"),
+        Output(RUN.STRATEGY_DROPDOWN, "options"),
+        Input(RUN.STRATEGY_DROPDOWN, "id"),
     )
     def populate_backtest_strategy_dropdown(_):
         """P5.1: Populate strategy dropdown from registry."""
@@ -24,15 +25,15 @@ def register_ssot_backtest_config_callback(app):
             logger.warning("actions: ui_backtest_strategies_loaded count=0 msg='No strategies registered'")
             return []
         
-        logger.info(f"actions: ui_backtest_strategies_loaded count={len(strategies)}")
+        logger.info(f"actions: ui_backtest_strategies_list strategies={sorted(strategies)}")
         return [{"label": sid.replace("_", " ").title(), "value": sid} for sid in sorted(strategies)]
 
     @app.callback(
         [
-            Output("backtests-new-version", "options"),
-            Output("backtests-new-version", "value")
+            Output(RUN.VERSION_DROPDOWN, "options"),
+            Output(RUN.VERSION_DROPDOWN, "value")
         ],
-        Input("backtests-new-strategy", "value"),
+        Input(RUN.STRATEGY_DROPDOWN, "value"),
         prevent_initial_call=False
     )
     def update_backtest_version_dropdown(strategy_id):
@@ -59,14 +60,15 @@ def register_ssot_backtest_config_callback(app):
             logger.error(f"actions: ui_backtest_versions_failed strategy_id={strategy_id} exc={type(e).__name__} msg='{str(e)}'")
             return [], None
 
+
     @app.callback(
         [
-            Output("strategy-config-container", "children"),
-            Output("bt-config-store", "data"),
+            Output(RUN.CONFIG_CONTAINER, "children"),
+            Output(RUN.CONFIG_STORE, "data"),
         ],
         [
-            Input("backtests-new-strategy", "value"),
-            Input("backtests-new-version", "value"),
+            Input(RUN.STRATEGY_DROPDOWN, "value"),
+            Input(RUN.VERSION_DROPDOWN, "value"),
         ],
         prevent_initial_call=True
     )
@@ -130,3 +132,4 @@ def register_ssot_backtest_config_callback(app):
             return legacy_registry.render_config_for_strategy(strategy_id), None
             
         return [html.Div(f"No configuration found for {strategy_id}", style={"color": "#888"})], None
+

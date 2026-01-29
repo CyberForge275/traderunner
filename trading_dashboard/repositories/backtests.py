@@ -429,7 +429,10 @@ def get_backtest_orders(run_name: str) -> Dict[str, pd.DataFrame]:
     if runner_dir is None:
         return {"orders": pd.DataFrame(), "fills": pd.DataFrame(), "trades": pd.DataFrame()}
 
+    # Artifact discovery: support both artifacts_index.json and run_manifest.json
     index_path = runner_dir / "artifacts_index.json"
+    manifest_path = runner_dir / "run_manifest.json"
+    
     kind_to_path: Dict[str, Path] = {}
 
     if index_path.exists():
@@ -442,7 +445,23 @@ def get_backtest_orders(run_name: str) -> Dict[str, pd.DataFrame]:
                 if kind and relpath:
                     kind_to_path[kind] = runner_dir / relpath
         except (OSError, json.JSONDecodeError):
-            kind_to_path = {}
+            pass
+
+    # Fallback to run_manifest.json (new pipeline format)
+    if not kind_to_path and manifest_path.exists():
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+            # Manifest has a simple list of filenames in artifacts_index
+            for filename in payload.get("artifacts_index", []):
+                if filename.endswith(".csv"):
+                    kind = filename.replace(".csv", "")
+                    kind_to_path[kind] = runner_dir / filename
+                elif filename.endswith(".json"):
+                    kind = filename.replace(".json", "")
+                    kind_to_path[kind] = runner_dir / filename
+        except (OSError, json.JSONDecodeError):
+            pass
 
     def _read_csv(kind: str, legacy_name: str) -> pd.DataFrame:
         path = kind_to_path.get(kind) if kind_to_path else None
@@ -455,11 +474,47 @@ def get_backtest_orders(run_name: str) -> Dict[str, pd.DataFrame]:
         except (pd.errors.EmptyDataError, pd.errors.ParserError, OSError):
             return pd.DataFrame()
 
+    # NEW MODULAR PIPELINE Mapping:
+    # 1. Orders = events_intent.csv
+    # 2. Fills = fills.csv
+    # 3. Trades = trades.csv
+    
+    orders = _read_csv("events_intent", "events_intent.csv")
+    if not orders.empty:
+        # Align column names for Dashboard UI (layouts/backtests.py)
+        # Expected: price, stop_loss, take_profit
+        # Provided: entry_price, stop_price, take_profit_price
+        mapping = {
+            "entry_price": "price",
+            "stop_price": "stop_loss",
+            "take_profit_price": "take_profit",
+            "signal_ts": "timestamp"
+        }
+        orders = orders.rename(columns={k: v for k, v in mapping.items() if k in orders.columns})
+
+    fills = _read_csv("fills", "fills.csv")
+    if not fills.empty:
+        # Dashboard expects entry_price and qty in fills for some calculations
+        if "fill_price" in fills.columns and "entry_price" not in fills.columns:
+            fills["entry_price"] = fills["fill_price"]
+        # New pipeline fills don't have qty (sizing is in trades)
+        # We try to join with trades if template_id is present
+        trades = _read_csv("trades", "trades.csv")
+        if not trades.empty and "template_id" in fills.columns and "template_id" in trades.columns:
+            try:
+                # Add qty from trades to fills for visualization
+                fills = fills.merge(trades[["template_id", "qty"]], on="template_id", how="left")
+            except Exception:
+                pass
+
     return {
-        "orders": _read_csv("orders", "orders.csv"),
-        "fills": _read_csv("filled_orders", "filled_orders.csv"),
+        "orders": orders,
+        "fills": fills,
         "trades": _read_csv("trades", "trades.csv"),
     }
+
+
+
 
 
 def get_rudometkin_candidates(run_name: str) -> pd.DataFrame:

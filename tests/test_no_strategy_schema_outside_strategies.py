@@ -10,7 +10,7 @@ def test_no_strategy_schema_outside_strategies():
         # allow legacy runner/adapters and tests; guard pipeline/contracts only
         if "strategies" in path.parts:
             continue
-        if "full_backtest_runner.py" in str(path) or "strategy_adapters" in str(path) or "trade_templates" in str(path):
+        if "strategy_adapters" in str(path) or "trade_templates" in str(path):
             continue
         if "contracts" in path.parts or "pipeline" in path.parts:
             text = path.read_text(errors="ignore")

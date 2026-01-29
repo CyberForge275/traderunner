@@ -144,13 +144,49 @@ def ensure_and_snapshot_bars(
     if not exec_source.exists():
         raise DataFetcherError(f"expected exec bars parquet missing: {exec_source}")
 
+    # CRITICAL FIX: Load bars and filter to requested date range
+    # Previously: shutil.copyfile(exec_source, target_exec) copied EVERYTHING
+    # Now: Load → Filter → Save only requested range
+    logger.info(
+        f"actions: pipeline_loading_bars symbol={symbol} tf={tf_upper} source={exec_source}"
+    )
+    
+    df_exec = pd.read_parquet(exec_source)
+    
+    # Convert to datetime index if needed
+    if "timestamp" in df_exec.columns:
+        df_exec = df_exec.set_index("timestamp")
+    
+    # Ensure timezone-aware index
+    if df_exec.index.tz is None:
+        df_exec.index = pd.to_datetime(df_exec.index, utc=True).tz_convert(market_tz)
+    else:
+        df_exec.index = df_exec.index.tz_convert(market_tz)
+    
+    # FILTER TO REQUESTED DATE RANGE
+    # start_ts and end_ts already calculated above (Lines 116-118)
+    df_filtered = df_exec.loc[start_ts:end_ts].copy()
+    
+    logger.info(
+        f"actions: pipeline_bars_filtered symbol={symbol} tf={tf_upper} "
+        f"original_bars={len(df_exec)} filtered_bars={len(df_filtered)} "
+        f"range={start_ts.date()}..{end_ts.date()} "
+        f"actual_range={df_filtered.index.min().date() if not df_filtered.empty else 'N/A'}..{df_filtered.index.max().date() if not df_filtered.empty else 'N/A'}"
+    )
+    
+    if df_filtered.empty:
+        raise DataFetcherError(
+            f"No bars found in requested range {start_ts.date()} to {end_ts.date()} "
+            f"for {symbol} (source has {len(df_exec)} bars from {df_exec.index.min().date()} to {df_exec.index.max().date()})"
+        )
+
     target_exec = bars_dir / f"bars_exec_{tf_upper}_rth.parquet"
     signal_target = None
 
     if tf_upper == "H1":
         # Resample from M1 to H1
-        df = pd.read_parquet(exec_source)
-        df_norm = _normalize_ohlcv_frame(df, target_tz=market_tz, symbol=symbol)
+        df_norm = _normalize_ohlcv_frame(df_filtered, target_tz=market_tz, symbol=symbol)
+
         agg = {
             "open": "first",
             "high": "max",
@@ -165,13 +201,13 @@ def ensure_and_snapshot_bars(
         resampled.to_parquet(target_exec)
         signal_target = target_exec
     else:
-        signal_source = exec_source  # same source used for snapshot; upstream resample already done
-        shutil.copyfile(exec_source, target_exec)
-        if signal_source is not None and signal_source.exists():
-            signal_target = bars_dir / f"bars_signal_{tf_upper}_rth.parquet"
-            shutil.copyfile(signal_source, signal_target)
+        # Save filtered bars directly (NOT copy entire source!)
+        df_filtered.to_parquet(target_exec)
+        signal_target = bars_dir / f"bars_signal_{tf_upper}_rth.parquet"
+        df_filtered.to_parquet(signal_target)
 
     bars_hash = _sha256_file(target_exec)
+
 
     meta = {
         "market_tz": market_tz,

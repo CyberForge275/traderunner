@@ -278,13 +278,11 @@ export AXIOM_BT_SKIP_PRECONDITIONS=1
 
 # Run TSLA with sufficient data
 python3 - <<'PY'
-from axiom_bt.full_backtest_runner import run_backtest_full
 from pathlib import Path
 from datetime import datetime
 
 run_id = "FINAL_TSLA_BASELINE_" + datetime.now().strftime("%Y%m%d_%H%M%S")
 
-result = run_backtest_full(
     run_id=run_id,
     symbol="TSLA",
     timeframe="M5",

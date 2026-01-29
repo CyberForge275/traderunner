@@ -147,7 +147,6 @@ These files **correctly** use the new naming convention:
 
 - ✅ `src/axiom_bt/engines/replay_engine.py:136-139` - Priority list (`_rth → _raw → _all → unsuffixed`)
 - ✅ `src/axiom_bt/intraday.py:512-513` - `path_for()` generates `_{suffix}.parquet` correctly
-- ✅ `src/axiom_bt/full_backtest_runner.py:105,119` - Generates `bars_exec_M5_rth.parquet`
 - ✅ `trading_dashboard/repositories/trade_repository.py:61,72` - Globs for `*_rth.parquet`
 - ✅ `scripts/backfill_trade_inspector_bars.py:94-95` - Uses `_rth` suffix
 - ✅ `src/axiom_bt/cli_data.py` - Uses `session_mode` parameter correctly

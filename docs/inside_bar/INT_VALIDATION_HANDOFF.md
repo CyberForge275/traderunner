@@ -24,7 +24,6 @@
 
 ## ⏸️ PAUSED - Technical Blocker
 
-**Issue:** `run_backtest_full()` parameter mismatch
 **Error:** `missing 1 required positional argument: 'artifacts_root'`
 
 **Root Cause:** Function signature changed or documentation inconsistent
@@ -79,12 +78,9 @@ cd /opt/trading/traderunner
 export PYTHONPATH=/opt/trading/traderunner/src
 export AXIOM_BT_SKIP_PRECONDITIONS=1
 
-# 3. Check run_backtest_full signature
 python3 - << 'PY'
 import sys; sys.path.insert(0, "src")
-from axiom_bt.full_backtest_runner import run_backtest_full
 import inspect
-print(inspect.signature(run_backtest_full))
 PY
 
 # 4. Run TSLA baseline with correct params
@@ -96,12 +92,10 @@ from datetime import datetime
 sys.path.insert(0, "/opt/trading/traderunner/src")
 os.environ["AXIOM_BT_SKIP_PRECONDITIONS"] = "1"
 
-from axiom_bt.full_backtest_runner import run_backtest_full
 
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 run_id = "INT_VAL_TSLA_BASELINE_" + timestamp
 
-result = run_backtest_full(
     run_id=run_id,
     symbol="TSLA",
     timeframe="M5",
@@ -194,15 +188,12 @@ done
 
 ## 🔍 TECHNICAL NOTES
 
-### run_backtest_full Signature Issue
 **Problem:** Function expects `artifacts_root` parameter
 **Solution:** Add `artifacts_root=Path("artifacts/backtests")` to all calls
 
 **To verify signature:**
 ```python
 import inspect
-from axiom_bt.full_backtest_runner import run_backtest_full
-print(inspect.signature(run_backtest_full))
 ```
 
 ### Alternative: CLI Runner

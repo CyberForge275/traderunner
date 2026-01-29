@@ -1,0 +1,444 @@
+2026-01-29 12:03:02 - root - INFO - ✅ Logging configured successfully
+2026-01-29 12:03:02 - root - INFO - 📁 Dashboard logs: /home/mirko/data/workspace/droid/traderunner/logs/dashboard.log
+2026-01-29 12:03:02 - root - INFO - 📊 Charts logs: /home/mirko/data/workspace/droid/traderunner/logs/charts.log
+2026-01-29 12:03:02 - root - INFO - 🧪 Pre-PaperTrade logs: /home/mirko/data/workspace/droid/traderunner/logs/pre_papertrade.log
+2026-01-29 12:03:02 - root - INFO - ❌ Error logs: /home/mirko/data/workspace/droid/traderunner/logs/errors.log
+2026-01-29 12:03:02 - trading_dashboard.repositories.live_candles - INFO - 📊 LiveCandlesRepository initialized
+2026-01-29 12:03:02 - trading_dashboard.repositories.live_candles - INFO -    DB: data/market_data.db
+2026-01-29 12:03:02 - trading_dashboard.repositories.live_candles - INFO -    Retention: 30 days
+2026-01-29 12:03:02 - trading_dashboard.repositories.live_candles - INFO -    Source: LIVE_SQLITE
+2026-01-29 12:03:02 - trading_dashboard.resolvers.timeframe_resolver - INFO - Using AxiomBtProvider (default)
+2026-01-29 12:03:02 - trading_dashboard.repositories.daily_universe - INFO - 📊 DailyUniverseRepository initialized
+2026-01-29 12:03:02 - trading_dashboard.repositories.daily_universe - INFO -    Source: data/universe/stocks_data.parquet
+2026-01-29 12:03:02 - trading_dashboard.repositories.daily_universe - INFO -    Data: UNIVERSE_PARQUET
+2026-01-29 12:03:02 - trading_dashboard.resolvers.timeframe_resolver - INFO - 📍 BacktestingTimeframeResolver initialized
+2026-01-29 12:03:02 - trading_dashboard.resolvers.timeframe_resolver - INFO -    Intraday: AxiomBtProvider
+2026-01-29 12:03:02 - trading_dashboard.resolvers.timeframe_resolver - INFO -    Daily: DailyUniverseRepository (universe parquet)
+2026-01-29 12:03:02 - trading_dashboard.resolvers.timeframe_resolver - INFO -    H1: Resample from M5
+==================================================
+Automatic Trading Factory Dashboard
+==================================================
+Starting on http://0.0.0.0:9001
+Debug mode: False
+Refresh interval: 5000ms
+==================================================
+Dash is running on http://0.0.0.0:9001/
+
+2026-01-29 12:03:02 - dash.dash - INFO - Dash is running on http://0.0.0.0:9001/
+
+ * Tip: There are .env files present. Install python-dotenv to use them.
+ * Serving Flask app 'app'
+ * Debug mode: off
+2026-01-29 12:03:02 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:9001
+ * Running on http://192.168.178.37:9001
+2026-01-29 12:03:02 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-01-29 12:03:05 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:05] "GET /inspect HTTP/1.1" 200 -
+2026-01-29 12:03:05 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:05] "[36mGET /assets/style.css?m=1767526253.4581954 HTTP/1.1[0m" 304 -
+2026-01-29 12:03:05 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:05] "[36mGET /assets/trade_inspector.css?m=1766617830.0321167 HTTP/1.1[0m" 304 -
+2026-01-29 12:03:05 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:05] "GET /_dash-layout HTTP/1.1" 200 -
+2026-01-29 12:03:05 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:05] "GET /_dash-dependencies HTTP/1.1" 200 -
+2026-01-29 12:03:05 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:05] "GET /_favicon.ico?v=3.3.0 HTTP/1.1" 200 -
+2026-01-29 12:03:05 - trading_dashboard.repositories - WARNING - ⚠️ EODHD_SYMBOLS environment variable not set! Dashboard watchlist will be empty. Set EODHD_SYMBOLS in systemd service or .env file.
+2026-01-29 12:03:05 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:05] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:05 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:05] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:05 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:05] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:06 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:06] "GET /inspect HTTP/1.1" 200 -
+2026-01-29 12:03:06 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:06] "[36mGET /assets/style.css?m=1767526253.4581954 HTTP/1.1[0m" 304 -
+2026-01-29 12:03:06 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:06] "[36mGET /assets/trade_inspector.css?m=1766617830.0321167 HTTP/1.1[0m" 304 -
+2026-01-29 12:03:06 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:06] "GET /_dash-layout HTTP/1.1" 200 -
+2026-01-29 12:03:06 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:06] "GET /_dash-dependencies HTTP/1.1" 200 -
+2026-01-29 12:03:06 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:06] "GET /_favicon.ico?v=3.3.0 HTTP/1.1" 200 -
+2026-01-29 12:03:06 - trading_dashboard.repositories - WARNING - ⚠️ EODHD_SYMBOLS environment variable not set! Dashboard watchlist will be empty. Set EODHD_SYMBOLS in systemd service or .env file.
+2026-01-29 12:03:06 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:06] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:06 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:06] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:06 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:06] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:07] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:07 - trading_dashboard.services.run_discovery_service - INFO - 🔍 Discovering runs from: /home/mirko/data/workspace/droid/traderunner/artifacts/backtests
+2026-01-29 12:03:07 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for 251220_160808_HOOD_IB_60: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:03:07 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for 251220_181256_HOOD_coverage_gate_fix_test: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:03:07 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for 251220_191248_gate_fix_4: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:03:07 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for TSLA_AUDIT_20251217: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:03:07 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for spyder_debug_251227_231953_hood: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:03:07 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for spyder_debug_251227_232137_hood: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:03:07 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for spyder_debug_260102_000416_hood: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:03:07 - trading_dashboard.services.run_discovery_service - INFO - ✅ Discovery complete: 306 discovered, 7 corrupt, 119 skipped
+2026-01-29 12:03:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:07] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:07] "[36mGET /_dash-component-suites/dash/dcc/async-dropdown.js HTTP/1.1[0m" 304 -
+2026-01-29 12:03:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:07] "[36mGET /_dash-component-suites/dash/dcc/async-datepicker.js HTTP/1.1[0m" 304 -
+2026-01-29 12:03:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:07] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:07] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:07] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:07] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:07 - trading_dashboard.callbacks.backtests_callbacks - INFO - 🔍 [backtests_detail] CALLBACK TRIGGERED: run_name=debug_reproduce_260129, n_clicks=None
+2026-01-29 12:03:07 - trading_dashboard.callbacks.backtests_callbacks - INFO - 🔍 [backtests_detail] run_dir=artifacts/backtests/debug_reproduce_260129, exists=True
+2026-01-29 12:03:07 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📊 [backtests_detail] Loaded details: status=UNKNOWN, source=manifest, symbols=[]
+2026-01-29 12:03:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:07] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:07 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📝 [backtests_detail] Loaded 0 steps from run_steps.jsonl
+2026-01-29 12:03:07 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📂 [backtests_detail] Found files in run_dir: equity_curve.csv, portfolio_ledger.csv, events_intent.csv, run_manifest.json, fills.csv, run_meta.json, metrics.json, run_result.json, trades.csv
+2026-01-29 12:03:07 - trading_dashboard.callbacks.backtests_callbacks - INFO - ✅ [backtests_detail] Using new-pipeline artifacts for debug_reproduce_260129
+2026-01-29 12:03:07 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📈 [backtests_detail] Charts/Artifacts: equity_rows=367, orders_count=0, steps_count=0
+2026-01-29 12:03:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:07] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:07] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:07] "[36mGET /_dash-component-suites/dash/dcc/async-graph.js HTTP/1.1[0m" 304 -
+2026-01-29 12:03:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:07] "[36mGET /_dash-component-suites/dash/dash_table/async-highlight.js HTTP/1.1[0m" 304 -
+2026-01-29 12:03:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:07] "[36mGET /_dash-component-suites/dash/dash_table/async-table.js HTTP/1.1[0m" 304 -
+2026-01-29 12:03:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:07] "[36mGET /_dash-component-suites/plotly/package_data/plotly.min.js HTTP/1.1[0m" 304 -
+2026-01-29 12:03:12 - trading_dashboard.callbacks.ssot_config_viewer_callback - WARNING - actions: ui_load_config_failed exc=ValueError msg=inside_bar v1.0.1 unknown core key: mother_breakout_wick_pct, trigger_must_be_within_session
+2026-01-29 12:03:12 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:12] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:12 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:12] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /inspect HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /assets/style.css?m=1767526253.4581954 HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /assets/trade_inspector.css?m=1766617830.0321167 HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/deps/react-dom@18.v3_3_0m1765037510.3.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/deps/polyfill@7.v3_3_0m1765037510.12.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/deps/react@18.v3_3_0m1765037510.3.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/deps/prop-types@15.v3_3_0m1765037510.8.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash_bootstrap_components/_components/dash_bootstrap_components.v2_0_4m1765037511.min.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/dash-renderer/build/dash_renderer.v3_3_0m1765037510.min.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/html/dash_html_components.v3_0_5m1765037510.min.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/dcc/dash_core_components-shared.v3_3_0m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/dcc/dash_core_components.v3_3_0m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/dash_table/bundle.v6_0_5m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-layout HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-dependencies HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_favicon.ico?v=3.3.0 HTTP/1.1" 200 -
+2026-01-29 12:03:59 - trading_dashboard.repositories - WARNING - ⚠️ EODHD_SYMBOLS environment variable not set! Dashboard watchlist will be empty. Set EODHD_SYMBOLS in systemd service or .env file.
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /inspect HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /assets/style.css?m=1767526253.4581954 HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/deps/react@18.v3_3_0m1765037510.3.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/deps/polyfill@7.v3_3_0m1765037510.12.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /assets/trade_inspector.css?m=1766617830.0321167 HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/deps/react-dom@18.v3_3_0m1765037510.3.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/deps/prop-types@15.v3_3_0m1765037510.8.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash_bootstrap_components/_components/dash_bootstrap_components.v2_0_4m1765037511.min.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/dash-renderer/build/dash_renderer.v3_3_0m1765037510.min.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/dcc/dash_core_components-shared.v3_3_0m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/dcc/dash_core_components.v3_3_0m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/html/dash_html_components.v3_0_5m1765037510.min.js HTTP/1.1" 200 -
+2026-01-29 12:03:59 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:03:59] "GET /_dash-component-suites/dash/dash_table/bundle.v6_0_5m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_dash-layout HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_dash-dependencies HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_favicon.ico?v=3.3.0 HTTP/1.1" 200 -
+2026-01-29 12:04:00 - trading_dashboard.repositories - WARNING - ⚠️ EODHD_SYMBOLS environment variable not set! Dashboard watchlist will be empty. Set EODHD_SYMBOLS in systemd service or .env file.
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /inspect HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /assets/style.css?m=1767526253.4581954 HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /assets/trade_inspector.css?m=1766617830.0321167 HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_dash-component-suites/dash/deps/polyfill@7.v3_3_0m1765037510.12.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_dash-component-suites/dash/deps/react@18.v3_3_0m1765037510.3.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_dash-component-suites/dash/deps/prop-types@15.v3_3_0m1765037510.8.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_dash-component-suites/dash/deps/react-dom@18.v3_3_0m1765037510.3.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_dash-component-suites/dash_bootstrap_components/_components/dash_bootstrap_components.v2_0_4m1765037511.min.js HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_dash-component-suites/dash/dash-renderer/build/dash_renderer.v3_3_0m1765037510.min.js HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_dash-component-suites/dash/dcc/dash_core_components-shared.v3_3_0m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_dash-component-suites/dash/dcc/dash_core_components.v3_3_0m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_dash-component-suites/dash/html/dash_html_components.v3_0_5m1765037510.min.js HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_dash-component-suites/dash/dash_table/bundle.v6_0_5m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_dash-layout HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_dash-dependencies HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "GET /_favicon.ico?v=3.3.0 HTTP/1.1" 200 -
+2026-01-29 12:04:00 - trading_dashboard.repositories - WARNING - ⚠️ EODHD_SYMBOLS environment variable not set! Dashboard watchlist will be empty. Set EODHD_SYMBOLS in systemd service or .env file.
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:00 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:00] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:01 - trading_dashboard.services.run_discovery_service - INFO - 🔍 Discovering runs from: /home/mirko/data/workspace/droid/traderunner/artifacts/backtests
+2026-01-29 12:04:01 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:01] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:01 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for 251220_160808_HOOD_IB_60: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:04:01 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for 251220_181256_HOOD_coverage_gate_fix_test: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:04:01 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for 251220_191248_gate_fix_4: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:04:01 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for TSLA_AUDIT_20251217: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:04:01 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for spyder_debug_251227_231953_hood: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:04:01 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for spyder_debug_251227_232137_hood: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:04:01 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for spyder_debug_260102_000416_hood: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:04:01 - trading_dashboard.services.run_discovery_service - INFO - ✅ Discovery complete: 306 discovered, 7 corrupt, 119 skipped
+2026-01-29 12:04:01 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:01] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:01 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:01] "[36mGET /_dash-component-suites/dash/dcc/async-dropdown.js HTTP/1.1[0m" 304 -
+2026-01-29 12:04:01 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:01] "[36mGET /_dash-component-suites/dash/dcc/async-datepicker.js HTTP/1.1[0m" 304 -
+2026-01-29 12:04:01 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:01] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:01 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:01] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:01 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:01] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:01 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:01] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:01 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:01] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:01 - trading_dashboard.callbacks.backtests_callbacks - INFO - 🔍 [backtests_detail] CALLBACK TRIGGERED: run_name=debug_reproduce_260129, n_clicks=None
+2026-01-29 12:04:01 - trading_dashboard.callbacks.backtests_callbacks - INFO - 🔍 [backtests_detail] run_dir=artifacts/backtests/debug_reproduce_260129, exists=True
+2026-01-29 12:04:01 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📊 [backtests_detail] Loaded details: status=UNKNOWN, source=manifest, symbols=[]
+2026-01-29 12:04:01 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📝 [backtests_detail] Loaded 0 steps from run_steps.jsonl
+2026-01-29 12:04:01 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📂 [backtests_detail] Found files in run_dir: equity_curve.csv, portfolio_ledger.csv, events_intent.csv, run_manifest.json, fills.csv, run_meta.json, metrics.json, run_result.json, trades.csv
+2026-01-29 12:04:01 - trading_dashboard.callbacks.backtests_callbacks - INFO - ✅ [backtests_detail] Using new-pipeline artifacts for debug_reproduce_260129
+2026-01-29 12:04:01 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📈 [backtests_detail] Charts/Artifacts: equity_rows=367, orders_count=0, steps_count=0
+2026-01-29 12:04:01 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:01] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:01 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:01] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:01 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:01] "[36mGET /_dash-component-suites/dash/dcc/async-graph.js HTTP/1.1[0m" 304 -
+2026-01-29 12:04:01 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:01] "[36mGET /_dash-component-suites/dash/dash_table/async-highlight.js HTTP/1.1[0m" 304 -
+2026-01-29 12:04:01 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:01] "[36mGET /_dash-component-suites/dash/dash_table/async-table.js HTTP/1.1[0m" 304 -
+2026-01-29 12:04:01 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:01] "[36mGET /_dash-component-suites/plotly/package_data/plotly.min.js HTTP/1.1[0m" 304 -
+2026-01-29 12:04:04 - trading_dashboard.callbacks.ssot_config_viewer_callback - WARNING - actions: ui_load_config_failed exc=ValueError msg=inside_bar v1.0.1 unknown core key: mother_breakout_wick_pct, trigger_must_be_within_session
+2026-01-29 12:04:04 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:04] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:04 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:04] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:07 - trading_dashboard.callbacks.backtests_callbacks - INFO - 🔍 [backtests_detail] CALLBACK TRIGGERED: run_name=260128_152247_HOOD_IB_cleanGIT_60d, n_clicks=None
+2026-01-29 12:04:07 - trading_dashboard.callbacks.backtests_callbacks - INFO - 🔍 [backtests_detail] run_dir=artifacts/backtests/260128_152247_HOOD_IB_cleanGIT_60d, exists=True
+2026-01-29 12:04:07 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📊 [backtests_detail] Loaded details: status=ERROR, source=manifest, symbols=['HOOD']
+2026-01-29 12:04:07 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📝 [backtests_detail] Loaded 0 steps from run_steps.jsonl
+2026-01-29 12:04:07 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📂 [backtests_detail] Found files in run_dir: error_stacktrace.txt, run_manifest.json, run_meta.json, run_result.json
+2026-01-29 12:04:07 - trading_dashboard.callbacks.backtests_callbacks - INFO - ✅ [backtests_detail] Using new-pipeline artifacts for 260128_152247_HOOD_IB_cleanGIT_60d
+2026-01-29 12:04:07 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📈 [backtests_detail] Charts/Artifacts: equity_rows=0, orders_count=0, steps_count=0
+2026-01-29 12:04:07 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:07] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:04:08 - trading_dashboard.callbacks.backtests_callbacks - INFO - 🔍 [backtests_detail] CALLBACK TRIGGERED: run_name=debug_reproduce_260129, n_clicks=None
+2026-01-29 12:04:08 - trading_dashboard.callbacks.backtests_callbacks - INFO - 🔍 [backtests_detail] run_dir=artifacts/backtests/debug_reproduce_260129, exists=True
+2026-01-29 12:04:08 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📊 [backtests_detail] Loaded details: status=UNKNOWN, source=manifest, symbols=[]
+2026-01-29 12:04:08 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📝 [backtests_detail] Loaded 0 steps from run_steps.jsonl
+2026-01-29 12:04:08 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📂 [backtests_detail] Found files in run_dir: equity_curve.csv, portfolio_ledger.csv, events_intent.csv, run_manifest.json, fills.csv, run_meta.json, metrics.json, run_result.json, trades.csv
+2026-01-29 12:04:08 - trading_dashboard.callbacks.backtests_callbacks - INFO - ✅ [backtests_detail] Using new-pipeline artifacts for debug_reproduce_260129
+2026-01-29 12:04:08 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📈 [backtests_detail] Charts/Artifacts: equity_rows=367, orders_count=0, steps_count=0
+2026-01-29 12:04:08 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:04:08] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:14 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:14] "GET /inspect HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "[36mGET /assets/style.css?m=1767526253.4581954 HTTP/1.1[0m" 304 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "[36mGET /assets/trade_inspector.css?m=1766617830.0321167 HTTP/1.1[0m" 304 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_dash-layout HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_dash-dependencies HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_favicon.ico?v=3.3.0 HTTP/1.1" 200 -
+2026-01-29 12:05:15 - trading_dashboard.repositories - WARNING - ⚠️ EODHD_SYMBOLS environment variable not set! Dashboard watchlist will be empty. Set EODHD_SYMBOLS in systemd service or .env file.
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /inspect HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /assets/style.css?m=1767526253.4581954 HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_dash-component-suites/dash/deps/polyfill@7.v3_3_0m1765037510.12.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /assets/trade_inspector.css?m=1766617830.0321167 HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_dash-component-suites/dash/deps/react-dom@18.v3_3_0m1765037510.3.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_dash-component-suites/dash/deps/prop-types@15.v3_3_0m1765037510.8.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_dash-component-suites/dash/deps/react@18.v3_3_0m1765037510.3.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_dash-component-suites/dash_bootstrap_components/_components/dash_bootstrap_components.v2_0_4m1765037511.min.js HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_dash-component-suites/dash/dcc/dash_core_components-shared.v3_3_0m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_dash-component-suites/dash/dash-renderer/build/dash_renderer.v3_3_0m1765037510.min.js HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_dash-component-suites/dash/html/dash_html_components.v3_0_5m1765037510.min.js HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_dash-component-suites/dash/dcc/dash_core_components.v3_3_0m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_dash-component-suites/dash/dash_table/bundle.v6_0_5m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_dash-layout HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_dash-dependencies HTTP/1.1" 200 -
+2026-01-29 12:05:15 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:15] "GET /_favicon.ico?v=3.3.0 HTTP/1.1" 200 -
+2026-01-29 12:05:16 - trading_dashboard.repositories - WARNING - ⚠️ EODHD_SYMBOLS environment variable not set! Dashboard watchlist will be empty. Set EODHD_SYMBOLS in systemd service or .env file.
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:16 - trading_dashboard.services.run_discovery_service - INFO - 🔍 Discovering runs from: /home/mirko/data/workspace/droid/traderunner/artifacts/backtests
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:16 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for 251220_160808_HOOD_IB_60: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:05:16 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for 251220_181256_HOOD_coverage_gate_fix_test: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:05:16 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for 251220_191248_gate_fix_4: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:05:16 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for TSLA_AUDIT_20251217: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:05:16 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for spyder_debug_251227_231953_hood: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:05:16 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for spyder_debug_251227_232137_hood: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:05:16 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for spyder_debug_260102_000416_hood: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:05:16 - trading_dashboard.services.run_discovery_service - INFO - ✅ Discovery complete: 306 discovered, 7 corrupt, 119 skipped
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "[36mGET /_dash-component-suites/dash/dcc/async-dropdown.js HTTP/1.1[0m" 304 -
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "[36mGET /_dash-component-suites/dash/dcc/async-datepicker.js HTTP/1.1[0m" 304 -
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:16 - trading_dashboard.callbacks.backtests_callbacks - INFO - 🔍 [backtests_detail] CALLBACK TRIGGERED: run_name=debug_reproduce_260129, n_clicks=None
+2026-01-29 12:05:16 - trading_dashboard.callbacks.backtests_callbacks - INFO - 🔍 [backtests_detail] run_dir=artifacts/backtests/debug_reproduce_260129, exists=True
+2026-01-29 12:05:16 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📊 [backtests_detail] Loaded details: status=UNKNOWN, source=manifest, symbols=[]
+2026-01-29 12:05:16 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📝 [backtests_detail] Loaded 0 steps from run_steps.jsonl
+2026-01-29 12:05:16 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📂 [backtests_detail] Found files in run_dir: equity_curve.csv, portfolio_ledger.csv, events_intent.csv, run_manifest.json, fills.csv, run_meta.json, metrics.json, run_result.json, trades.csv
+2026-01-29 12:05:16 - trading_dashboard.callbacks.backtests_callbacks - INFO - ✅ [backtests_detail] Using new-pipeline artifacts for debug_reproduce_260129
+2026-01-29 12:05:16 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📈 [backtests_detail] Charts/Artifacts: equity_rows=367, orders_count=0, steps_count=0
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "[36mGET /_dash-component-suites/dash/dcc/async-graph.js HTTP/1.1[0m" 304 -
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "[36mGET /_dash-component-suites/dash/dash_table/async-highlight.js HTTP/1.1[0m" 304 -
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "[36mGET /_dash-component-suites/dash/dash_table/async-table.js HTTP/1.1[0m" 304 -
+2026-01-29 12:05:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:16] "[36mGET /_dash-component-suites/plotly/package_data/plotly.min.js HTTP/1.1[0m" 304 -
+2026-01-29 12:05:19 - trading_dashboard.config_store.strategy_config_store - INFO - actions: config_loaded strategy=insidebar_intraday version=1.0.1 source=yaml
+2026-01-29 12:05:19 - trading_dashboard.callbacks.ssot_config_viewer_callback - INFO - actions: ui_config_loaded strategy_id=insidebar_intraday version=1.0.1 finalized=False core_keys=11 tunable_keys=4
+2026-01-29 12:05:19 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:19] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:05:19 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:05:19] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /inspect HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /assets/style.css?m=1767526253.4581954 HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /_dash-component-suites/dash/deps/polyfill@7.v3_3_0m1765037510.12.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /assets/trade_inspector.css?m=1766617830.0321167 HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /_dash-component-suites/dash/deps/react@18.v3_3_0m1765037510.3.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /_dash-component-suites/dash/deps/react-dom@18.v3_3_0m1765037510.3.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /_dash-component-suites/dash/deps/prop-types@15.v3_3_0m1765037510.8.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /_dash-component-suites/dash_bootstrap_components/_components/dash_bootstrap_components.v2_0_4m1765037511.min.js HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /_dash-component-suites/dash/dcc/dash_core_components.v3_3_0m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /_dash-component-suites/dash/dash-renderer/build/dash_renderer.v3_3_0m1765037510.min.js HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /_dash-component-suites/dash/dcc/dash_core_components-shared.v3_3_0m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /_dash-component-suites/dash/html/dash_html_components.v3_0_5m1765037510.min.js HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /_dash-component-suites/dash/dash_table/bundle.v6_0_5m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /_dash-layout HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /_dash-dependencies HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "GET /_favicon.ico?v=3.3.0 HTTP/1.1" 200 -
+2026-01-29 12:06:16 - trading_dashboard.repositories - WARNING - ⚠️ EODHD_SYMBOLS environment variable not set! Dashboard watchlist will be empty. Set EODHD_SYMBOLS in systemd service or .env file.
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:16 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:16] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /inspect HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /assets/style.css?m=1767526253.4581954 HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /assets/trade_inspector.css?m=1766617830.0321167 HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /_dash-component-suites/dash/deps/react@18.v3_3_0m1765037510.3.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /_dash-component-suites/dash/deps/prop-types@15.v3_3_0m1765037510.8.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /_dash-component-suites/dash/deps/polyfill@7.v3_3_0m1765037510.12.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /_dash-component-suites/dash/deps/react-dom@18.v3_3_0m1765037510.3.1.min.js HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /_dash-component-suites/dash_bootstrap_components/_components/dash_bootstrap_components.v2_0_4m1765037511.min.js HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /_dash-component-suites/dash/dcc/dash_core_components-shared.v3_3_0m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /_dash-component-suites/dash/dash-renderer/build/dash_renderer.v3_3_0m1765037510.min.js HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /_dash-component-suites/dash/dcc/dash_core_components.v3_3_0m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /_dash-component-suites/dash/dash_table/bundle.v6_0_5m1765037510.js HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /_dash-component-suites/dash/html/dash_html_components.v3_0_5m1765037510.min.js HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /_dash-layout HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /_dash-dependencies HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "GET /_favicon.ico?v=3.3.0 HTTP/1.1" 200 -
+2026-01-29 12:06:17 - trading_dashboard.repositories - WARNING - ⚠️ EODHD_SYMBOLS environment variable not set! Dashboard watchlist will be empty. Set EODHD_SYMBOLS in systemd service or .env file.
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:17 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:17] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:18 - trading_dashboard.services.run_discovery_service - INFO - 🔍 Discovering runs from: /home/mirko/data/workspace/droid/traderunner/artifacts/backtests
+2026-01-29 12:06:18 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:18] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:18 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for 251220_160808_HOOD_IB_60: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:06:18 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for 251220_181256_HOOD_coverage_gate_fix_test: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:06:18 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for 251220_191248_gate_fix_4: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:06:18 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for TSLA_AUDIT_20251217: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:06:18 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for spyder_debug_251227_231953_hood: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:06:18 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for spyder_debug_251227_232137_hood: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:06:18 - trading_dashboard.services.run_discovery_service - ERROR - Failed to parse manifest for spyder_debug_260102_000416_hood: 'NoneType' object has no attribute 'upper'
+2026-01-29 12:06:18 - trading_dashboard.services.run_discovery_service - INFO - ✅ Discovery complete: 306 discovered, 7 corrupt, 119 skipped
+2026-01-29 12:06:18 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:18] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:18 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:18] "[36mGET /_dash-component-suites/dash/dcc/async-dropdown.js HTTP/1.1[0m" 304 -
+2026-01-29 12:06:18 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:18] "[36mGET /_dash-component-suites/dash/dcc/async-datepicker.js HTTP/1.1[0m" 304 -
+2026-01-29 12:06:18 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:18] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:18 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:18] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:18 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:18] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:18 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:18] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:18 - trading_dashboard.callbacks.backtests_callbacks - INFO - 🔍 [backtests_detail] CALLBACK TRIGGERED: run_name=debug_reproduce_260129, n_clicks=None
+2026-01-29 12:06:18 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:18] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:18 - trading_dashboard.callbacks.backtests_callbacks - INFO - 🔍 [backtests_detail] run_dir=artifacts/backtests/debug_reproduce_260129, exists=True
+2026-01-29 12:06:18 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📊 [backtests_detail] Loaded details: status=UNKNOWN, source=manifest, symbols=[]
+2026-01-29 12:06:18 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📝 [backtests_detail] Loaded 0 steps from run_steps.jsonl
+2026-01-29 12:06:18 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📂 [backtests_detail] Found files in run_dir: equity_curve.csv, portfolio_ledger.csv, events_intent.csv, run_manifest.json, fills.csv, run_meta.json, metrics.json, run_result.json, trades.csv
+2026-01-29 12:06:18 - trading_dashboard.callbacks.backtests_callbacks - INFO - ✅ [backtests_detail] Using new-pipeline artifacts for debug_reproduce_260129
+2026-01-29 12:06:18 - trading_dashboard.callbacks.backtests_callbacks - INFO - 📈 [backtests_detail] Charts/Artifacts: equity_rows=367, orders_count=0, steps_count=0
+2026-01-29 12:06:18 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:18] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:18 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:18] "POST /_dash-update-component HTTP/1.1" 200 -
+2026-01-29 12:06:18 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:18] "[36mGET /_dash-component-suites/dash/dcc/async-graph.js HTTP/1.1[0m" 304 -
+2026-01-29 12:06:18 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:18] "[36mGET /_dash-component-suites/dash/dash_table/async-highlight.js HTTP/1.1[0m" 304 -
+2026-01-29 12:06:18 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:18] "[36mGET /_dash-component-suites/dash/dash_table/async-table.js HTTP/1.1[0m" 304 -
+2026-01-29 12:06:18 - werkzeug - INFO - 127.0.0.1 - - [29/Jan/2026 12:06:18] "[36mGET /_dash-component-suites/plotly/package_data/plotly.min.js HTTP/1.1[0m" 304 -
+Error reading order intents: Execution failed on sql '
+            SELECT
+                id, symbol, side, quantity, price, status,
+                datetime(created_at) as created_at,
+                datetime(updated_at) as updated_at
+            FROM order_intents
+            WHERE created_at > ?
+            ORDER BY created_at DESC
+            LIMIT 50
+        ': no such column: updated_at
+Error reading order intents: Execution failed on sql '
+            SELECT
+                id, symbol, side, quantity, price, status,
+                datetime(created_at) as created_at,
+                datetime(updated_at) as updated_at
+            FROM order_intents
+            WHERE created_at > ?
+            ORDER BY created_at DESC
+            LIMIT 50
+        ': no such column: updated_at
+Error reading order intents: Execution failed on sql '
+            SELECT
+                id, symbol, side, quantity, price, status,
+                datetime(created_at) as created_at,
+                datetime(updated_at) as updated_at
+            FROM order_intents
+            WHERE created_at > ?
+            ORDER BY created_at DESC
+            LIMIT 50
+        ': no such column: updated_at
+Error reading order intents: Execution failed on sql '
+            SELECT
+                id, symbol, side, quantity, price, status,
+                datetime(created_at) as created_at,
+                datetime(updated_at) as updated_at
+            FROM order_intents
+            WHERE created_at > ?
+            ORDER BY created_at DESC
+            LIMIT 50
+        ': no such column: updated_at
+Error reading order intents: Execution failed on sql '
+            SELECT
+                id, symbol, side, quantity, price, status,
+                datetime(created_at) as created_at,
+                datetime(updated_at) as updated_at
+            FROM order_intents
+            WHERE created_at > ?
+            ORDER BY created_at DESC
+            LIMIT 50
+        ': no such column: updated_at
+Error reading order intents: Execution failed on sql '
+            SELECT
+                id, symbol, side, quantity, price, status,
+                datetime(created_at) as created_at,
+                datetime(updated_at) as updated_at
+            FROM order_intents
+            WHERE created_at > ?
+            ORDER BY created_at DESC
+            LIMIT 50
+        ': no such column: updated_at
+Error reading order intents: Execution failed on sql '
+            SELECT
+                id, symbol, side, quantity, price, status,
+                datetime(created_at) as created_at,
+                datetime(updated_at) as updated_at
+            FROM order_intents
+            WHERE created_at > ?
+            ORDER BY created_at DESC
+            LIMIT 50
+        ': no such column: updated_at
+Error reading order intents: Execution failed on sql '
+            SELECT
+                id, symbol, side, quantity, price, status,
+                datetime(created_at) as created_at,
+                datetime(updated_at) as updated_at
+            FROM order_intents
+            WHERE created_at > ?
+            ORDER BY created_at DESC
+            LIMIT 50
+        ': no such column: updated_at
+Error reading order intents: Execution failed on sql '
+            SELECT
+                id, symbol, side, quantity, price, status,
+                datetime(created_at) as created_at,
+                datetime(updated_at) as updated_at
+            FROM order_intents
+            WHERE created_at > ?
+            ORDER BY created_at DESC
+            LIMIT 50
+        ': no such column: updated_at
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/mirko/data/workspace/droid/traderunner/trading_dashboard/app.py", line 43, in <module>
+    from trading_dashboard.callbacks.ssot_backtest_config_callback import register_ssot_backtest_config_callback
+  File "/home/mirko/data/workspace/droid/traderunner/trading_dashboard/callbacks/ssot_backtest_config_callback.py", line 1
+    \"\"\"Callback for dynamic backtest configuration from SSOT registry.\"\"\"
+     ^
+SyntaxError: unexpected character after line continuation character
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/mirko/data/workspace/droid/traderunner/trading_dashboard/app.py", line 43, in <module>
+    from trading_dashboard.callbacks.ssot_backtest_config_callback import register_ssot_backtest_config_callback
+  File "/home/mirko/data/workspace/droid/traderunner/trading_dashboard/callbacks/ssot_backtest_config_callback.py", line 1
+    \"\"\"Callback for dynamic backtest configuration from SSOT registry.\"\"\"
+     ^
+SyntaxError: unexpected character after line continuation character

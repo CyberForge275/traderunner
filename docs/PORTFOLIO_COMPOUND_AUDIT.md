@@ -25,7 +25,6 @@
 |:-----|:-----|:---------------|:-------------|:---------------|:------|:---------|
 | **Initial Cash Setup** |
 | Config | `src/core/settings/constants.py` | `DEFAULT_INITIAL_CASH` | Default value = 10000.0 | Constant | No | Low |
-| Runner Entry | `src/axiom_bt/full_backtest_runner.py:156` | `run_backtest_full()` | Parameter default | `initial_cash=10000.0` | No | Low |
 | Runner Entry | `src/axiom_bt/runner.py:87` | Run config parsing | Extract from config | `cfg.get("initial_cash")` | No | Low |
 | **Order Sizing (CRITICAL)** |
 | Sizing Core | `src/trade/position_sizing.py` | `qty_risk_based()` | Calculate qty based on risk | `equity, risk_pct, prices` → `qty` | **Yes** | Med |
@@ -44,7 +43,6 @@
 | **Portfolio State (Minimal)** |
 | Risk Guards | `src/axiom_bt/risk/guards.py:27-32` | `Portfolio` (Protocol) | **Interface only** - not implemented | `cash, positions, daily_pnl, peak_equity` | No | Low |
 | **Artifacts** |
-| Output | `src/axiom_bt/full_backtest_runner.py:716` | Write equity curve | Save CSV | `equity.to_csv()` | No | Low |
 | Output | `src/axiom_bt/runner.py:180` | Write equity curve | Save CSV | `equity.to_csv()` | No | Low |
 | Metrics | `src/axiom_bt/metrics.py:186-187` | Compose final metrics | `initial_cash, final_cash` | From equity curve | No | Low |
 
@@ -56,7 +54,6 @@
 USER (Dashboard/CLI)
   ↓ run_id, symbols, strategy, lookback_days
 ┌─────────────────────────────────────────────────────────────────┐
-│ src/axiom_bt/full_backtest_runner.py::run_backtest_full()      │
 │   - initial_cash=10000.0 (parameter)                            │
 │   - Passes to strategy.generate_signals(initial_cash=...)       │
 └──────────────────┬──────────────────────────────────────────────┘
