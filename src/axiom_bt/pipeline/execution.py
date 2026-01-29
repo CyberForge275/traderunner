@@ -126,7 +126,13 @@ def execute(fills: pd.DataFrame, events_intent: pd.DataFrame, bars: pd.DataFrame
     Fills remain identical; sizing adjusts qty in _build_trades(), then trades/equity/ledger are derived.
     """
     if fills.empty:
-        raise ExecutionError("fills empty; cannot execute")
+        logger.info("actions: execution_skipped_empty_fills")
+        empty_trades = pd.DataFrame(
+            columns=["symbol", "side", "qty", "entry_ts", "entry_price", "exit_ts", "exit_price", "pnl", "reason"]
+        )
+        empty_equity = pd.DataFrame(columns=["ts", "equity"])
+        empty_ledger = pd.DataFrame(columns=["timestamp", "cash", "seq"])
+        return ExecutionArtifacts(trades=empty_trades, equity_curve=empty_equity, portfolio_ledger=empty_ledger)
 
     sized_fills = _apply_sizing(fills, initial_cash, compound_enabled)
     trades = _build_trades(sized_fills, events_intent, bars, initial_cash, compound_enabled)

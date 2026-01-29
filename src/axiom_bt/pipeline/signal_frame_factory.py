@@ -49,6 +49,18 @@ def build_signal_frame(
     
     df = plugin.extend_signal_frame(bars, params)
 
+    # Normalize all datetime64[ns, UTC] columns to tz-aware UTC before validation.
+    for col in schema.all_columns():
+        if not col.dtype.startswith("datetime64"):
+            continue
+        if col.name not in df.columns:
+            continue
+        df[col.name] = pd.to_datetime(
+            df[col.name],
+            utc=True,
+            errors="coerce" if col.nullable else "raise",
+        )
+
     validate_signal_frame_v1(df, schema)
 
     logger.info(

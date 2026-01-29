@@ -40,7 +40,12 @@ def generate_fills(events_intent: pd.DataFrame, bars: pd.DataFrame) -> FillArtif
         FillArtifacts with fills DataFrame and fills_hash.
     """
     if events_intent.empty:
-        raise FillModelError("intent empty; cannot generate fills")
+        fills = pd.DataFrame(
+            columns=["template_id", "symbol", "fill_ts", "fill_price", "reason"]
+        )
+        fills_hash = _hash_dataframe(fills)
+        logger.warning("actions: fills_empty_intent fills_hash=%s", fills_hash)
+        return FillArtifacts(fills=fills, fills_hash=fills_hash)
     if bars.empty:
         raise FillModelError("bars empty; cannot generate fills")
 
@@ -65,7 +70,12 @@ def generate_fills(events_intent: pd.DataFrame, bars: pd.DataFrame) -> FillArtif
 
     fills = pd.DataFrame(rows)
     if fills.empty:
-        raise FillModelError("no fills generated; no matching bars for intents")
+        fills = pd.DataFrame(
+            columns=["template_id", "symbol", "fill_ts", "fill_price", "reason"]
+        )
+        fills_hash = _hash_dataframe(fills)
+        logger.warning("actions: fills_empty_no_match fills_hash=%s", fills_hash)
+        return FillArtifacts(fills=fills, fills_hash=fills_hash)
 
     fills_hash = _hash_dataframe(fills)
     logger.info("actions: fills_generated fills_hash=%s fills=%d", fills_hash, len(fills))
