@@ -58,20 +58,59 @@ def _build_trades(
     - After trade: cash += PnL
     - Next trade uses updated cash for sizing
     """
-    # One-fill trades: map intent side and exit info to trades
-    intent_cols = ["template_id", "side", "exit_ts", "exit_reason"]
-    merged = fills.merge(events_intent[intent_cols], on="template_id", how="left")
-    
-    merged = merged.rename(
-        columns={
-            "fill_ts": "entry_ts",
-            "fill_price": "entry_price",
-            "side": "side",
-            "symbol": "symbol",
-        }
+    fills = fills.copy()
+    fills["fill_ts"] = pd.to_datetime(fills["fill_ts"], utc=True)
+    fills = fills.sort_values("fill_ts").reset_index(drop=True)
+
+    # Pair entry + exit fills per template_id
+    entry_fills = (
+        fills[fills["reason"] == "signal_fill"]
+        .sort_values("fill_ts")
+        .groupby("template_id", as_index=False)
+        .first()
+        .rename(columns={"fill_ts": "entry_ts", "fill_price": "entry_price"})
     )
-    
-    # Fallback for missing exit_ts: enforce session_end (no instant trades)
+    if entry_fills.empty:
+        raise ValueError("no entry fills found to build trades")
+
+    exit_fills = (
+        fills[fills["reason"] != "signal_fill"]
+        .sort_values("fill_ts")
+        .groupby("template_id", as_index=False)
+        .first()
+        .rename(
+            columns={
+                "fill_ts": "exit_ts_fill",
+                "fill_price": "exit_price_fill",
+                "reason": "exit_reason_fill",
+            }
+        )
+    )
+
+    intent_df = events_intent.copy()
+    if "side" not in intent_df.columns:
+        raise ValueError("events_intent missing required column: side")
+    if "exit_ts" not in intent_df.columns:
+        intent_df["exit_ts"] = pd.NA
+    if "exit_reason" not in intent_df.columns:
+        intent_df["exit_reason"] = pd.NA
+    intent_cols = ["template_id", "side", "exit_ts", "exit_reason"]
+    merged = (
+        entry_fills.merge(exit_fills, on="template_id", how="left")
+        .merge(
+            intent_df[intent_cols].rename(
+                columns={"exit_ts": "intent_exit_ts", "exit_reason": "intent_exit_reason"}
+            ),
+            on="template_id",
+            how="left",
+        )
+    )
+
+    # Resolve exit_ts/price/reason
+    merged["exit_ts"] = merged["exit_ts_fill"]
+    merged["exit_price"] = merged["exit_price_fill"]
+    merged["exit_reason"] = merged["exit_reason_fill"]
+
     if merged["exit_ts"].isna().any():
         if order_validity_policy != "session_end":
             raise ValueError(
@@ -86,19 +125,25 @@ def _build_trades(
         def _fallback_exit(row):
             if pd.notna(row["exit_ts"]):
                 return row["exit_ts"]
+            if pd.notna(row["intent_exit_ts"]):
+                return row["intent_exit_ts"]
             return session_end_for_day(
                 pd.to_datetime(row["entry_ts"], utc=True),
                 session_filter,
                 session_timezone,
             )
         merged["exit_ts"] = merged.apply(_fallback_exit, axis=1)
-        merged["exit_reason"] = merged["exit_reason"].fillna("session_end")
+        merged["exit_reason"] = merged["exit_reason"].fillna(
+            merged["intent_exit_reason"]
+        ).fillna("session_end")
 
-    # Map exit price from bars (after exit_ts is final)
-    bar_idx = bars.set_index("timestamp")["close"]
-    merged["exit_price"] = merged["exit_ts"].map(bar_idx)
+    if merged["exit_price"].isna().any():
+        bar_idx = bars.set_index("timestamp")["close"]
+        merged["exit_price"] = merged["exit_ts"].map(bar_idx)
     if merged["exit_price"].isna().any():
         raise ValueError("exit_price could not be mapped for one or more exit_ts values")
+
+    merged = merged.rename(columns={"symbol_x": "symbol"})
     
     # COMPOUND SIZING: Calculate qty for each trade based on running cash balance
     if compound_enabled:

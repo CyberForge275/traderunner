@@ -153,7 +153,13 @@ def run_pipeline(
     intent_art = generate_intent(signals_frame, strategy_id, strategy_version, {**strategy_params, "symbol": strategy_params.get("symbol")})
     
     # [Engine Layer]: Market Simulation: Match the intent stream against historical bars to generate discrete execution fills (STOP/LIMIT/MARKET).
-    fills_art = generate_fills(intent_art.events_intent, bars)
+    fills_art = generate_fills(
+        intent_art.events_intent,
+        bars,
+        order_validity_policy=strategy_params.get("order_validity_policy"),
+        session_timezone=strategy_params.get("session_timezone"),
+        session_filter=strategy_params.get("session_filter"),
+    )
     
     # [Engine Layer]: Portfolio Management: Apply position sizing, risk rules, and derive actual trades, equity curve, and the portfolio ledger.
     # Execution: apply sizing (respecting compound_enabled) and derive trades/equity/ledger
