@@ -14,6 +14,20 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+ORDER_CONTEXT_COLUMNS_DEFAULT = [
+    "atr",
+    "inside_bar",
+    "mother_high",
+    "mother_low",
+    "entry_price",
+    "stop_price",
+    "take_profit_price",
+    "signal_ts",
+    "mother_ts",
+    "inside_ts",
+    "breakout_ts",
+]
+
 
 class IntentGenerationError(ValueError):
     """Raised when signals or intent cannot be produced."""
@@ -56,23 +70,26 @@ def generate_intent(signals_frame: pd.DataFrame, strategy_id: str, strategy_vers
         events_intent = pd.DataFrame(columns=["template_id", "signal_ts", "symbol", "side", "entry_price", "stop_price", "take_profit_price", "strategy_id", "strategy_version"])
     else:
         # Build deterministic intent stream using strategy-owned columns
+        context_cols = params.get("order_context_columns", ORDER_CONTEXT_COLUMNS_DEFAULT)
         intents = []
         for _, sig in active_signals.iterrows():
-            intents.append(
-                {
-                    "template_id": str(sig["template_id"]),
-                    "signal_ts": pd.to_datetime(sig["timestamp"], utc=True),
-                    "symbol": sig["symbol"],
-                    "side": sig["signal_side"],
-                    "entry_price": float(sig["entry_price"]) if pd.notna(sig["entry_price"]) else None,
-                    "stop_price": float(sig["stop_price"]) if pd.notna(sig["stop_price"]) else None,
-                    "take_profit_price": float(sig["take_profit_price"]) if pd.notna(sig["take_profit_price"]) else None,
-                    "exit_ts": pd.to_datetime(sig["exit_ts"], utc=True) if pd.notna(sig["exit_ts"]) else None,
-                    "exit_reason": sig["exit_reason"] if pd.notna(sig["exit_reason"]) else None,
-                    "strategy_id": strategy_id,
-                    "strategy_version": strategy_version,
-                }
-            )
+            intent = {
+                "template_id": str(sig["template_id"]),
+                "signal_ts": pd.to_datetime(sig["timestamp"], utc=True),
+                "symbol": sig["symbol"],
+                "side": sig["signal_side"],
+                "entry_price": float(sig["entry_price"]) if pd.notna(sig["entry_price"]) else None,
+                "stop_price": float(sig["stop_price"]) if pd.notna(sig["stop_price"]) else None,
+                "take_profit_price": float(sig["take_profit_price"]) if pd.notna(sig["take_profit_price"]) else None,
+                "exit_ts": pd.to_datetime(sig["exit_ts"], utc=True) if pd.notna(sig["exit_ts"]) else None,
+                "exit_reason": sig["exit_reason"] if pd.notna(sig["exit_reason"]) else None,
+                "strategy_id": strategy_id,
+                "strategy_version": strategy_version,
+            }
+            for col in context_cols:
+                if col in sig.index:
+                    intent[f"sig_{col}"] = sig[col]
+            intents.append(intent)
         events_intent = pd.DataFrame(intents)
 
     intent_hash = _hash_dataframe(events_intent)
