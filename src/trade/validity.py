@@ -12,13 +12,37 @@ from datetime import timedelta
 from typing import Tuple
 import pandas as pd
 
-from strategies.inside_bar.config import SessionFilter
+from trade.session_windows import session_end_for_day
+
+
+def compute_session_end_exit_ts(
+    signal_ts_utc: pd.Timestamp, session_filter: list[str], session_timezone: str
+) -> pd.Timestamp:
+    """Compute session end in UTC for the day of signal_ts_utc."""
+    if signal_ts_utc.tz is None:
+        signal_ts_utc = signal_ts_utc.tz_localize("UTC")
+    return session_end_for_day(signal_ts_utc, session_filter, session_timezone)
+
+
+def _get_session_end(
+    valid_from: pd.Timestamp, session_filter: object, session_timezone: str
+) -> pd.Timestamp | None:
+    """Return session end in the same timezone as valid_from.
+
+    Supports legacy SessionFilter objects via duck-typing or a list[str].
+    """
+    if hasattr(session_filter, "get_session_end"):
+        return session_filter.get_session_end(valid_from, session_timezone)
+    if isinstance(session_filter, (list, tuple)):
+        end_utc = session_end_for_day(valid_from.tz_convert("UTC"), list(session_filter), session_timezone)
+        return end_utc.tz_convert(session_timezone)
+    raise ValueError("session_filter must be a SessionFilter-like object or list of 'HH:MM-HH:MM' strings")
 
 
 def calculate_validity_window(
     signal_ts: pd.Timestamp,
     timeframe_minutes: int,
-    session_filter: SessionFilter,
+    session_filter: object,
     session_timezone: str,
     validity_policy: str,
     validity_minutes: int = 60,
@@ -100,12 +124,9 @@ def calculate_validity_window(
         # CRITICAL FIX: Use valid_from, not signal_ts
         # This prevents zero-duration windows when valid_from crosses session boundary
         try:
-            session_end = session_filter.get_session_end(valid_from, session_timezone)
+            session_end = _get_session_end(valid_from, session_filter, session_timezone)
         except ValueError as e:
-            # SessionFilter raises ValueError for naive timestamps
-            raise ValueError(
-                f"Session filter error for valid_from ({valid_from}): {e}"
-            )
+            raise ValueError(f"Session filter error for valid_from ({valid_from}): {e}")
 
         if session_end is None:
             # valid_from is outside session - this can happen with next_bar policy
@@ -133,7 +154,7 @@ def calculate_validity_window(
 
         # Optional: Clamp to session end if valid_from is in session
         try:
-            session_end = session_filter.get_session_end(valid_from, session_timezone)
+            session_end = _get_session_end(valid_from, session_filter, session_timezone)
             if session_end and valid_to > session_end:
                 # Clamp to session boundary
                 valid_to = session_end

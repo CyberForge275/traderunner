@@ -17,7 +17,6 @@ import pandas as pd
 from core.settings import DEFAULT_INITIAL_CASH
 from trade.cli_export_orders import _build_inside_bar_orders, Session
 from trade.validity import calculate_validity_window
-from strategies.inside_bar.config import SessionFilter
 
 logger = logging.getLogger(__name__)
 
@@ -188,8 +187,7 @@ def build_orders_for_backtest(
     # Recompute validity windows using the canonical validity calculator so that
     # policies like "one_bar" take effect even when expire_policy was not set.
     if not orders_df.empty:
-        session_windows = strategy_params.get("session_filter") or ["09:30-16:00"]
-        session_filter = SessionFilter.from_strings(session_windows)
+        session_filter = strategy_params.get("session_filter") or ["09:30-16:00"]
         session_timezone = strategy_params.get("session_timezone", market_tz)
         validity_policy = args.validity_policy
         validity_minutes = args.validity_minutes
