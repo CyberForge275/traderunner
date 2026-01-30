@@ -83,6 +83,24 @@ Die Default-Regel bleibt jedoch: **main-forward**.
 
 ---
 
+## Session Windows SSOT (Backtest/PrePaper/Paper/Live)
+
+- Session-Windows gelten **identisch** in Backtest, PrePaper, Paper und Live.
+- Es gibt **genau eine** Implementierung: `src/trade/session_windows.py`.
+- **Keine** zweite Implementierung in `strategies/*`, `pipeline/*`, `dashboard/*`.
+
+### Dependency Rules (SSOT)
+- `src/trade/*` darf **niemals** `src/strategies/*` importieren.
+- `src/axiom_bt/pipeline/*` darf **niemals** `src/strategies/*` importieren.
+- Strategien dürfen `src/trade/*` nutzen (one‑way dependency).
+
+### Config Contract
+- `session_timezone`
+- `session_filter` (Liste von `"HH:MM-HH:MM"`)
+- `order_validity_policy` (z. B. `session_end`)
+
+---
+
 ## 2) Backtest Pipeline SSOT Contract (must never break)
 Every backtest run MUST create a run directory and these artifacts:
 
