@@ -11,6 +11,8 @@ from typing import Tuple
 
 import pandas as pd
 
+from trade.session_windows import session_end_for_day
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,7 +38,17 @@ def _apply_sizing(fills: pd.DataFrame, initial_cash: float, compound_enabled: bo
     return fills
 
 
-def _build_trades(fills: pd.DataFrame, events_intent: pd.DataFrame, bars: pd.DataFrame, initial_cash: float, compound_enabled: bool) -> pd.DataFrame:
+def _build_trades(
+    fills: pd.DataFrame,
+    events_intent: pd.DataFrame,
+    bars: pd.DataFrame,
+    initial_cash: float,
+    compound_enabled: bool,
+    *,
+    order_validity_policy: str | None,
+    session_timezone: str | None,
+    session_filter: list[str] | None,
+) -> pd.DataFrame:
     """Build trades from fills with proper compound sizing.
     
     CRITICAL FIX FOR COMPOUND SIZING BUG:
@@ -59,13 +71,34 @@ def _build_trades(fills: pd.DataFrame, events_intent: pd.DataFrame, bars: pd.Dat
         }
     )
     
-   # Map exit price from bars
+    # Fallback for missing exit_ts: enforce session_end (no instant trades)
+    if merged["exit_ts"].isna().any():
+        if order_validity_policy != "session_end":
+            raise ValueError(
+                "exit_ts missing in intent and order_validity_policy is not session_end; "
+                "cannot determine deterministic exit_ts"
+            )
+        if not session_filter or not session_timezone:
+            raise ValueError(
+                "exit_ts missing in intent and session_end fallback requires "
+                "session_filter + session_timezone"
+            )
+        def _fallback_exit(row):
+            if pd.notna(row["exit_ts"]):
+                return row["exit_ts"]
+            return session_end_for_day(
+                pd.to_datetime(row["entry_ts"], utc=True),
+                session_filter,
+                session_timezone,
+            )
+        merged["exit_ts"] = merged.apply(_fallback_exit, axis=1)
+        merged["exit_reason"] = merged["exit_reason"].fillna("session_end")
+
+    # Map exit price from bars (after exit_ts is final)
     bar_idx = bars.set_index("timestamp")["close"]
     merged["exit_price"] = merged["exit_ts"].map(bar_idx)
-    
-    # Fallback if no exit defined
-    merged["exit_ts"] = merged["exit_ts"].fillna(merged["entry_ts"])
-    merged["exit_price"] = merged["exit_price"].fillna(merged["entry_price"])
+    if merged["exit_price"].isna().any():
+        raise ValueError("exit_price could not be mapped for one or more exit_ts values")
     
     # COMPOUND SIZING: Calculate qty for each trade based on running cash balance
     if compound_enabled:
@@ -104,9 +137,20 @@ def _build_trades(fills: pd.DataFrame, events_intent: pd.DataFrame, bars: pd.Dat
     merged["pnl"] = (merged["exit_price"] - merged["entry_price"]) * merged["qty"]
     merged.loc[merged["side"] == "SELL", "pnl"] = (merged["entry_price"] - merged["exit_price"]) * merged["qty"]
     
-    merged["reason"] = merged["exit_reason"].fillna("signal_fill")
+    merged["reason"] = merged["exit_reason"].fillna("UNKNOWN_EXIT_REASON")
     
-    cols = ["symbol", "side", "qty", "entry_ts", "entry_price", "exit_ts", "exit_price", "pnl", "reason"]
+    cols = [
+        "template_id",
+        "symbol",
+        "side",
+        "qty",
+        "entry_ts",
+        "entry_price",
+        "exit_ts",
+        "exit_price",
+        "pnl",
+        "reason",
+    ]
     return merged[cols]
 
 
@@ -120,7 +164,17 @@ def _equity_from_trades(trades: pd.DataFrame, initial_cash: float) -> pd.DataFra
     return eq[["ts", "equity"]]
 
 
-def execute(fills: pd.DataFrame, events_intent: pd.DataFrame, bars: pd.DataFrame, *, initial_cash: float, compound_enabled: bool) -> ExecutionArtifacts:
+def execute(
+    fills: pd.DataFrame,
+    events_intent: pd.DataFrame,
+    bars: pd.DataFrame,
+    *,
+    initial_cash: float,
+    compound_enabled: bool,
+    order_validity_policy: str | None = None,
+    session_timezone: str | None = None,
+    session_filter: list[str] | None = None,
+) -> ExecutionArtifacts:
     """Apply sizing and produce trades/ledger/equity.
 
     Fills remain identical; sizing adjusts qty in _build_trades(), then trades/equity/ledger are derived.
@@ -128,14 +182,34 @@ def execute(fills: pd.DataFrame, events_intent: pd.DataFrame, bars: pd.DataFrame
     if fills.empty:
         logger.info("actions: execution_skipped_empty_fills")
         empty_trades = pd.DataFrame(
-            columns=["symbol", "side", "qty", "entry_ts", "entry_price", "exit_ts", "exit_price", "pnl", "reason"]
+            columns=[
+                "template_id",
+                "symbol",
+                "side",
+                "qty",
+                "entry_ts",
+                "entry_price",
+                "exit_ts",
+                "exit_price",
+                "pnl",
+                "reason",
+            ]
         )
         empty_equity = pd.DataFrame(columns=["ts", "equity"])
         empty_ledger = pd.DataFrame(columns=["timestamp", "cash", "seq"])
         return ExecutionArtifacts(trades=empty_trades, equity_curve=empty_equity, portfolio_ledger=empty_ledger)
 
     sized_fills = _apply_sizing(fills, initial_cash, compound_enabled)
-    trades = _build_trades(sized_fills, events_intent, bars, initial_cash, compound_enabled)
+    trades = _build_trades(
+        sized_fills,
+        events_intent,
+        bars,
+        initial_cash,
+        compound_enabled,
+        order_validity_policy=order_validity_policy,
+        session_timezone=session_timezone,
+        session_filter=session_filter,
+    )
 
     equity_curve = _equity_from_trades(trades, initial_cash)
     ledger = equity_curve.rename(columns={"ts": "timestamp", "equity": "cash"}).reset_index(drop=True)

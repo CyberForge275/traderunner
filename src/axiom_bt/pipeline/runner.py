@@ -163,6 +163,9 @@ def run_pipeline(
         bars,
         initial_cash=initial_cash,
         compound_enabled=compound_enabled,
+        order_validity_policy=strategy_params.get("order_validity_policy"),
+        session_timezone=strategy_params.get("session_timezone"),
+        session_filter=strategy_params.get("session_filter"),
     )
 
     # 5) Compute metrics and write artifacts/manifest hashes.
@@ -228,4 +231,3 @@ def run_pipeline(
         fills_art.fills_hash,
         bars_hash,
     )
-
