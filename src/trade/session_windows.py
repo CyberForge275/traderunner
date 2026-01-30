@@ -49,3 +49,22 @@ def session_end_for_day(
         hour=end_time.hour, minute=end_time.minute, second=0, microsecond=0
     )
     return session_end_local.tz_convert("UTC")
+
+
+def session_window_end_for_ts(
+    ts_utc: pd.Timestamp, session_filter: List[str], session_timezone: str
+) -> pd.Timestamp:
+    if not session_timezone:
+        raise ValueError("session_timezone must be provided")
+    windows = parse_session_filter(session_filter)
+    if ts_utc.tz is None:
+        ts_utc = ts_utc.tz_localize("UTC")
+    ts_local = ts_utc.tz_convert(session_timezone)
+    t = ts_local.timetz().replace(tzinfo=None)
+    for w in windows:
+        if w.start <= t <= w.end:
+            window_end_local = ts_local.replace(
+                hour=w.end.hour, minute=w.end.minute, second=0, microsecond=0
+            )
+            return window_end_local.tz_convert("UTC")
+    raise ValueError("timestamp not within any session window")

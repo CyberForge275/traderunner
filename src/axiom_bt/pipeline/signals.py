@@ -12,7 +12,7 @@ from typing import Tuple
 
 import pandas as pd
 
-from trade.session_windows import session_end_for_day
+from trade.session_windows import session_window_end_for_ts
 
 logger = logging.getLogger(__name__)
 
@@ -109,15 +109,18 @@ def generate_intent(signals_frame: pd.DataFrame, strategy_id: str, strategy_vers
             intent["breakout_confirmation"] = params.get("breakout_confirmation")
             intent["dbg_signal_ts_ny"] = signal_ts.tz_convert("America/New_York")
             intent["dbg_signal_ts_berlin"] = signal_ts.tz_convert("Europe/Berlin")
-            if valid_from_policy:
-                intent["dbg_effective_valid_from_policy"] = valid_from_policy
+            effective_valid_from_policy = valid_from_policy
+            if strategy_id == "insidebar_intraday":
+                effective_valid_from_policy = "next_bar"
+            if effective_valid_from_policy:
+                intent["dbg_effective_valid_from_policy"] = effective_valid_from_policy
 
             if order_validity_policy == "session_end":
                 if not session_timezone or not session_filter:
                     raise IntentGenerationError(
                         "order_validity_policy=session_end requires session_timezone and session_filter"
                     )
-                exit_ts = session_end_for_day(signal_ts, session_filter, session_timezone)
+                exit_ts = session_window_end_for_ts(signal_ts, session_filter, session_timezone)
                 intent["exit_ts"] = exit_ts
                 intent["exit_reason"] = "session_end"
                 intent["dbg_valid_to_ts_utc"] = exit_ts
@@ -125,8 +128,8 @@ def generate_intent(signals_frame: pd.DataFrame, strategy_id: str, strategy_vers
                 intent["dbg_valid_to_ts"] = exit_ts.tz_convert(session_timezone)
                 intent["dbg_exit_ts_ny"] = exit_ts.tz_convert("America/New_York")
 
-            if valid_from_policy in {"signal_ts", "next_bar"}:
-                if valid_from_policy == "signal_ts":
+            if effective_valid_from_policy in {"signal_ts", "next_bar"}:
+                if effective_valid_from_policy == "signal_ts":
                     valid_from = signal_ts
                 else:
                     if timeframe_minutes is None:
