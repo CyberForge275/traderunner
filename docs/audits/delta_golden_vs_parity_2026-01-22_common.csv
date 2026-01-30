@@ -1,0 +1,3 @@
+signal_ts,template_id_g,template_id_p,side,entry_price_g,entry_price_p,delta_entry_price,diff_entry_price,stop_price_g,stop_price_p,delta_stop_price,diff_stop_price,take_profit_price_g,take_profit_price_p,delta_take_profit_price,diff_take_profit_price
+2026-01-22 15:20:00+00:00,ib_tpl_18574,ib_HOOD_20260122_152000,SELL,105.33,105.33,0.0,False,105.73,105.73,0.0,False,104.53,104.53,0.0,False
+2026-01-22 19:15:00+00:00,ib_tpl_18621,ib_HOOD_20260122_191500,SELL,106.48,106.48,0.0,False,106.81,106.81,0.0,False,105.82,105.82,0.0,False
