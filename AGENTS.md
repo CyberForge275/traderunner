@@ -52,6 +52,37 @@ If the agent cannot locate them, STOP and report that as a blocking issue.
 
 ---
 
+## Branching & Commit Policy (SSOT)
+
+Wir arbeiten **standardmäßig direkt auf `main`** (forward-only). `main` ist die Entwickler- und Vorwärts-Linie.
+
+Dieser Ansatz ist nur zulässig, wenn **alle** folgenden Regeln eingehalten werden:
+
+1) **Main bleibt grün**
+   - Jeder Commit auf `main` muss Tests bestehen (maximal 1 Commit darf rot sein und wird **sofort** gefixt).
+2) **Kleine, atomare Commits**
+   - Ein Commit = eine klar abgegrenzte Änderung mit nachvollziehbarer Wirkung + DoD.
+3) **Keine WIP-Commits**
+   - Kein “fix later”, keine halbfertigen Zwischenstände auf `main`.
+4) **Fast-forward only / keine History-Rewrites**
+   - Keine Resets, keine Force-Pushes, keine Rewrites der `main`-Historie.
+   - Rollback erfolgt über **Revert-Commits**, nicht über Reset.
+5) **Stabile Stände werden markiert**
+   - Sobald ein stabiler Stand erreicht ist, wird er **getaggt** (z. B. `stable-YYYYMMDD-HHMM`) oder als `stable/<date>` Branch markiert.
+
+Hinweis: Feature-Branches sind optional und können genutzt werden, wenn eine Änderung
+- sehr groß ist,
+- mehrere Stunden/Stage-Commits erfordert,
+- oder die „Main bleibt grün“-Regel sonst gefährdet.
+Die Default-Regel bleibt jedoch: **main-forward**.
+
+### DoD vor jedem Commit auf main
+- `pytest -q` (oder definierter Smoke-Subset) ist grün
+- `git status` ist sauber (keine IDE/Caches/Backups)
+- Commit-Message beschreibt Wirkung + Scope eindeutig
+
+---
+
 ## 2) Backtest Pipeline SSOT Contract (must never break)
 Every backtest run MUST create a run directory and these artifacts:
 
