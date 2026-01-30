@@ -90,6 +90,13 @@ def extend_insidebar_signal_frame_from_core(
     df["mother_low"] = np.nan
     df["breakout_long"] = False
     df["breakout_short"] = False
+    # Debug-only columns (no behavior impact)
+    df["mother_ts"] = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns, UTC]")
+    df["inside_ts"] = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns, UTC]")
+    df["trigger_ts"] = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns, UTC]")
+    df["breakout_level"] = np.nan
+    df["order_expired"] = False
+    df["order_expire_reason"] = pd.NA
 
     # Core SSOT: generate signals only via process_data()
     core = InsideBarCore(_core_config_from_params(params))
@@ -119,6 +126,12 @@ def extend_insidebar_signal_frame_from_core(
         df.at[idx, "stop_price"] = sig.stop_loss
         df.at[idx, "take_profit_price"] = sig.take_profit
         df.at[idx, "template_id"] = f"ib_{df.at[idx, 'symbol']}_{ts.strftime('%Y%m%d_%H%M%S')}"
+        # Debug-only: trigger timestamp uses the signal bar timestamp
+        df.at[idx, "trigger_ts"] = ts
+        # Debug-only: breakout_level is entry basis if no explicit level exists
+        df.at[idx, "breakout_level"] = sig.entry_price
+        df.at[idx, "order_expired"] = False
+        df.at[idx, "order_expire_reason"] = pd.NA
 
         if sig.side == "BUY":
             df.at[idx, "breakout_long"] = True
@@ -134,13 +147,22 @@ def extend_insidebar_signal_frame_from_core(
 
         ib_idx = meta.get("ib_idx")
         if isinstance(ib_idx, (int, float)) and 0 <= int(ib_idx) < len(df):
-            df.at[int(ib_idx), "inside_bar"] = True
+            ib_idx = int(ib_idx)
+            df.at[ib_idx, "inside_bar"] = True
             if "mother_high" in meta:
-                df.at[int(ib_idx), "mother_high"] = meta["mother_high"]
+                df.at[ib_idx, "mother_high"] = meta["mother_high"]
             if "mother_low" in meta:
-                df.at[int(ib_idx), "mother_low"] = meta["mother_low"]
+                df.at[ib_idx, "mother_low"] = meta["mother_low"]
             if "atr" in meta:
-                df.at[int(ib_idx), "atr"] = meta["atr"]
+                df.at[ib_idx, "atr"] = meta["atr"]
+            # Debug-only: inside/mother timestamps from bar indices
+            inside_ts = df.at[ib_idx, "timestamp"]
+            df.at[ib_idx, "inside_ts"] = inside_ts
+            df.at[idx, "inside_ts"] = inside_ts
+            if ib_idx > 0:
+                mother_ts = df.at[ib_idx - 1, "timestamp"]
+                df.at[ib_idx, "mother_ts"] = mother_ts
+                df.at[idx, "mother_ts"] = mother_ts
 
     return df
 

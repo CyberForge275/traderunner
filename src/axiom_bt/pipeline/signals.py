@@ -30,6 +30,18 @@ ORDER_CONTEXT_COLUMNS_DEFAULT = [
     "breakout_ts",
 ]
 
+DBG_CONTEXT_MAP = {
+    "breakout_level": "dbg_breakout_level",
+    "mother_high": "dbg_mother_high",
+    "mother_low": "dbg_mother_low",
+    "mother_range": "dbg_mother_range",
+    "mother_ts": "dbg_mother_ts",
+    "inside_ts": "dbg_inside_ts",
+    "trigger_ts": "dbg_trigger_ts",
+    "order_expired": "dbg_order_expired",
+    "order_expire_reason": "dbg_order_expire_reason",
+}
+
 
 class IntentGenerationError(ValueError):
     """Raised when signals or intent cannot be produced."""
@@ -94,6 +106,9 @@ def generate_intent(signals_frame: pd.DataFrame, strategy_id: str, strategy_vers
                 "strategy_id": strategy_id,
                 "strategy_version": strategy_version,
             }
+            intent["breakout_confirmation"] = params.get("breakout_confirmation")
+            intent["dbg_signal_ts_ny"] = signal_ts.tz_convert("America/New_York")
+            intent["dbg_signal_ts_berlin"] = signal_ts.tz_convert("Europe/Berlin")
             if valid_from_policy:
                 intent["dbg_effective_valid_from_policy"] = valid_from_policy
 
@@ -108,6 +123,7 @@ def generate_intent(signals_frame: pd.DataFrame, strategy_id: str, strategy_vers
                 intent["dbg_valid_to_ts_utc"] = exit_ts
                 intent["dbg_valid_to_ts_ny"] = exit_ts.tz_convert("America/New_York")
                 intent["dbg_valid_to_ts"] = exit_ts.tz_convert(session_timezone)
+                intent["dbg_exit_ts_ny"] = exit_ts.tz_convert("America/New_York")
 
             if valid_from_policy in {"signal_ts", "next_bar"}:
                 if valid_from_policy == "signal_ts":
@@ -126,6 +142,34 @@ def generate_intent(signals_frame: pd.DataFrame, strategy_id: str, strategy_vers
             for col in context_cols:
                 if col in sig.index:
                     intent[f"sig_{col}"] = sig[col]
+            for src_col, dbg_col in DBG_CONTEXT_MAP.items():
+                if src_col in sig.index:
+                    intent[dbg_col] = sig[src_col]
+            if "mother_high" in sig.index:
+                intent["dbg_mother_high"] = sig["mother_high"]
+            if "mother_low" in sig.index:
+                intent["dbg_mother_low"] = sig["mother_low"]
+            if pd.notna(intent.get("dbg_mother_high")) and pd.notna(intent.get("dbg_mother_low")):
+                intent["dbg_mother_range"] = float(intent["dbg_mother_high"]) - float(intent["dbg_mother_low"])
+            if "inside_ts" in sig.index:
+                intent["dbg_inside_ts"] = pd.to_datetime(sig["inside_ts"], utc=True) if pd.notna(sig["inside_ts"]) else None
+            if "mother_ts" in sig.index:
+                intent["dbg_mother_ts"] = pd.to_datetime(sig["mother_ts"], utc=True) if pd.notna(sig["mother_ts"]) else None
+            if "trigger_ts" in sig.index and pd.notna(sig["trigger_ts"]):
+                intent["dbg_trigger_ts"] = pd.to_datetime(sig["trigger_ts"], utc=True)
+            else:
+                intent["dbg_trigger_ts"] = signal_ts
+            if "breakout_level" in sig.index and pd.notna(sig["breakout_level"]):
+                intent["dbg_breakout_level"] = float(sig["breakout_level"])
+            elif pd.notna(sig.get("entry_price")):
+                # Debug-only: breakout_level falls back to entry basis when explicit level is absent
+                intent["dbg_breakout_level"] = float(sig["entry_price"])
+            if "order_expired" in sig.index and pd.notna(sig["order_expired"]):
+                intent["dbg_order_expired"] = bool(sig["order_expired"])
+            else:
+                intent["dbg_order_expired"] = False
+            if "order_expire_reason" in sig.index and pd.notna(sig["order_expire_reason"]):
+                intent["dbg_order_expire_reason"] = sig["order_expire_reason"]
             intents.append(intent)
         events_intent = pd.DataFrame(intents)
 

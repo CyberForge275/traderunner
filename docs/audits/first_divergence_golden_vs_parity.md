@@ -3,7 +3,7 @@
 
 Golden: `artifacts/backtests/260125_122357_HOOD_IB_refactor5_180d`
 
-Parity: `artifacts/backtests/260130_120607_HOOD_IB_goldenParity_300d`
+Parity: `artifacts/backtests/260130_153000_HOOD_IB_parity_dbgfill`
 
 Symbol: `HOOD`
 
