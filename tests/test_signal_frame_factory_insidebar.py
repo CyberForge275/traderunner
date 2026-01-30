@@ -69,6 +69,8 @@ def test_insidebar_signal_frame_builds():
     assert (df["timeframe"] == "M5").all()
     assert (df["strategy_id"] == "insidebar_intraday").all()
     assert (df["strategy_version"] == "1.0.0").all()
+    assert df["atr"].isna().sum() == 0
+    assert (df["atr"] >= 0).all()
 
     signal_rows = df[df["signal_side"].notna()]
     assert len(signal_rows) >= 1

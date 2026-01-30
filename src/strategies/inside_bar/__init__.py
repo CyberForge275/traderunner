@@ -84,7 +84,7 @@ def extend_insidebar_signal_frame_from_core(
     df["template_id"] = pd.NA
 
     # Default indicator values (required by schema)
-    df["atr"] = np.nan
+    df["atr"] = 0.0
     df["inside_bar"] = False
     df["mother_high"] = np.nan
     df["mother_low"] = np.nan
