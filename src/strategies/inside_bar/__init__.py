@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+
+import numpy as np
 import pandas as pd
 
 from .core import InsideBarCore, InsideBarConfig, RawSignal
@@ -10,6 +13,7 @@ from .config import load_config, get_default_config_path, load_default_config
 from strategies.registry import register_strategy
 from .signal_schema import get_signal_frame_schema
 
+logger = logging.getLogger(__name__)
 
 def _core_config_from_params(params: dict) -> InsideBarConfig:
     # Keep mapping consistent with InsideBarStrategy.generate_signals()
@@ -65,7 +69,9 @@ def extend_insidebar_signal_frame_from_core(
             if col.dtype == "bool":
                 df[col.name] = False
             elif col.dtype.startswith("datetime64"):
-                df[col.name] = pd.NA
+                df[col.name] = pd.NaT
+            elif col.dtype.startswith(("float", "int")):
+                df[col.name] = np.nan
             else:
                 df[col.name] = pd.NA
 
@@ -75,13 +81,13 @@ def extend_insidebar_signal_frame_from_core(
     df["strategy_id"] = "insidebar_intraday"
     df["strategy_version"] = version
     df["strategy_tag"] = schema.strategy_tag
-    df["template_id"] = [f"ib_tpl_{i}" for i in range(len(df))]
+    df["template_id"] = pd.NA
 
     # Default indicator values (required by schema)
-    df["atr"] = 0.0
+    df["atr"] = np.nan
     df["inside_bar"] = False
-    df["mother_high"] = pd.NA
-    df["mother_low"] = pd.NA
+    df["mother_high"] = np.nan
+    df["mother_low"] = np.nan
     df["breakout_long"] = False
     df["breakout_short"] = False
 
@@ -92,23 +98,33 @@ def extend_insidebar_signal_frame_from_core(
     # Map signals into frame
     for sig in signals:
         ts = pd.to_datetime(sig.timestamp, utc=True)
-        match_idx = df.index[df["timestamp"] == ts]
-        if match_idx.empty:
-            continue
-        idx = int(match_idx[0])
+        meta = sig.metadata or {}
+        sig_idx = meta.get("sig_idx") or meta.get("signal_idx") or meta.get("bar_index")
+        if isinstance(sig_idx, (int, float)) and 0 <= int(sig_idx) < len(df):
+            idx = int(sig_idx)
+        else:
+            match_idx = df.index[df["timestamp"] == ts]
+            if match_idx.empty:
+                logger.warning(
+                    "InsideBarCore signal timestamp not found in frame (symbol=%s, ts=%s)",
+                    df.at[0, "symbol"] if len(df) else "UNKNOWN",
+                    ts,
+                )
+                continue
+            idx = int(match_idx[0])
 
         df.at[idx, "signal_side"] = sig.side
         df.at[idx, "signal_reason"] = "inside_bar"
         df.at[idx, "entry_price"] = sig.entry_price
         df.at[idx, "stop_price"] = sig.stop_loss
         df.at[idx, "take_profit_price"] = sig.take_profit
+        df.at[idx, "template_id"] = f"ib_{df.at[idx, 'symbol']}_{ts.strftime('%Y%m%d_%H%M%S')}"
 
         if sig.side == "BUY":
             df.at[idx, "breakout_long"] = True
         else:
             df.at[idx, "breakout_short"] = True
 
-        meta = sig.metadata or {}
         if "mother_high" in meta:
             df.at[idx, "mother_high"] = meta["mother_high"]
         if "mother_low" in meta:
