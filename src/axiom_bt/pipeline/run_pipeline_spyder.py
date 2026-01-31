@@ -12,7 +12,7 @@ from pathlib import Path
 from datetime import datetime
 
 # Ensure local source takes precedence (avoid stale installed package)
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
@@ -26,17 +26,17 @@ if __name__ == "__main__":
 
     argv = [
         "--run-id", run_id,
-        "--out-dir", out_dir,
-        "--bars-path", "/pfad/zu/bars.csv",
+        "--out-dir", str(out_dir),
+        "--bars-path", "/pfad/zu/bars.parquet",  # <-- HIER anpassen
         "--strategy-id", "insidebar_intraday",
-        "--strategy-version", "1.0.0",
+        "--strategy-version", "1.0.1",
         "--symbol", "HOOD",
         "--timeframe", "M5",
-        "--valid-to", "2026-01-10",       # Ende der Datenperiode (ISO)
-        "--lookback-days", "40",          # Lookback ohne Warmup (alternativ --valid-from)
+        "--valid-to", "2026-01-23",     # Ende der Datenperiode (ISO)
+        "--lookback-days", "1",     
         "--initial-cash", "10000",
-        "--compound-enabled",       # weglassen, wenn aus
         "--fees-bps", "0",
         "--slippage-bps", "0",
     ]
     main(argv)
+
