@@ -182,8 +182,10 @@ def ensure_and_snapshot_bars(
     
     if df_filtered.empty:
         raise DataFetcherError(
-            f"No bars found in requested range {start_ts.date()} to {end_ts.date()} "
-            f"for {symbol} (source has {len(df_exec)} bars from {df_exec.index.min().date()} to {df_exec.index.max().date()})"
+            f"No bars found for {symbol} tf={tf_upper} in window "
+            f"{effective_start.date()}..{end_ts.date()} "
+            f"(requested_start={requested_start.date()}, warmup_days={warmup_days_calc}). "
+            f"Source has {len(df_exec)} bars from {df_exec.index.min().date()} to {df_exec.index.max().date()}."
         )
 
     target_exec = bars_dir / f"bars_exec_{tf_upper}_rth.parquet"
