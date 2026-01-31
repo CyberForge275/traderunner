@@ -22,21 +22,23 @@ from axiom_bt.pipeline.cli import main
 if __name__ == "__main__":
     ts = datetime.now().strftime("%y%m%d_%H%M%S")
     run_id = f"dev_{ts}"
-    out_dir = ROOT / "artifacts" / "backtest" / run_id
+    out_dir = ROOT / "artifacts" / "backtests" / run_id
+    bars_path = out_dir / "bars_snapshot.parquet"
 
     argv = [
         "--run-id", run_id,
         "--out-dir", str(out_dir),
-        "--bars-path", "/pfad/zu/bars.parquet",  # <-- HIER anpassen
+        "--bars-path", str(bars_path),
         "--strategy-id", "insidebar_intraday",
         "--strategy-version", "1.0.1",
         "--symbol", "HOOD",
         "--timeframe", "M5",
         "--valid-to", "2026-01-23",     # Ende der Datenperiode (ISO)
         "--lookback-days", "1",     
+        "--valid-from-policy", "next_bar",
+        "--order-validity-policy", "session_end",
         "--initial-cash", "10000",
         "--fees-bps", "0",
         "--slippage-bps", "0",
     ]
     main(argv)
-
