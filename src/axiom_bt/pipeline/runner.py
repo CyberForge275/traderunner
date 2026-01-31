@@ -105,6 +105,13 @@ def run_pipeline(
             if candles > 0:
                 extra_days = math.ceil((candles * int(tf_minutes)) / (60 * 24))
                 lookback_days = max(int(lookback_days), extra_days)
+                logger.info(
+                    "actions: lookback_candles_applied lookback_candles=%s tf_minutes=%s extra_days=%s lookback_days=%s",
+                    candles,
+                    tf_minutes,
+                    extra_days,
+                    lookback_days,
+                )
         except (TypeError, ValueError):
             raise PipelineError(f"invalid lookback_candles: {lookback_candles} (must be int >= 1)")
 
