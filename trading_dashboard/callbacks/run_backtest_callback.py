@@ -1,6 +1,7 @@
 """Run Backtest Callback - Handle backtest execution from UI."""
 
-from dash import Input, Output, State, html
+from dash import Input, Output, State, html, dcc
+import logging
 import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
 from ..ui_ids import Nav, BT, RUN
@@ -173,7 +174,6 @@ def register_run_backtest_callback(app):
                 equity_basis_val
             )
 
-        import logging
         logger = logging.getLogger(__name__)
         logger.info(
             f"actions: backtest_params_from_ssot strategy_id={strategy} version={version_to_use} "
