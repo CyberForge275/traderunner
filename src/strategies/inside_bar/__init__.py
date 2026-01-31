@@ -58,6 +58,15 @@ def extend_insidebar_signal_frame_from_core(
     """Build SignalFrame from core.process_data (single SSOT)."""
     version = params.get("strategy_version", "1.0.0")
     schema = get_signal_frame_schema(version)
+    from axiom_bt.utils.trace import trace_ui
+    trace_ui(
+        step="insidebar_extend_start",
+        run_id=params.get("run_id"),
+        strategy_id="insidebar_intraday",
+        strategy_version=version,
+        file=__file__,
+        func="extend_insidebar_signal_frame_from_core",
+    )
 
     df = bars.copy()
     df = df.sort_values("timestamp").reset_index(drop=True)
@@ -101,6 +110,15 @@ def extend_insidebar_signal_frame_from_core(
     # Core SSOT: generate signals only via process_data()
     core = InsideBarCore(_core_config_from_params(params))
     signals = core.process_data(df, params.get("symbol", "UNKNOWN"))
+    trace_ui(
+        step="insidebar_core_done",
+        run_id=params.get("run_id"),
+        strategy_id="insidebar_intraday",
+        strategy_version=version,
+        file=__file__,
+        func="extend_insidebar_signal_frame_from_core",
+        extra={"signals": len(signals)},
+    )
 
     # Map signals into frame
     for sig in signals:

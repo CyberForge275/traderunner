@@ -48,6 +48,15 @@ def run_pipeline(
     4) Generate intent → fills → execute (sizing, trades, equity/ledger).
     5) Compute metrics and write artifacts/manifest hashes.
     """
+    from axiom_bt.utils.trace import trace_ui
+    trace_ui(
+        step="pipeline_run_start",
+        run_id=run_id,
+        strategy_id=strategy_id,
+        strategy_version=strategy_version,
+        file=__file__,
+        func="run_pipeline",
+    )
     if compound_equity_basis != "cash_only":
         raise PipelineError("unsupported compound_equity_basis (only cash_only allowed)")
     core = strategy_meta.get("core", {}) if strategy_meta else {}
@@ -136,7 +145,16 @@ def run_pipeline(
         bars=bars,
         strategy_id=strategy_id,
         strategy_version=strategy_version,
-        strategy_params=strategy_params,
+        strategy_params={**strategy_params, "run_id": run_id},
+    )
+    trace_ui(
+        step="pipeline_signal_frame_built",
+        run_id=run_id,
+        strategy_id=strategy_id,
+        strategy_version=strategy_version,
+        file=__file__,
+        func="run_pipeline",
+        extra={"rows": len(signals_frame)},
     )
 
     # [Contract Layer]: Validate the strategy-generated signal frame against its versioned schema contract to ensure data integrity before execution.
@@ -151,6 +169,15 @@ def run_pipeline(
 
     # [Framework Layer]: Transform the strategy-specific SignalFrame into a normalized, generic intent stream (events_intent) understood by the execution engine.
     intent_art = generate_intent(signals_frame, strategy_id, strategy_version, {**strategy_params, "symbol": strategy_params.get("symbol")})
+    trace_ui(
+        step="pipeline_intent_generated",
+        run_id=run_id,
+        strategy_id=strategy_id,
+        strategy_version=strategy_version,
+        file=__file__,
+        func="run_pipeline",
+        extra={"rows": len(intent_art.events_intent)},
+    )
     
     # [Engine Layer]: Market Simulation: Match the intent stream against historical bars to generate discrete execution fills (STOP/LIMIT/MARKET).
     fills_art = generate_fills(
@@ -159,6 +186,15 @@ def run_pipeline(
         order_validity_policy=strategy_params.get("order_validity_policy"),
         session_timezone=strategy_params.get("session_timezone"),
         session_filter=strategy_params.get("session_filter"),
+    )
+    trace_ui(
+        step="pipeline_fills_generated",
+        run_id=run_id,
+        strategy_id=strategy_id,
+        strategy_version=strategy_version,
+        file=__file__,
+        func="run_pipeline",
+        extra={"rows": len(fills_art.fills)},
     )
     
     # [Engine Layer]: Portfolio Management: Apply position sizing, risk rules, and derive actual trades, equity curve, and the portfolio ledger.
@@ -172,6 +208,15 @@ def run_pipeline(
         order_validity_policy=strategy_params.get("order_validity_policy"),
         session_timezone=strategy_params.get("session_timezone"),
         session_filter=strategy_params.get("session_filter"),
+    )
+    trace_ui(
+        step="pipeline_execution_done",
+        run_id=run_id,
+        strategy_id=strategy_id,
+        strategy_version=strategy_version,
+        file=__file__,
+        func="run_pipeline",
+        extra={"trades": len(exec_art.trades)},
     )
 
     # 5) Compute metrics and write artifacts/manifest hashes.
@@ -217,6 +262,14 @@ def run_pipeline(
     }
 
     # [Persistence Layer]: Commit all generated data products and the comprehensive run manifest to disk for auditability and dashboard visualization.
+    trace_ui(
+        step="pipeline_write_artifacts",
+        run_id=run_id,
+        strategy_id=strategy_id,
+        strategy_version=strategy_version,
+        file=__file__,
+        func="run_pipeline",
+    )
     write_artifacts(
         out_dir,
         signals_frame=intent_art.signals_frame,

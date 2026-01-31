@@ -55,6 +55,15 @@ class BacktestService:
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         job_id = f"{run_name}_{timestamp}"
+        from axiom_bt.utils.trace import trace_ui
+        trace_ui(
+            step="service_start_backtest",
+            run_id=run_name,
+            strategy_id=strategy,
+            file=__file__,
+            func="start_backtest",
+            extra={"job_id": job_id},
+        )
 
         with self._lock:
             self.running_jobs[job_id] = {
@@ -109,6 +118,15 @@ class BacktestService:
                 self._update_job_progress(job_id, msg)
 
             adapter = create_new_adapter(progress_callback=update_progress)
+            from axiom_bt.utils.trace import trace_ui
+            trace_ui(
+                step="service_run_pipeline_start",
+                run_id=run_name,
+                strategy_id=strategy,
+                file=__file__,
+                func="_run_pipeline",
+                extra={"job_id": job_id},
+            )
 
 
             # Execute backtest
@@ -120,6 +138,14 @@ class BacktestService:
                 start_date=start_date,
                 end_date=end_date,
                 config_params=config_params
+            )
+            trace_ui(
+                step="service_run_pipeline_done",
+                run_id=run_name,
+                strategy_id=strategy,
+                file=__file__,
+                func="_run_pipeline",
+                extra={"job_id": job_id, "status": result.get("status")},
             )
 
             # Handle results from new pipeline adapter (Phase 1-5)

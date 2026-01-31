@@ -93,6 +93,15 @@ class NewPipelineAdapter:
 
             # Parse config params
             strategy_params = config_params or {}
+            from axiom_bt.utils.trace import trace_ui
+            trace_ui(
+                step="adapter_execute_backtest_start",
+                run_id=run_name,
+                strategy_id=strategy,
+                strategy_version=strategy_params.get("strategy_version"),
+                file=__file__,
+                func="execute_backtest",
+            )
 
             # Calculate lookback from date range
             from datetime import datetime, date
@@ -148,6 +157,14 @@ class NewPipelineAdapter:
             
             # Call NEW MODULAR PIPELINE (CORRECT!)
             # This function returns void - writes all artifacts directly
+            trace_ui(
+                step="adapter_call_run_pipeline",
+                run_id=run_name,
+                strategy_id=strategy,
+                strategy_version=strategy_version,
+                file=__file__,
+                func="execute_backtest",
+            )
             run_pipeline(
                 run_id=run_name,
                 out_dir=run_dir,
@@ -171,6 +188,14 @@ class NewPipelineAdapter:
 
             # If we reach here, pipeline succeeded (would raise PipelineError otherwise)
             self.progress_callback("✅ Pipeline completed successfully!")
+            trace_ui(
+                step="adapter_run_pipeline_done",
+                run_id=run_name,
+                strategy_id=strategy,
+                strategy_version=strategy_version,
+                file=__file__,
+                func="execute_backtest",
+            )
             
             return {
                 "status": "success",

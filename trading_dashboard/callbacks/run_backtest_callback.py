@@ -71,6 +71,14 @@ def register_run_backtest_callback(app):
         # Prepend timestamp to run name
         timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
         run_name = f"{timestamp}_{run_name.strip()}"
+        from axiom_bt.utils.trace import trace_ui
+        trace_ui(
+            step="ui_callback_entry",
+            run_id=run_name,
+            strategy_id=strategy,
+            file=__file__,
+            func="run_backtest",
+        )
 
         # CRITICAL: Validate version is provided (mandatory for strategy lab progression)
         import re
@@ -206,6 +214,15 @@ def register_run_backtest_callback(app):
             start_date=start_date_str,
             end_date=end_date_str,
             config_params=config_params if config_params else None,
+        )
+        trace_ui(
+            step="ui_start_backtest",
+            run_id=run_name,
+            strategy_id=strategy,
+            strategy_version=version_to_use,
+            file=__file__,
+            func="run_backtest",
+            extra={"job_id": job_id},
         )
 
         # Format date range for display

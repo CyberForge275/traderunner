@@ -36,11 +36,28 @@ def build_signal_frame(
     Raises:
         ValueError: if strategy_id unknown or validation fails.
     """
+    from axiom_bt.utils.trace import trace_ui
+    trace_ui(
+        step="signal_frame_factory_start",
+        run_id=strategy_params.get("run_id"),
+        strategy_id=strategy_id,
+        strategy_version=strategy_version,
+        file=__file__,
+        func="build_signal_frame",
+    )
     # Decoupled strategy dispatch
     try:
         plugin = get_strategy(strategy_id)
     except KeyError as exc:
         raise ValueError(f"Unknown strategy_id: {strategy_id}") from exc
+    trace_ui(
+        step="strategy_loaded",
+        run_id=strategy_params.get("run_id"),
+        strategy_id=strategy_id,
+        strategy_version=strategy_version,
+        file=__file__,
+        func="build_signal_frame",
+    )
 
     schema = plugin.get_schema(strategy_version)
     

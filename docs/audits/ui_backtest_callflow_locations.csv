@@ -1,0 +1,15 @@
+step,file,func,line_from,line_to,responsibility,key_inputs,key_outputs
+1_ui_callback,trading_dashboard/callbacks/run_backtest_callback.py,run_backtest,41,209,"Validate UI inputs, build config_params, start backtest job","strategy, symbols_str, timeframe, date_mode, bt_config_snapshot","job_id, run_name, bt-active-run store"
+2_service_start,trading_dashboard/services/backtest_service.py,start_backtest,40,80,"Create job_id, enqueue background thread","run_name, strategy, symbols, timeframe, start_date, end_date, config_params",job_id
+3_service_run_pipeline,trading_dashboard/services/backtest_service.py,_run_pipeline,82,174,Invoke pipeline adapter in background thread,"job_id, run_name, strategy, symbols, timeframe, dates, config_params","status, run_name"
+4_adapter_execute,trading_dashboard/services/new_pipeline_adapter.py,execute_backtest,50,179,"Normalize params, compute lookback, call run_pipeline","run_name, strategy, symbols, timeframe, start/end, config_params","status, run_dir"
+5_pipeline_runner,src/axiom_bt/pipeline/runner.py,run_pipeline,27,220,"Orchestrate data fetch, signals, intents, fills, execution, metrics, artifacts","run_id, out_dir, bars_path, strategy_id, strategy_version, strategy_params, strategy_meta","artifacts: events_intent, fills, trades, metrics, equity_curve"
+6_signal_frame_factory,src/axiom_bt/pipeline/signal_frame_factory.py,build_signal_frame,13,68,Strategy dispatch + build/validate SignalFrame,"bars, strategy_id, strategy_version, strategy_params","signals_frame, schema"
+7_strategy_registry,src/strategies/registry.py,get_strategy,348,356,Load strategy plugin for strategy_id,strategy_id,plugin
+8_insidebar_plugin,src/strategies/inside_bar/__init__.py,extend_insidebar_signal_frame_from_core,54,167,Map InsideBarCore signals into SignalFrame (entry/SL/TP),"bars, params",SignalFrame with signal_side/entry/stop/take_profit
+9_insidebar_core,src/strategies/inside_bar/core.py,process_data,694,812,ATR → inside bar detection → breakout signals → session filter,"df, symbol, config",RawSignal list
+10_generate_intent,src/axiom_bt/pipeline/signals.py,generate_intent,63,187,"Convert SignalFrame to events_intent (valid_from/to, dbg fields)","signals_frame, strategy_id, strategy_version, params",events_intent
+11_fill_model,src/axiom_bt/pipeline/fill_model.py,generate_fills,35,164,Simulate entry+exit fills from intents + bars,"events_intent, bars, order_validity_policy, session_*",fills
+12_execution,src/axiom_bt/pipeline/execution.py,execute,212,265,Sizing → trades → equity/ledger,"fills, events_intent, bars, compound_enabled, session_*","trades, equity_curve, portfolio_ledger"
+13_metrics,src/axiom_bt/pipeline/metrics.py,compute_and_write_metrics,17,23,Compute metrics.json,"trades, equity, initial_cash",metrics.json
+14_artifacts,src/axiom_bt/pipeline/artifacts.py,write_artifacts,24,57,Persist events_intent/fills/trades/equity/run_meta/run_manifest/run_result,"signals_frame, events_intent, fills, trades, equity, ledger",artifacts in run_dir
