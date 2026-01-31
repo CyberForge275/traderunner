@@ -7,6 +7,9 @@ from datetime import datetime, timedelta
 from ..ui_ids import Nav, BT, RUN
 
 
+logger = logging.getLogger(__name__)
+
+
 def register_run_backtest_callback(app):
     """Register callback for running backtests from the UI.
 
@@ -174,7 +177,6 @@ def register_run_backtest_callback(app):
                 equity_basis_val
             )
 
-        logger = logging.getLogger(__name__)
         logger.info(
             f"actions: backtest_params_from_ssot strategy_id={strategy} version={version_to_use} "
             f"total_params={len(config_params)} compound_enabled={'enabled' in (compound_toggle_val or [])}"
