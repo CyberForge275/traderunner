@@ -98,25 +98,10 @@ def register_run_backtest_callback(app):
                 error_msg = html.Div("❌ Strategy version missing in snapshot", style={"color": "red"})
                 return error_msg, run_name, {"bt_job_running": False}, "", None, ""
         
-        # Legacy: Check if other strategy supports versioning (v2 is technically legacy now, or mixed)
+        # Legacy v2 path removed (inputs no longer exist)
         elif strategy in ["insidebar_intraday_v2"]:
-            # (Existing legacy version check remains for compatibility with v2 not yet fully matched)
-            if insidebar_new_version and insidebar_new_version.strip():
-                # Validate format
-                pattern = r'^v\d+\.\d{2}$'
-                if re.match(pattern, insidebar_new_version.strip()):
-                    version_to_use = insidebar_new_version.strip()
-                else:
-                    error_msg = html.Div([
-                        html.Span("❌ Invalid version format. ", style={"color": "red", "fontWeight": "bold"}),
-                        html.Span(f"Use pattern v#.## (e.g., v1.01, v2.00). You entered: '{insidebar_new_version}'"),
-                    ])
-                    return error_msg, run_name, {"bt_job_running": False}, "", None, ""
-            elif insidebar_strategy_version:
-                version_to_use = insidebar_strategy_version
-            else:
-                error_msg = html.Div("❌ Version required for legacy InsideBar v2 path", style={"color": "red"})
-                return error_msg, run_name, {"bt_job_running": False}, "", None, ""
+            error_msg = html.Div("❌ Legacy InsideBar v2 path is not supported in UI", style={"color": "red"})
+            return error_msg, run_name, {"bt_job_running": False}, "", None, ""
         
         # New Strategy: check if it's in registry but not migrated
         else:
@@ -197,12 +182,7 @@ def register_run_backtest_callback(app):
         logger.info(f"🔍 [run_backtest] config_params payload: {config_params}")
 
         if strategy == "insidebar_intraday_v2":
-            # Legacy Path: Use individual State inputs (Wait, I removed them from signature!)
-            # Actually, I should probably remove v2 support if I'm cleaning up, 
-            # but to be safe I'll just error out if someone tries to run v2 now, 
-            # or better: I already removed the inputs so v2 is broken.
-            # I will remove v2 logic to avoid confusion.
-            pass
+            return html.Div("❌ Legacy InsideBar v2 path is not supported in UI", style={"color": "red"}), run_name, {"bt_job_running": False}, "", None, ""
 
         # session_filter is already in config_params from snapshot
 
