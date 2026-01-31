@@ -17,28 +17,49 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from axiom_bt.pipeline.cli import main
+from axiom_bt.pipeline.runner import run_pipeline
+from axiom_bt.pipeline.strategy_config_loader import load_strategy_params_from_ssot
 
 if __name__ == "__main__":
     ts = datetime.now().strftime("%y%m%d_%H%M%S")
     run_id = f"dev_{ts}"
     out_dir = ROOT / "artifacts" / "backtests" / run_id
     bars_path = out_dir / "bars_snapshot.parquet"
+    strategy_id = "insidebar_intraday"
+    strategy_version = "1.0.1"
+    requested_end = "2026-01-30"
 
-    argv = [
-        "--run-id", run_id,
-        "--out-dir", str(out_dir),
-        "--bars-path", str(bars_path),
-        "--strategy-id", "insidebar_intraday",
-        "--strategy-version", "1.0.1",
-        "--symbol", "HOOD",
-        "--timeframe", "M5",
-        "--valid-to", "2026-01-23",     # Ende der Datenperiode (ISO)
-        "--lookback-days", "1",     
-        "--valid-from-policy", "next_bar",
-        "--order-validity-policy", "session_end",
-        "--initial-cash", "10000",
-        "--fees-bps", "0",
-        "--slippage-bps", "0",
-    ]
-    main(argv)
+    cfg = load_strategy_params_from_ssot(strategy_id, strategy_version)
+    params = {
+        **cfg.get("core", {}),
+        **cfg.get("tunable", {}),
+        "symbol": "HOOD",
+        "timeframe": "M5",
+        "requested_end": requested_end,
+        "lookback_days": 300,
+        "valid_from_policy": "signal_ts",
+        "order_validity_policy": "session_end",
+    }
+    params.setdefault("strategy_version", strategy_version)
+    params.setdefault("backtesting", {})
+    params["backtesting"].update(
+        {
+            "compound_sizing": True,
+            "compound_equity_basis": "cash_only",
+        }
+    )
+
+    run_pipeline(
+        run_id=run_id,
+        out_dir=out_dir,
+        bars_path=bars_path,
+        strategy_id=strategy_id,
+        strategy_version=strategy_version,
+        strategy_params=params,
+        strategy_meta=cfg,
+        compound_enabled=True,
+        compound_equity_basis="cash_only",
+        initial_cash=10000.0,
+        fees_bps=2.0,
+        slippage_bps=1.0,
+    )

@@ -16,7 +16,7 @@ versions:
       - 09:30-11:00
       - 14:00-15:00
       timeframe_minutes: 5
-      valid_from_policy: next_bar
+      valid_from_policy: signal_ts
       order_validity_policy: session_end
     tunable:
       lookback_candles: 50
@@ -37,7 +37,7 @@ versions:
       - 09:30-11:00
       - 14:00-15:00
       timeframe_minutes: 5
-      valid_from_policy: next_bar
+      valid_from_policy: signal_ts
       order_validity_policy: session_end
 
     tunable:
@@ -59,7 +59,7 @@ versions:
       session_filter:
       - 09:30-16:00
       timeframe_minutes: 5
-      valid_from_policy: next_bar
+      valid_from_policy: signal_ts
       order_validity_policy: session_end
     tunable:
       lookback_candles: 50
