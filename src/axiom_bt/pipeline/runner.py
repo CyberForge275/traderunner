@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from pathlib import Path
 from typing import Dict
 
@@ -94,6 +95,18 @@ def run_pipeline(
         warmup_days = warmup_days_from_bars(required_warmup_bars, int(tf_minutes), session_mode)
     except WarmupError as exc:
         raise PipelineError(str(exc)) from exc
+
+    # Apply lookback_candles from strategy params (tunable) by converting to days and
+    # expanding the lookback_days window if needed (SSOT: candles -> days).
+    lookback_candles = strategy_params.get("lookback_candles")
+    if lookback_candles is not None:
+        try:
+            candles = int(lookback_candles)
+            if candles > 0:
+                extra_days = math.ceil((candles * int(tf_minutes)) / (60 * 24))
+                lookback_days = max(int(lookback_days), extra_days)
+        except (TypeError, ValueError):
+            raise PipelineError(f"invalid lookback_candles: {lookback_candles} (must be int >= 1)")
 
     logger.info(
         "actions: pipeline_effective_config_built strategy_id=%s version=%s market_tz=%s session_mode=%s tf=%s warmup_bars=%s warmup_days=%s",
