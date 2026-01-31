@@ -125,3 +125,5 @@ evidence_*.zip
 dashboard.pid
 .spyproject/
 backups/
+# Spyder project files
+.spyproject/

@@ -6,8 +6,12 @@ import argparse
 import logging
 from pathlib import Path
 
-from .runner import run_pipeline
-from .strategy_config_loader import load_strategy_params_from_ssot
+try:
+    from .runner import run_pipeline
+    from .strategy_config_loader import load_strategy_params_from_ssot
+except ImportError:  # Allows %runfile execution in Spyder
+    from axiom_bt.pipeline.runner import run_pipeline
+    from axiom_bt.pipeline.strategy_config_loader import load_strategy_params_from_ssot
 
 
 def build_parser() -> argparse.ArgumentParser:
