@@ -508,8 +508,8 @@ class InsideBarCore:
                         continue
                     # else: ts >= netting_open_until, previous position window closed
 
-                # Check LONG breakout
-                if current['close'] > entry_long:
+                # Check LONG breakout (intraday: trigger on high)
+                if current['high'] > entry_long:
                     # === MVP: TRIGGER MUST BE WITHIN SESSION ===
                     if trigger_must_be_in_session:
                         # Trigger timestamp = current bar timestamp (breakout confirmed on close)
@@ -602,8 +602,8 @@ class InsideBarCore:
                         'stop_cap_applied': stop_cap_applied
                     })
 
-                # Check SHORT breakout
-                elif current['close'] < entry_short:
+                # Check SHORT breakout (intraday: trigger on low)
+                elif current['low'] < entry_short:
                     # === MVP: TRIGGER MUST BE WITHIN SESSION ===
                     if trigger_must_be_in_session:
                         trigger_ts = ts

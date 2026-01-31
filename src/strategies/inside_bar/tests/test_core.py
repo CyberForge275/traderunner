@@ -283,6 +283,30 @@ class TestSignalGeneration:
         # Should have no signals (no breakout)
         assert len(signals) == 0
 
+    def test_breakout_on_high_triggers_signal(self):
+        """Breakout should trigger on high/low, not only close."""
+        dates = pd.date_range('2025-01-01 14:00', periods=4, freq='5min', tz='UTC')
+        # Bar 1 is mother, bar 2 is inside, bar 3 breaks above mother_high by high only.
+        data = pd.DataFrame({
+            'timestamp': dates,
+            'open':  [100, 101, 100.5, 102.5],
+            'high':  [102, 103, 102.5, 103.2],  # breakout by high
+            'low':   [99,  98,  99.5, 101.8],
+            'close': [101, 102, 101,  102.9],  # close below mother_high=103
+        })
+
+        config = InsideBarConfig(
+            breakout_confirmation=True,
+            min_mother_bar_size=0,
+            risk_reward_ratio=2.0
+        )
+        core = InsideBarCore(config)
+
+        signals = core.process_data(data, 'TEST')
+
+        assert len(signals) > 0
+        assert signals[0].side == 'BUY'
+
 
 class TestRawSignalValidation:
     """Test RawSignal data validation."""
