@@ -62,7 +62,14 @@ class BacktestService:
             strategy_id=strategy,
             file=__file__,
             func="start_backtest",
-            extra={"job_id": job_id},
+            extra={
+                "job_id": job_id,
+                "symbols": symbols,
+                "timeframe": timeframe,
+                "start_date": start_date,
+                "end_date": end_date,
+                "config_params": config_params,
+            },
         )
 
         with self._lock:
