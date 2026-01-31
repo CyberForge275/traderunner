@@ -126,6 +126,72 @@ class TestInsideBarDetection:
         assert result.iloc[2]['mother_bar_high'] == 103.0
         assert result.iloc[2]['mother_bar_low'] == 98.0
 
+    def test_mother_size_filter_disabled_when_zero(self, inside_bar_data):
+        """min_mother_bar_size=0 should disable size filter even if ATR is NaN."""
+        config = InsideBarConfig(
+            inside_bar_mode="inclusive",
+            min_mother_bar_size=0  # Disable size filter
+        )
+        core = InsideBarCore(config)
+
+        df = core.calculate_atr(inside_bar_data)  # ATR will be NaN for early rows
+        result = core.detect_inside_bars(df)
+
+        # Inside bar should still be detected when filter is disabled
+        assert result.iloc[2]['is_inside_bar'] == True
+
+    def test_mother_size_filter_uses_mother_atr(self):
+        """Mother size filter should use mother bar ATR (i-1), not inside bar ATR (i)."""
+        dates = pd.date_range('2025-01-01', periods=4, freq='5min')
+        data = pd.DataFrame({
+            'timestamp': dates,
+            'open': [100, 101, 102, 103],
+            'high': [110, 110, 109, 111],  # idx=2 is inside idx=1
+            'low': [90, 100, 101, 102],
+            'close': [105, 105, 105, 106],
+        })
+
+        config = InsideBarConfig(
+            inside_bar_mode="inclusive",
+            min_mother_bar_size=1.0,
+            atr_period=2
+        )
+        core = InsideBarCore(config)
+
+        df = core.calculate_atr(data)
+        # Force distinct ATR values at mother vs inside bars
+        df.loc[1, 'atr'] = 5.0   # mother ATR
+        df.loc[2, 'atr'] = 15.0  # inside ATR (should NOT be used)
+
+        result = core.detect_inside_bars(df)
+
+        # mother_range = 110 - 100 = 10; min_size = 1.0 * mother_ATR = 5 -> pass
+        assert result.iloc[2]['is_inside_bar'] == True
+
+    def test_mother_size_filter_rejects_when_atr_missing(self):
+        """If min_mother_bar_size>0 and mother ATR is missing/<=0, reject."""
+        dates = pd.date_range('2025-01-01', periods=4, freq='5min')
+        data = pd.DataFrame({
+            'timestamp': dates,
+            'open': [100, 101, 102, 103],
+            'high': [110, 110, 109, 111],
+            'low': [90, 100, 101, 102],
+            'close': [105, 105, 105, 106],
+        })
+
+        config = InsideBarConfig(
+            inside_bar_mode="inclusive",
+            min_mother_bar_size=1.0,
+            atr_period=2
+        )
+        core = InsideBarCore(config)
+
+        df = core.calculate_atr(data)
+        df.loc[1, 'atr'] = 0.0  # mother ATR missing/invalid
+
+        result = core.detect_inside_bars(df)
+        assert result.iloc[2]['is_inside_bar'] == False
+
     def test_detect_inside_bar_strict(self):
         """Should NOT detect if touching in strict mode."""
         dates = pd.date_range('2025-01-01', periods=3, freq='5min')
@@ -156,7 +222,7 @@ class TestSignalGeneration:
     @pytest.fixture
     def breakout_data(self):
         """Create data with inside bar and breakout."""
-        dates = pd.date_range('2025-01-01', periods=10, freq='5min')
+        dates = pd.date_range('2025-01-01 14:00', periods=10, freq='5min', tz='UTC')
         return pd.DataFrame({
             'timestamp': dates,
             # Bar 0-1: Normal
@@ -200,7 +266,7 @@ class TestSignalGeneration:
 
     def test_no_signal_without_breakout(self):
         """Should NOT generate signal if no breakout occurs."""
-        dates = pd.date_range('2025-01-01', periods=5, freq='5min')
+        dates = pd.date_range('2025-01-01 14:00', periods=5, freq='5min', tz='UTC')
         data = pd.DataFrame({
             'timestamp': dates,
             'open': [100, 101, 100.5, 101, 100.5],

@@ -232,9 +232,10 @@ class InsideBarCore:
         # Optional: Minimum mother bar size filter
         # (avoid patterns where mother bar is too small/noisy)
         if self.config.min_mother_bar_size > 0:
-            # Mother bar range must be >= min_mother_size * ATR
-            size_ok = df['prev_range'] >= (
-                self.config.min_mother_bar_size * df['atr']
+            # Mother bar range must be >= min_mother_size * ATR (mother bar ATR)
+            atr_ref = df['atr'].shift(1)
+            size_ok = (atr_ref > 0) & (
+                df['prev_range'] >= (self.config.min_mother_bar_size * atr_ref)
             )
             inside_mask = inside_mask & size_ok.fillna(False)
 
@@ -432,21 +433,22 @@ class InsideBarCore:
                 )
 
                 if is_inside:
-                    # Check min mother bar size
+                    # Check min mother bar size (only when filter enabled)
                     mother_range = prev['high'] - prev['low']
-                    atr_val = current['atr'] if 'atr' in current and pd.notna(current['atr']) else 0.0
+                    atr_val = prev['atr'] if 'atr' in prev and pd.notna(prev['atr']) else 0.0
                     min_size = self.config.min_mother_bar_size * atr_val
 
-                    if mother_range < min_size:
-                        emit({
-                            'event': 'ib_rejected',
-                            'reason': 'mother_bar_too_small',
-                            'idx': int(idx),
-                            'mother_range': float(mother_range),
-                            'min_size': float(min_size),
-                            'atr': float(atr_val)
-                        })
-                        continue
+                    if self.config.min_mother_bar_size > 0:
+                        if atr_val <= 0 or mother_range < min_size:
+                            emit({
+                                'event': 'ib_rejected',
+                                'reason': 'mother_bar_too_small',
+                                'idx': int(idx),
+                                'mother_range': float(mother_range),
+                                'min_size': float(min_size),
+                                'atr': float(atr_val)
+                            })
+                            continue
 
                     # FIRST IB FOUND - ARM SESSION
                     state['armed'] = True
