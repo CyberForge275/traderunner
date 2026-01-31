@@ -152,7 +152,17 @@ class BacktestService:
                 strategy_id=strategy,
                 file=__file__,
                 func="_run_pipeline",
-                extra={"job_id": job_id, "status": result.get("status")},
+                extra={
+                    "job_id": job_id,
+                    "status": result.get("status"),
+                    "run_name": run_name,
+                    "strategy": strategy,
+                    "symbols": symbols,
+                    "timeframe": timeframe,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "config_params": config_params,
+                },
             )
 
             # Handle results from new pipeline adapter (Phase 1-5)
