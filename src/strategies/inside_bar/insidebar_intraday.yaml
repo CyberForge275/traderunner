@@ -18,6 +18,8 @@ versions:
       timeframe_minutes: 5
       valid_from_policy: signal_ts
       order_validity_policy: session_end
+      stop_distance_cap_ticks: 40
+      max_position_pct: 100.0
     tunable:
       lookback_candles: 50
       max_pattern_age_candles: 12
@@ -39,6 +41,8 @@ versions:
       timeframe_minutes: 5
       valid_from_policy: signal_ts
       order_validity_policy: session_end
+      stop_distance_cap_ticks: 40
+      max_position_pct: 100.0
 
     tunable:
       lookback_candles: 50
@@ -61,6 +65,8 @@ versions:
       timeframe_minutes: 5
       valid_from_policy: signal_ts
       order_validity_policy: session_end
+      stop_distance_cap_ticks: 40
+      max_position_pct: 100.0
     tunable:
       lookback_candles: 50
       max_pattern_age_candles: 12

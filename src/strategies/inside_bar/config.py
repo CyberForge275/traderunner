@@ -360,8 +360,33 @@ def load_config(config_path: Path) -> dict:
     if not data:
         raise ValueError(f"Empty config file: {config_path}")
 
-    params = data.get('parameters', {})
-    return params
+    # Legacy format: top-level "parameters" (flat dict)
+    if "parameters" in data:
+        return data.get("parameters", {})
+
+    # SSOT format: top-level strategy_id + versions
+    versions = data.get("versions", {})
+    if not versions:
+        return {}
+
+    # Prefer latest stable (1.0.1) if present, else first sorted key
+    version_key = "1.0.1" if "1.0.1" in versions else sorted(versions.keys())[0]
+    node = versions.get(version_key, {})
+    core = node.get("core", {})
+    tunable = node.get("tunable", {})
+    merged = {**core, **tunable}
+
+    # Map SSOT session_filter to config session_windows
+    if "session_windows" not in merged and "session_filter" in merged:
+        merged["session_windows"] = merged["session_filter"]
+
+    # Filter to dataclass fields only (avoid passing spec-only keys)
+    allowed = set(InsideBarConfig.__dataclass_fields__.keys())
+    filtered: dict = {}
+    for key, value in merged.items():
+        if key in allowed:
+            filtered[key] = value
+    return filtered
 
 
 def get_default_config_path() -> Path:

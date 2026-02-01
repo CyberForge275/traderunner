@@ -19,7 +19,7 @@ def test_config_path_is_strategy_local():
     
     # Verify the path is within the strategy directory
     assert "src/strategies/inside_bar" in str(config_path)
-    assert config_path.name == "inside_bar.yaml"
+    assert config_path.name == "insidebar_intraday.yaml"
     assert config_path.exists()
 
 
@@ -46,9 +46,9 @@ def test_config_has_correct_defaults():
     config = load_default_config()
     
     # Verify some critical defaults
-    assert config['atr_period'] == 14
-    assert config['max_position_pct'] == 100
-    assert config['stop_distance_cap_ticks'] == 1000
+    assert config['atr_period'] == 15
+    assert config['max_position_pct'] == 100.0
+    assert config['stop_distance_cap_ticks'] == 40
 
 
 def test_inside_bar_config_accepts_loaded_defaults():
@@ -59,9 +59,9 @@ def test_inside_bar_config_accepts_loaded_defaults():
     config = InsideBarConfig(**defaults)
     
     # Verify the instance has correct attributes
-    assert config.atr_period == 14
+    assert config.atr_period == 15
     assert config.max_position_pct == 100.0
-    assert config.stop_distance_cap_ticks == 1000
+    assert config.stop_distance_cap_ticks == 40
 
 
 def test_old_global_config_path_is_not_primary():

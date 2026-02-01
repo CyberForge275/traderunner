@@ -34,10 +34,13 @@ def test_store_reads_inside_bar_defaults_from_yaml(temp_config_root):
                     "breakout_confirmation": False,
                     "inside_bar_mode": "strict",
                     "session_timezone": "America/New_York",
+                    "session_mode": "rth",
                     "session_filter": ["09:30-16:00"],
                     "timeframe_minutes": 5,
                     "valid_from_policy": "signal_ts",
-                    "order_validity_policy": "session_end"
+                    "order_validity_policy": "session_end",
+                    "stop_distance_cap_ticks": 40,
+                    "max_position_pct": 100.0
                 },
                 "tunable": {
                     "lookback_candles": 100,
