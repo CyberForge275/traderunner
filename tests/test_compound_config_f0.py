@@ -12,7 +12,7 @@ def test_ssot_location_no_legacy_duplicates():
     legacy_path = Path("src/strategies/inside_bar/inside_bar.yaml")
     assert not legacy_path.exists(), "Legacy inside_bar.yaml should not be restored"
 
-    ssot_path = Path("configs/strategies/insidebar_intraday.yaml")
+    ssot_path = Path("src/strategies/inside_bar/insidebar_intraday.yaml")
     assert ssot_path.exists(), "SSOT insidebar config must exist at configs/strategies"
 
 

@@ -369,10 +369,7 @@ def get_default_config_path() -> Path:
     Get path to default config file.
 
     Searches in order:
-    1. src/strategies/inside_bar/inside_bar.yaml (local strategy directory)
-    2. ~/data/workspace/droid/traderunner/config/inside_bar.yaml (legacy global)
-    3. config/inside_bar.yaml (production)
-    4. ~/.trading/config/inside_bar.yaml (user home)
+    1. src/strategies/inside_bar/insidebar_intraday.yaml (local strategy directory)
 
     Returns:
         Path to first config file found
@@ -381,13 +378,8 @@ def get_default_config_path() -> Path:
         FileNotFoundError: If no config file found
     """
     candidates = [
-        # 1. Local strategy directory (Strongest preference - encapsulated)
-        Path(__file__).parent / 'inside_bar.yaml',
-        
-        # 2. Global project config (Fallback/Legacy)
-        Path.home() / 'data' / 'workspace' / 'droid' / 'traderunner' / 'config' / 'inside_bar.yaml',
-        Path('config/inside_bar.yaml'),
-        Path.home() / '.trading' / 'config' / 'inside_bar.yaml',
+        # 1. Local strategy directory (SSOT)
+        Path(__file__).parent / 'insidebar_intraday.yaml',
     ]
 
     for path in candidates:

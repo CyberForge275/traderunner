@@ -47,7 +47,7 @@ Goal: map where `config.py` / `InsideBarConfig` is used and where defaults curre
 
 ### A) YAML SSOT (desired single source)
 
-- `configs/strategies/insidebar_intraday.yaml`  
+- `src/strategies/inside_bar/insidebar_intraday.yaml`  
   - Defines *core* and *tunable* defaults per version.  
   - Line refs (v1.0.1 example): **25–47**.  
   - Key fields: `valid_from_policy`, `session_filter`, `atr_period`, `min_mother_bar_size`, etc.
@@ -99,5 +99,4 @@ Goal: map where `config.py` / `InsideBarConfig` is used and where defaults curre
 
 - `_core_config_from_params` defaults: `src/strategies/inside_bar/__init__.py#L18-L51`  
 - `InsideBarConfig` defaults: `src/strategies/inside_bar/config.py#L200-L335`  
-- SSOT YAML defaults: `configs/strategies/insidebar_intraday.yaml#L1-L67`
-
+- SSOT YAML defaults: `src/strategies/inside_bar/insidebar_intraday.yaml#L1-L67`

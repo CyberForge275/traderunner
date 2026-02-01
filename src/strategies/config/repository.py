@@ -30,10 +30,10 @@ class StrategyConfigRepository:
         if env_path:
             return Path(env_path)
             
-        # Default to project_root/configs/strategies
+        # Default to inside_bar strategy directory (SSOT)
         current_file = Path(__file__).resolve()
         project_root = current_file.parent.parent.parent.parent
-        return project_root / "configs" / "strategies"
+        return project_root / "src" / "strategies" / "inside_bar"
 
     def read_strategy_file(self, strategy_name: str) -> Dict[str, Any]:
         """
