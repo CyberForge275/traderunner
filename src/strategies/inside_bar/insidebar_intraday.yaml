@@ -28,7 +28,7 @@ versions:
     required_warmup_bars: 40
     strategy_finalized: false
     core:
-      atr_period: 15
+      atr_period: 8
       risk_reward_ratio: 2.0
       min_mother_bar_size: 0.5
       breakout_confirmation: true
@@ -47,7 +47,7 @@ versions:
       lookback_candles: 50
       max_pattern_age_candles: 12
       max_deviation_atr: 3.0
-      max_position_loss_pct_equity: 0.01
+      max_position_loss_pct_equity: 0.03
   2.0.0:
     required_warmup_bars: 40
     strategy_finalized: false
