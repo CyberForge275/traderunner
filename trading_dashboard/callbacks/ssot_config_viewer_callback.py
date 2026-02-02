@@ -216,6 +216,24 @@ def register_ssot_config_viewer_callback(app):
             core_params = defaults.get("core", {})
             tunable_params = defaults.get("tunable", {})
             is_finalized = defaults.get("strategy_finalized", False)
+            if "max_position_loss_pct_equity" in core_params:
+                val = core_params.get("max_position_loss_pct_equity")
+                logger.info(
+                    "actions: ui_loaded_default key=max_position_loss_pct_equity section=core val=%r type=%s strategy_id=%s version=%s",
+                    val,
+                    type(val).__name__,
+                    strategy_id,
+                    version,
+                )
+            if "max_position_loss_pct_equity" in tunable_params:
+                val = tunable_params.get("max_position_loss_pct_equity")
+                logger.info(
+                    "actions: ui_loaded_default key=max_position_loss_pct_equity section=tunable val=%r type=%s strategy_id=%s version=%s",
+                    val,
+                    type(val).__name__,
+                    strategy_id,
+                    version,
+                )
             
             logger.info(
                 f"actions: ui_config_loaded strategy_id={strategy_id} version={version} "
@@ -280,7 +298,9 @@ def register_ssot_config_viewer_callback(app):
     )
     def save_config(n_clicks, strategy_id, current_version, new_version, loaded_defaults, edited_values, edited_ids):
         """Save config: in-place for drafts, new version for finalized or if new_version provided."""
-        
+        from dash import callback_context
+        logger.info("actions: ui_trigger %r", callback_context.triggered)
+
         if not n_clicks:
             raise PreventUpdate
         
@@ -438,16 +458,71 @@ def _compute_overrides(loaded_defaults, edited_values, edited_ids):
     for value, id_dict in zip(edited_values, edited_ids):
         section = id_dict["section"]
         key = id_dict["key"]
+        if key == "max_position_loss_pct_equity":
+            logger.info(
+                "actions: ui_param_raw key=max_position_loss_pct_equity value_repr=%r value_type=%s",
+                value,
+                type(value).__name__,
+            )
         
         original = loaded_defaults[section][key]
+        if key == "max_position_loss_pct_equity":
+            logger.info(
+                "actions: ui_param_orig key=max_position_loss_pct_equity orig=%r orig_type=%s",
+                original,
+                type(original).__name__,
+            )
+            if value in (None, ""):
+                continue
+            if isinstance(value, list):
+                if not value:
+                    continue
+                value = value[0]
+            if isinstance(value, str):
+                value = value.strip()
+                if value == "":
+                    continue
+                value = value.replace(",", ".")
+            try:
+                new_value = float(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"Invalid max_position_loss_pct_equity value: {value!r}"
+                ) from exc
+            original_norm = float(original)
+            if new_value != original_norm:
+                if section == "core":
+                    core_overrides[key] = new_value
+                else:
+                    tunable_overrides[key] = new_value
+                logger.info(
+                    "actions: ui_override_added key=%s new=%r orig=%r",
+                    key,
+                    new_value,
+                    original_norm,
+                )
+            continue
         
         # Type conversion
         if isinstance(original, bool):
             new_value = (value == ["true"]) if isinstance(value, list) else bool(value)
         elif isinstance(original, int):
-            new_value = int(value) if value else 0
+            if value in (None, ""):
+                continue
+            new_value = int(value)
         elif isinstance(original, float):
-            new_value = float(value) if value else 0.0
+            if value in (None, ""):
+                continue
+            if isinstance(value, list):
+                if not value:
+                    continue
+                value = value[0]
+            if isinstance(value, str):
+                value = value.strip()
+                if value == "":
+                    continue
+                value = value.replace(",", ".")
+            new_value = float(value)
         elif isinstance(original, list):
             # Special handling for lists (e.g., session_filter)
             if isinstance(value, str):
