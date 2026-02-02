@@ -25,11 +25,13 @@ def add_buy_sell_ny_columns(df: pd.DataFrame, entry_col: str, exit_col: str, sid
         return df
 
     out = df.copy()
+    if entry_col not in out.columns or exit_col not in out.columns:
+        return add_ny_time_columns(out, [entry_col, exit_col])
     if side_col not in out.columns:
         return add_ny_time_columns(out, [entry_col, exit_col])
 
-    entry_ts = pd.to_datetime(out.get(entry_col), errors="coerce", utc=True)
-    exit_ts = pd.to_datetime(out.get(exit_col), errors="coerce", utc=True)
+    entry_ts = pd.to_datetime(out[entry_col], errors="coerce", utc=True)
+    exit_ts = pd.to_datetime(out[exit_col], errors="coerce", utc=True)
 
     side = out[side_col].astype(str).str.upper()
     buy_ts = entry_ts.where(side == "BUY", exit_ts)
