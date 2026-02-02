@@ -573,11 +573,13 @@ def create_backtest_detail(
         BT.ORDERS_INSPECT_MODAL,
         BT.ORDERS_INSPECT_TITLE,
         BT.ORDERS_INSPECT_BODY,
+        chart_id=BT.ORDERS_INSPECT_CHART,
     )
     trades_modal = build_inspector_modal(
         BT.TRADES_INSPECT_MODAL,
         BT.TRADES_INSPECT_TITLE,
         BT.TRADES_INSPECT_BODY,
+        chart_id=BT.TRADES_INSPECT_CHART,
     )
 
     # Rudometkin daily candidates (optional)

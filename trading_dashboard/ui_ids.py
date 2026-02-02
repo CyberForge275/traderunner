@@ -40,11 +40,13 @@ class BT:
     ORDERS_INSPECT_TITLE = "bt:orders-inspect-title"
     ORDERS_INSPECT_BODY = "bt:orders-inspect-body"
     ORDERS_INSPECT_CLOSE = "bt:orders-inspect-modal__close"
+    ORDERS_INSPECT_CHART = "bt:orders-inspect-chart"
 
     TRADES_INSPECT_MODAL = "bt:trades-inspect-modal"
     TRADES_INSPECT_TITLE = "bt:trades-inspect-title"
     TRADES_INSPECT_BODY = "bt:trades-inspect-body"
     TRADES_INSPECT_CLOSE = "bt:trades-inspect-modal__close"
+    TRADES_INSPECT_CHART = "bt:trades-inspect-chart"
     
     RUN_DROPDOWN = "bt:run-dropdown"
     STATUS_CONTAINER = "bt:status-container"

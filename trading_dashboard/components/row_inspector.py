@@ -8,7 +8,7 @@ from typing import Any, Iterable, Mapping
 import logging
 
 import pandas as pd
-from dash import html
+from dash import html, dcc
 import dash_bootstrap_components as dbc
 
 logger = logging.getLogger(__name__)
@@ -95,17 +95,30 @@ def render_kv_table(items: Iterable[Mapping[str, str]]) -> html.Div:
     )
 
 
-def build_inspector_modal(modal_id: str, title_id: str, body_id: str) -> dbc.Modal:
+def build_inspector_modal(modal_id: str, title_id: str, body_id: str, chart_id: str | None = None) -> dbc.Modal:
     """Create a reusable Modal shell for row inspection."""
     close_id = f"{modal_id}__close"
+    if chart_id:
+        body = html.Div(
+            style={"display": "flex", "gap": "12px"},
+            children=[
+                html.Div(id=body_id, style={"flex": "1 1 45%"}),
+                html.Div(
+                    style={"flex": "1 1 55%"},
+                    children=[dcc.Graph(id=chart_id, figure={})],
+                ),
+            ],
+        )
+    else:
+        body = html.Div(id=body_id)
     return dbc.Modal(
         id=modal_id,
         is_open=False,
-        size="lg",
+        size="xl",
         scrollable=True,
         children=[
             dbc.ModalHeader(dbc.ModalTitle(id=title_id)),
-            dbc.ModalBody(html.Div(id=body_id)),
+            dbc.ModalBody(body),
             dbc.ModalFooter(
                 dbc.Button("Close", id=close_id, color="secondary")
             ),
