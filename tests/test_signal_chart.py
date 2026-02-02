@@ -55,3 +55,4 @@ def test_slice_bars_window_nearest_previous_anchor():
 def test_build_candlestick_figure_empty():
     fig = build_candlestick_figure(pd.DataFrame())
     assert fig.layout.title.text == "No bars available"
+    assert fig.layout.annotations

@@ -77,7 +77,7 @@ def render_kv_table(items: Iterable[Mapping[str, str]]) -> html.Div:
                 ],
                 style={
                     "display": "grid",
-                    "gridTemplateColumns": "220px 1fr",
+                    "gridTemplateColumns": "280px 1fr",
                     "gap": "12px",
                     "padding": "6px 0",
                     "borderBottom": "1px solid var(--border-color)",
@@ -91,6 +91,8 @@ def render_kv_table(items: Iterable[Mapping[str, str]]) -> html.Div:
             "maxHeight": "65vh",
             "overflowY": "auto",
             "fontFamily": "monospace",
+            "wordBreak": "break-word",
+            "overflowWrap": "anywhere",
         },
     )
 

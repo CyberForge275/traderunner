@@ -70,7 +70,21 @@ def slice_bars_window_by_count(
 def build_candlestick_figure(bars_window_df: pd.DataFrame, tz: str = "America/New_York") -> go.Figure:
     fig = go.Figure()
     if bars_window_df.empty:
-        fig.update_layout(title="No bars available")
+        fig.update_layout(
+            title="No bars available",
+            xaxis={"visible": False},
+            yaxis={"visible": False},
+            annotations=[
+                {
+                    "text": "No bars available for this window",
+                    "xref": "paper",
+                    "yref": "paper",
+                    "x": 0.5,
+                    "y": 0.5,
+                    "showarrow": False,
+                }
+            ],
+        )
         return fig
 
     ts = pd.to_datetime(bars_window_df["timestamp"], utc=True, errors="coerce")
