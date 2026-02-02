@@ -57,9 +57,8 @@ def _create_input_for_param(key, value, section, spec):
             html.Label(key, style=label_style),
             dcc.Input(
                 id=input_id,
-                type="number",
-                value=value,
-                step=0.1,
+                type="text",
+                value=str(value),
                 style={"width": "100%", "marginBottom": "8px"},
             ),
         ])
