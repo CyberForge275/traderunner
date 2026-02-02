@@ -49,6 +49,9 @@ def slice_bars_window_by_count(
     if bars_df.empty:
         return bars_df
 
+    if "timestamp" not in bars_df.columns:
+        return pd.DataFrame()
+
     bars = bars_df.sort_values("timestamp").reset_index(drop=True)
     ts_series = pd.to_datetime(bars["timestamp"], utc=True, errors="coerce")
     anchor_idx = _find_nearest_previous_index(ts_series, anchor_ts)
@@ -140,5 +143,7 @@ def load_bars_for_run(run_dir: Path) -> pd.DataFrame:
             if col in df.columns:
                 df = df.rename(columns={col: "timestamp"})
                 break
+    if "timestamp" not in df.columns:
+        return pd.DataFrame()
 
     return df
