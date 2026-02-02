@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['src/axiom_bt/pipeline/run_pipeline_spyder.py', 'src/axiom_bt/pipeline/strategy_config_loader.py', 'src/axiom_bt/pipeline/runner.py', 'docs/ARCHITECTURE_TESTS.md', 'configs/strategies/insidebar_intraday.yaml', 'src/strategies/inside_bar/signal_schema.py', 'src/strategies/profiles/inside_bar.py', 'scripts/audit_trade_verification.py']
+recent_files = ['src/axiom_bt/pipeline/run_pipeline_spyder.py', 'src/strategies/profiles/inside_bar.py', 'src/axiom_bt/pipeline/cli.py', 'trading_dashboard/callbacks/run_backtest_callback.py', 'src/axiom_bt/pipeline/signal_frame_factory.py', 'src/strategies/inside_bar/insidebar_intraday.yaml']
 
 [main]
 version = 0.2.0

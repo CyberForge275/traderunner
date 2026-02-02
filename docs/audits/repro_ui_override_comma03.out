@@ -1,0 +1,15 @@
+original=0.01 value='0,03' type=str
+  EXC: ValueError: could not convert string to float: '0,03'
+original=0.01 value='0.03' type=str
+  core_overrides={}
+  tunable_overrides={'max_position_loss_pct_equity': 0.03}
+original=0.01 value='' type=str
+  core_overrides={}
+  tunable_overrides={'max_position_loss_pct_equity': 0.0}
+original=0.01 value=None type=NoneType
+  core_overrides={}
+  tunable_overrides={'max_position_loss_pct_equity': 0.0}
+original=0.01 value=' 0,03 ' type=str
+  EXC: ValueError: could not convert string to float: ' 0,03 '
+original=0.01 value=['0,03'] type=list
+  EXC: TypeError: float() argument must be a string or a real number, not 'list'

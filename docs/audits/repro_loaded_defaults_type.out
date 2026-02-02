@@ -1,0 +1,4 @@
+strategy: insidebar_intraday
+version: 1.0.1
+section=core key=max_position_loss_pct_equity MISSING
+section=tunable key=max_position_loss_pct_equity value=0.0 type=float
