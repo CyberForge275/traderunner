@@ -508,7 +508,22 @@ def _compute_overrides(loaded_defaults, edited_values, edited_ids):
         elif isinstance(original, int):
             if value in (None, ""):
                 continue
-            new_value = int(value)
+            if isinstance(value, list):
+                if not value:
+                    continue
+                value = value[0]
+            if isinstance(value, str):
+                value = value.strip()
+                if value == "":
+                    continue
+                value = value.replace(",", ".")
+            try:
+                float_val = float(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Invalid int value for {key}: {value!r}") from exc
+            if not float_val.is_integer():
+                raise ValueError(f"Invalid int value for {key}: {value!r}")
+            new_value = int(float_val)
         elif isinstance(original, float):
             if value in (None, ""):
                 continue
