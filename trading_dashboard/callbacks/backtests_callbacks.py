@@ -4,8 +4,15 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from dash import Input, Output, State
+from dash import Input, Output, State, no_update, callback_context
+from dash.exceptions import PreventUpdate
 from ..ui_ids import BT, RUN
+from ..components.row_inspector import (
+    INSPECT_COL,
+    row_to_kv_items,
+    render_kv_table,
+    log_open,
+)
 
 
 def register_backtests_callbacks(app):
@@ -232,3 +239,67 @@ def register_backtests_callbacks(app):
         # Toggle options is checked if 'enabled' is in list
         is_enabled = "enabled" in (toggle_value or [])
         return not is_enabled  # Disabled if NOT enabled
+
+    @app.callback(
+        Output(BT.ORDERS_INSPECT_MODAL, "is_open"),
+        Output(BT.ORDERS_INSPECT_TITLE, "children"),
+        Output(BT.ORDERS_INSPECT_BODY, "children"),
+        Input(BT.ORDERS_TABLE, "active_cell"),
+        Input(BT.ORDERS_INSPECT_CLOSE, "n_clicks"),
+        State(BT.ORDERS_TABLE, "derived_viewport_data"),
+        State(BT.ORDERS_TABLE, "data"),
+        prevent_initial_call=True,
+    )
+    def open_orders_inspector(active_cell, close_clicks, viewport_rows, all_rows):
+        if not callback_context.triggered:
+            raise PreventUpdate
+        trigger_id = callback_context.triggered[0]["prop_id"].split(".")[0]
+        if trigger_id == BT.ORDERS_INSPECT_CLOSE:
+            return False, no_update, no_update
+
+        if not active_cell or active_cell.get("column_id") != INSPECT_COL:
+            return no_update, no_update, no_update
+
+        rows = viewport_rows or all_rows or []
+        row_index = active_cell.get("row")
+        if row_index is None or row_index >= len(rows):
+            return no_update, no_update, no_update
+
+        row = rows[row_index]
+        items = row_to_kv_items(row)
+        title = f"Order Inspector — {row.get('template_id', '')} ({row.get('symbol', '')})"
+        body = render_kv_table(items)
+        log_open("orders", row.get("template_id"), row.get("symbol"), row.get("signal_ts"))
+        return True, title, body
+
+    @app.callback(
+        Output(BT.TRADES_INSPECT_MODAL, "is_open"),
+        Output(BT.TRADES_INSPECT_TITLE, "children"),
+        Output(BT.TRADES_INSPECT_BODY, "children"),
+        Input(BT.TRADES_TABLE, "active_cell"),
+        Input(BT.TRADES_INSPECT_CLOSE, "n_clicks"),
+        State(BT.TRADES_TABLE, "derived_viewport_data"),
+        State(BT.TRADES_TABLE, "data"),
+        prevent_initial_call=True,
+    )
+    def open_trades_inspector(active_cell, close_clicks, viewport_rows, all_rows):
+        if not callback_context.triggered:
+            raise PreventUpdate
+        trigger_id = callback_context.triggered[0]["prop_id"].split(".")[0]
+        if trigger_id == BT.TRADES_INSPECT_CLOSE:
+            return False, no_update, no_update
+
+        if not active_cell or active_cell.get("column_id") != INSPECT_COL:
+            return no_update, no_update, no_update
+
+        rows = viewport_rows or all_rows or []
+        row_index = active_cell.get("row")
+        if row_index is None or row_index >= len(rows):
+            return no_update, no_update, no_update
+
+        row = rows[row_index]
+        items = row_to_kv_items(row)
+        title = f"Trade Inspector — {row.get('template_id', '')} ({row.get('symbol', '')})"
+        body = render_kv_table(items)
+        log_open("trades", row.get("template_id"), row.get("symbol"), row.get("entry_ts"))
+        return True, title, body

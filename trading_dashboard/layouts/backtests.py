@@ -15,6 +15,10 @@ import pandas as pd
 
 from ..repositories.backtests import list_backtests
 from ..ui_ids import Nav, BT, SSOT, RUN
+from ..components.row_inspector import (
+    add_inspect_column,
+    build_inspector_modal,
+)
 
 
 def _create_backtests_table(df):
@@ -460,6 +464,7 @@ def create_backtest_detail(
     orders_content = html.Div("No orders available.")
     if not orders_df.empty:
         display_orders = _format_numeric(orders_df, ["price", "stop_loss", "take_profit"])
+        display_orders = add_inspect_column(display_orders)
         orders_content = dash_table.DataTable(
             id=BT.ORDERS_TABLE,
             columns=[{"name": c, "id": c} for c in display_orders.columns],
@@ -532,6 +537,7 @@ def create_backtest_detail(
             "slippage_total",
         ]
         display_trades = _format_numeric(trades_df, fee_cols, digits=2)
+        display_trades = add_inspect_column(display_trades)
         trades_content = dash_table.DataTable(
             id=BT.TRADES_TABLE,
             columns=[{"name": c, "id": c} for c in display_trades.columns],
@@ -558,6 +564,17 @@ def create_backtest_detail(
         dcc.Tab(label="Filled Orders", children=fills_content),
         dcc.Tab(label="Trades", children=trades_content),
     ]
+
+    orders_modal = build_inspector_modal(
+        BT.ORDERS_INSPECT_MODAL,
+        BT.ORDERS_INSPECT_TITLE,
+        BT.ORDERS_INSPECT_BODY,
+    )
+    trades_modal = build_inspector_modal(
+        BT.TRADES_INSPECT_MODAL,
+        BT.TRADES_INSPECT_TITLE,
+        BT.TRADES_INSPECT_BODY,
+    )
 
     # Rudometkin daily candidates (optional)
     rk_block = html.Div()
@@ -626,6 +643,8 @@ def create_backtest_detail(
                 ],
                 style={"marginTop": "20px"},
             ),
+            orders_modal,
+            trades_modal,
             rk_block,
         ],
     )
