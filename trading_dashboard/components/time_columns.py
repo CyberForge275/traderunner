@@ -19,19 +19,19 @@ def add_ny_time_columns(df: pd.DataFrame, cols: Iterable[str], suffix: str = "_n
     return out
 
 
-def add_buy_sell_ny_columns(trades_df: pd.DataFrame) -> pd.DataFrame:
+def add_buy_sell_ny_columns(df: pd.DataFrame, entry_col: str, exit_col: str, side_col: str = "side") -> pd.DataFrame:
     """Add buy_ts_ny/sell_ts_ny derived from side + entry/exit timestamps."""
-    if trades_df.empty:
-        return trades_df
+    if df.empty:
+        return df
 
-    out = trades_df.copy()
-    if "side" not in out.columns:
-        return add_ny_time_columns(out, ["entry_ts", "exit_ts"])
+    out = df.copy()
+    if side_col not in out.columns:
+        return add_ny_time_columns(out, [entry_col, exit_col])
 
-    entry_ts = pd.to_datetime(out.get("entry_ts"), errors="coerce", utc=True)
-    exit_ts = pd.to_datetime(out.get("exit_ts"), errors="coerce", utc=True)
+    entry_ts = pd.to_datetime(out.get(entry_col), errors="coerce", utc=True)
+    exit_ts = pd.to_datetime(out.get(exit_col), errors="coerce", utc=True)
 
-    side = out["side"].astype(str).str.upper()
+    side = out[side_col].astype(str).str.upper()
     buy_ts = entry_ts.where(side == "BUY", exit_ts)
     sell_ts = exit_ts.where(side == "BUY", entry_ts)
 

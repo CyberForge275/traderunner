@@ -11,7 +11,7 @@ def test_buy_sell_ny_columns_buy_side():
             "exit_ts": ["2026-01-01T16:00:00Z"],
         }
     )
-    out = add_buy_sell_ny_columns(df)
+    out = add_buy_sell_ny_columns(df, "entry_ts", "exit_ts")
     assert out.loc[0, "buy_ts_ny"].endswith("-0500")
     assert out.loc[0, "sell_ts_ny"].endswith("-0500")
 
@@ -24,7 +24,7 @@ def test_buy_sell_ny_columns_sell_side():
             "exit_ts": ["2026-01-01T16:00:00Z"],
         }
     )
-    out = add_buy_sell_ny_columns(df)
+    out = add_buy_sell_ny_columns(df, "entry_ts", "exit_ts")
     # For SELL: buy happens at exit_ts, sell at entry_ts
     assert out.loc[0, "buy_ts_ny"].startswith("2026-01-01 11:00")
     assert out.loc[0, "sell_ts_ny"].startswith("2026-01-01 10:00")
@@ -38,6 +38,18 @@ def test_buy_sell_ny_handles_missing():
             "exit_ts": ["2026-01-01T16:00:00Z"],
         }
     )
-    out = add_buy_sell_ny_columns(df)
+    out = add_buy_sell_ny_columns(df, "entry_ts", "exit_ts")
     assert out.loc[0, "buy_ts_ny"] == ""
     assert out.loc[0, "sell_ts_ny"].endswith("-0500")
+
+def test_orders_buy_sell_columns_from_signal_ts():
+    df = pd.DataFrame(
+        {
+            "side": ["BUY"],
+            "signal_ts": ["2026-01-01T15:00:00Z"],
+            "exit_ts": ["2026-01-01T16:00:00Z"],
+        }
+    )
+    out = add_buy_sell_ny_columns(df, "signal_ts", "exit_ts")
+    assert out.loc[0, "buy_ts_ny"].startswith("2026-01-01 10:00")
+    assert out.loc[0, "sell_ts_ny"].startswith("2026-01-01 11:00")

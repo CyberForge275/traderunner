@@ -466,6 +466,7 @@ def create_backtest_detail(
     orders_content = html.Div("No orders available.")
     if not orders_df.empty:
         display_orders = _format_numeric(orders_df, ["price", "stop_loss", "take_profit"])
+        display_orders = add_buy_sell_ny_columns(display_orders, "signal_ts", "exit_ts")
         display_orders = add_inspect_column(display_orders)
         orders_content = dash_table.DataTable(
             id=BT.ORDERS_TABLE,
@@ -539,7 +540,7 @@ def create_backtest_detail(
             "slippage_total",
         ]
         display_trades = _format_numeric(trades_df, fee_cols, digits=2)
-        display_trades = add_buy_sell_ny_columns(display_trades)
+        display_trades = add_buy_sell_ny_columns(display_trades, "entry_ts", "exit_ts")
         display_trades = add_inspect_column(display_trades)
         trades_content = dash_table.DataTable(
             id=BT.TRADES_TABLE,
