@@ -19,6 +19,7 @@ from ..components.row_inspector import (
     add_inspect_column,
     build_inspector_modal,
 )
+from ..components.time_columns import add_buy_sell_ny_columns
 
 
 def _create_backtests_table(df):
@@ -460,6 +461,7 @@ def create_backtest_detail(
                 out[col] = pd.to_numeric(out[col], errors="coerce").round(digits)
         return out
 
+
     # Orders
     orders_content = html.Div("No orders available.")
     if not orders_df.empty:
@@ -537,6 +539,7 @@ def create_backtest_detail(
             "slippage_total",
         ]
         display_trades = _format_numeric(trades_df, fee_cols, digits=2)
+        display_trades = add_buy_sell_ny_columns(display_trades)
         display_trades = add_inspect_column(display_trades)
         trades_content = dash_table.DataTable(
             id=BT.TRADES_TABLE,
