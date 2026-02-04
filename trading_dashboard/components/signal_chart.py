@@ -1,7 +1,7 @@
 """Signal inspector chart helpers."""
 from __future__ import annotations
 
-from typing import Iterable, Mapping, Optional, Tuple
+from typing import Iterable, Mapping, Optional, Tuple, Sequence
 import logging
 from pathlib import Path
 
@@ -50,6 +50,7 @@ def infer_exit_ts(row: Mapping[str, object]) -> Optional[pd.Timestamp]:
 
 
 def _find_nearest_previous_index(ts_series: pd.Series, target: pd.Timestamp) -> int:
+    ts_series = ts_series.reset_index(drop=True)
     candidates = ts_series[ts_series <= target]
     if candidates.empty:
         return 0
@@ -95,6 +96,133 @@ def align_marker_ts(bars_window_df: pd.DataFrame, ts: Optional[pd.Timestamp]) ->
         return pd.to_datetime(row["timestamp"], utc=True, errors="coerce")
     except Exception:
         return None
+
+
+def _align_ts_to_bars(
+    bars_df: pd.DataFrame, ts: Optional[pd.Timestamp]
+) -> Tuple[Optional[pd.Timestamp], str]:
+    if ts is None:
+        return None, "parse_failed"
+    if bars_df.empty or "timestamp" not in bars_df.columns:
+        return None, "no_bars"
+    ts_series = pd.to_datetime(bars_df["timestamp"], utc=True, errors="coerce")
+    ts_series = ts_series.dropna()
+    if ts_series.empty:
+        return None, "no_bars"
+    if ts < ts_series.min() or ts > ts_series.max():
+        return None, "out_of_dataset"
+    idx = _find_nearest_previous_index(ts_series, ts)
+    if idx < 0 or idx >= len(ts_series):
+        return None, "out_of_dataset"
+    return pd.to_datetime(ts_series.iloc[idx], utc=True, errors="coerce"), "ok"
+
+
+def compute_bars_window_union(
+    bars_df: pd.DataFrame,
+    timestamps: Sequence[Optional[pd.Timestamp]],
+    pre_bars: int = 5,
+    post_bars: int = 5,
+) -> Tuple[pd.DataFrame, dict]:
+    if bars_df.empty:
+        return bars_df, {"reason": "empty_bars_df"}
+    if "timestamp" not in bars_df.columns:
+        return pd.DataFrame(), {"reason": "missing_timestamp_col"}
+    bars = bars_df.sort_values("timestamp").reset_index(drop=True)
+    ts_series = pd.to_datetime(bars["timestamp"], utc=True, errors="coerce")
+    aligned = []
+    for ts in timestamps:
+        aligned_ts, reason = _align_ts_to_bars(bars, ts)
+        if aligned_ts is not None:
+            aligned.append(aligned_ts)
+        else:
+            logger.info(
+                "actions: inspector_marker_skip reason=%s wanted_ts=%s",
+                reason,
+                ts,
+            )
+    if not aligned:
+        return pd.DataFrame(), {"reason": "no_aligned_timestamps"}
+    min_ts = min(aligned)
+    max_ts = max(aligned)
+    start_idx = _find_nearest_previous_index(ts_series, min_ts)
+    end_idx = _find_nearest_previous_index(ts_series, max_ts)
+    start_idx = max(start_idx - pre_bars, 0)
+    end_idx = min(end_idx + post_bars, len(bars) - 1)
+    window = bars.iloc[start_idx : end_idx + 1].copy()
+    meta = {
+        "reason": "ok",
+        "start_ts": window["timestamp"].iloc[0] if not window.empty else None,
+        "end_ts": window["timestamp"].iloc[-1] if not window.empty else None,
+    }
+    return window, meta
+
+
+def build_marker(
+    bars_window_df: pd.DataFrame,
+    key: str,
+    wanted_ts: Optional[pd.Timestamp],
+    price_col: str,
+    color: str,
+    symbol: str,
+    label: str,
+) -> Optional[dict]:
+    if wanted_ts is None:
+        logger.info("actions: inspector_marker key=%s reason=parse_failed", key)
+        return None
+    if bars_window_df.empty or "timestamp" not in bars_window_df.columns:
+        logger.info("actions: inspector_marker key=%s reason=no_window", key)
+        return None
+    ts_series = pd.to_datetime(bars_window_df["timestamp"], utc=True, errors="coerce")
+    window_min = ts_series.iloc[0]
+    window_max = ts_series.iloc[-1]
+    if pd.isna(window_min) or pd.isna(window_max):
+        logger.info("actions: inspector_marker key=%s reason=window_ts_invalid", key)
+        return None
+    if len(ts_series) <= 1:
+        tolerance = None
+    else:
+        deltas = ts_series.diff().dropna()
+        tolerance = deltas.median() if not deltas.empty else pd.Timedelta(0)
+    if wanted_ts < window_min or (tolerance is not None and wanted_ts > window_max + tolerance):
+        logger.info(
+            "actions: inspector_marker key=%s reason=out_of_window wanted_ts=%s window_min=%s window_max=%s",
+            key,
+            wanted_ts,
+            window_min,
+            window_max,
+        )
+        return None
+    aligned_ts = align_marker_ts(bars_window_df, wanted_ts)
+    if aligned_ts is None:
+        logger.info(
+            "actions: inspector_marker key=%s reason=not_in_window wanted_ts=%s",
+            key,
+            wanted_ts,
+        )
+        return None
+    price = resolve_marker_price(bars_window_df, aligned_ts, price_col)
+    if price is None or pd.isna(price):
+        logger.info(
+            "actions: inspector_marker key=%s reason=no_price aligned_ts=%s",
+            key,
+            aligned_ts,
+        )
+        return None
+    window_high = pd.to_numeric(bars_window_df["high"], errors="coerce").max()
+    window_low = pd.to_numeric(bars_window_df["low"], errors="coerce").min()
+    span = float(window_high - window_low) if pd.notna(window_high) and pd.notna(window_low) else 0.0
+    offset = span * 0.02
+    y = price + offset if price_col == "high" else price - offset
+    logger.info(
+        "actions: inspector_marker key=%s wanted_ts=%s aligned_ts=%s y=%s window_min=%s window_max=%s",
+        key,
+        wanted_ts,
+        aligned_ts,
+        y,
+        bars_window_df["timestamp"].iloc[0] if not bars_window_df.empty else None,
+        bars_window_df["timestamp"].iloc[-1] if not bars_window_df.empty else None,
+    )
+    return {"ts": aligned_ts, "price": y, "label": label, "symbol": symbol, "color": color}
 
 
 def resolve_inspector_timestamps(row: Mapping[str, object]) -> Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp], Optional[pd.Timestamp]]:

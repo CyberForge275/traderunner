@@ -17,10 +17,9 @@ from ..components.row_inspector import (
 )
 from ..components.signal_chart import (
     build_candlestick_figure,
-    compute_bars_window,
+    compute_bars_window_union,
     resolve_inspector_timestamps,
-    resolve_marker_price,
-    align_marker_ts,
+    build_marker,
     infer_mother_ts,
     infer_exit_ts,
     log_chart_window,
@@ -294,60 +293,25 @@ def register_backtests_callbacks(app):
                 mother_ts, inside_ts, exit_ts = resolve_inspector_timestamps(row)
                 if mother_ts is None:
                     mother_ts = pd.to_datetime(row.get("signal_ts"), utc=True, errors="coerce")
-                if pd.notna(mother_ts):
-                    window, meta = compute_bars_window(bars_df, mother_ts, exit_ts)
-                    markers = []
-                    logger = logging.getLogger(__name__)
-                    if not window.empty:
-                        m_price = resolve_marker_price(window, mother_ts, "high")
-                        m_ts = align_marker_ts(window, mother_ts)
-                        if m_price is not None and m_ts is not None:
-                            markers.append({"ts": m_ts, "price": m_price * 1.002, "label": "M", "symbol": "triangle-down", "color": "#1f77b4"})
-                        else:
-                            logger.info(
-                                "actions: inspector_chart_marker_missing kind=mother template_id=%s symbol=%s",
-                                row.get("template_id"),
-                                row.get("symbol"),
-                            )
-
-                        if inside_ts is not None:
-                            ib_price = resolve_marker_price(window, inside_ts, "high")
-                            ib_ts = align_marker_ts(window, inside_ts)
-                            if ib_price is not None and ib_ts is not None:
-                                markers.append({"ts": ib_ts, "price": ib_price * 1.002, "label": "IB", "symbol": "triangle-down", "color": "#000000"})
-                            else:
-                                logger.info(
-                                    "actions: inspector_chart_marker_missing kind=inside template_id=%s symbol=%s",
-                                    row.get("template_id"),
-                                    row.get("symbol"),
-                                )
-                        entry_ts = pd.to_datetime(row.get("dbg_trigger_ts") or row.get("signal_ts"), utc=True, errors="coerce")
-                        if pd.notna(entry_ts):
-                            e_price = resolve_marker_price(window, entry_ts, "low")
-                            e_ts = align_marker_ts(window, entry_ts)
-                            if e_price is not None and e_ts is not None:
-                                markers.append({"ts": e_ts, "price": e_price * 0.998, "label": "Entry", "symbol": "triangle-up", "color": "#2ca02c"})
-                            else:
-                                logger.info(
-                                    "actions: inspector_chart_marker_missing kind=entry template_id=%s symbol=%s",
-                                    row.get("template_id"),
-                                    row.get("symbol"),
-                                )
-                    if markers:
-                        for marker in markers:
-                            logger.info(
-                                "actions: inspector_chart_marker_align kind=%s template_id=%s symbol=%s ts=%s price=%s",
-                                marker.get("label"),
-                                row.get("template_id"),
-                                row.get("symbol"),
-                                marker.get("ts"),
-                                marker.get("price"),
-                            )
-                    fig = build_candlestick_figure(window, markers=markers)
-                    start_ts = meta.get("start_ts")
-                    end_ts = meta.get("end_ts")
-                    log_chart_window(
-                        "orders",
+                entry_ts = pd.to_datetime(row.get("dbg_trigger_ts") or row.get("signal_ts"), utc=True, errors="coerce")
+                timestamps = [mother_ts, inside_ts, entry_ts, exit_ts]
+                window, meta = compute_bars_window_union(bars_df, timestamps, pre_bars=5, post_bars=5)
+                markers = []
+                if not window.empty:
+                    m = build_marker(window, "mother", mother_ts, "high", "#1f77b4", "triangle-down", "M")
+                    if m:
+                        markers.append(m)
+                    ib = build_marker(window, "inside", inside_ts, "high", "#000000", "triangle-down", "IB")
+                    if ib:
+                        markers.append(ib)
+                    en = build_marker(window, "entry", entry_ts, "low", "#2ca02c", "triangle-up", "E")
+                    if en:
+                        markers.append(en)
+                fig = build_candlestick_figure(window, markers=markers)
+                start_ts = meta.get("start_ts")
+                end_ts = meta.get("end_ts")
+                log_chart_window(
+                    "orders",
                         row.get("template_id"),
                         row.get("symbol"),
                         mother_ts,
@@ -407,59 +371,25 @@ def register_backtests_callbacks(app):
                 if mother_ts is None:
                     mother_ts = pd.to_datetime(row.get("entry_ts"), utc=True, errors="coerce")
                 exit_ts = pd.to_datetime(row.get("exit_ts"), utc=True, errors="coerce")
-                if pd.notna(mother_ts):
-                    window, meta = compute_bars_window(bars_df, mother_ts, exit_ts)
-                    markers = []
-                    logger = logging.getLogger(__name__)
-                    if not window.empty:
-                        m_price = resolve_marker_price(window, mother_ts, "high")
-                        m_ts = align_marker_ts(window, mother_ts)
-                        if m_price is not None and m_ts is not None:
-                            markers.append({"ts": m_ts, "price": m_price * 1.002, "label": "M", "symbol": "triangle-down", "color": "#1f77b4"})
-                        else:
-                            logger.info(
-                                "actions: inspector_chart_marker_missing kind=mother template_id=%s symbol=%s",
-                                row.get("template_id"),
-                                row.get("symbol"),
-                            )
-                        if inside_ts is not None:
-                            ib_price = resolve_marker_price(window, inside_ts, "high")
-                            ib_ts = align_marker_ts(window, inside_ts)
-                            if ib_price is not None and ib_ts is not None:
-                                markers.append({"ts": ib_ts, "price": ib_price * 1.002, "label": "IB", "symbol": "triangle-down", "color": "#000000"})
-                            else:
-                                logger.info(
-                                    "actions: inspector_chart_marker_missing kind=inside template_id=%s symbol=%s",
-                                    row.get("template_id"),
-                                    row.get("symbol"),
-                                )
-                        entry_ts = pd.to_datetime(row.get("entry_ts"), utc=True, errors="coerce")
-                        if pd.notna(entry_ts):
-                            e_price = resolve_marker_price(window, entry_ts, "low")
-                            e_ts = align_marker_ts(window, entry_ts)
-                            if e_price is not None and e_ts is not None:
-                                markers.append({"ts": e_ts, "price": e_price * 0.998, "label": "Entry", "symbol": "triangle-up", "color": "#2ca02c"})
-                            else:
-                                logger.info(
-                                    "actions: inspector_chart_marker_missing kind=entry template_id=%s symbol=%s",
-                                    row.get("template_id"),
-                                    row.get("symbol"),
-                                )
-                    if markers:
-                        for marker in markers:
-                            logger.info(
-                                "actions: inspector_chart_marker_align kind=%s template_id=%s symbol=%s ts=%s price=%s",
-                                marker.get("label"),
-                                row.get("template_id"),
-                                row.get("symbol"),
-                                marker.get("ts"),
-                                marker.get("price"),
-                            )
-                    fig = build_candlestick_figure(window, markers=markers)
-                    start_ts = meta.get("start_ts")
-                    end_ts = meta.get("end_ts")
-                    log_chart_window(
-                        "trades",
+                entry_ts = pd.to_datetime(row.get("entry_ts"), utc=True, errors="coerce")
+                timestamps = [mother_ts, inside_ts, entry_ts, exit_ts]
+                window, meta = compute_bars_window_union(bars_df, timestamps, pre_bars=5, post_bars=5)
+                markers = []
+                if not window.empty:
+                    m = build_marker(window, "mother", mother_ts, "high", "#1f77b4", "triangle-down", "M")
+                    if m:
+                        markers.append(m)
+                    ib = build_marker(window, "inside", inside_ts, "high", "#000000", "triangle-down", "IB")
+                    if ib:
+                        markers.append(ib)
+                    en = build_marker(window, "entry", entry_ts, "low", "#2ca02c", "triangle-up", "E")
+                    if en:
+                        markers.append(en)
+                fig = build_candlestick_figure(window, markers=markers)
+                start_ts = meta.get("start_ts")
+                end_ts = meta.get("end_ts")
+                log_chart_window(
+                    "trades",
                         row.get("template_id"),
                         row.get("symbol"),
                         mother_ts,
