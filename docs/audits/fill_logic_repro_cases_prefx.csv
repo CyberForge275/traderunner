@@ -1,0 +1,4 @@
+case,symbol,side,target_ts,template_id,signal_ts,entry_price_intent,stop_price_intent,take_profit_intent,entry_fill_ts,entry_fill_price,exit_fill_reason,exit_fill_ts,exit_fill_price,trade_entry_price,trade_exit_price,trade_reason,trade_pnl,bar_close_at_signal,invariant_ok,bars_path
+case_1,HOOD,BUY,2025-09-08 13:45:00+00:00,ib_tpl_11235,2025-09-08 13:45:00+00:00,113.52,113.12,114.32,2025-09-08 13:45:00+00:00,113.52,,,,,,,,,True,
+case_2,HOOD,BUY,2025-11-04 14:40:00+00:00,ib_tpl_14432,2025-11-04 14:40:00+00:00,140.74,140.34,141.54000000000002,2025-11-04 14:40:00+00:00,140.74,,,,,,,,,True,
+case_3,HOOD,SELL,2025-05-01 18:20:00+00:00,ib_tpl_4426,2025-05-01 18:20:00+00:00,47.09,47.27,46.73,2025-05-01 18:20:00+00:00,47.09,,,,,,,,,True,
