@@ -207,27 +207,41 @@ class InsideBarCore:
         """
         df = df.copy()
 
-        # Previous candle OHLC
+        # Previous candle OHLC (mother bar)
         df['prev_high'] = df['high'].shift(1)
         df['prev_low'] = df['low'].shift(1)
+        df['prev_open'] = df['open'].shift(1)
+        df['prev_close'] = df['close'].shift(1)
         df['prev_range'] = df['prev_high'] - df['prev_low']
 
-        # Inside bar condition based on mode
+        # Mother bar body (for inside-bar detection)
+        body_low = df[['prev_open', 'prev_close']].min(axis=1)
+        body_high = df[['prev_open', 'prev_close']].max(axis=1)
+
+        # Inside bar condition based on mother body (high + close)
         if self.config.inside_bar_mode == "strict":
-            # Strict: Current MUST be strictly inside (no touching)
+            # Strict: Current MUST be strictly inside mother body
             inside_mask = (
-                (df['high'] < df['prev_high']) &
-                (df['low'] > df['prev_low'])
+                (df['high'] < body_high) &
+                (df['close'] > body_low) &
+                (df['close'] < body_high)
             )
         else:  # inclusive (default)
-            # Inclusive: Current can touch the previous high/low
+            # Inclusive: Current can touch mother body edges
             inside_mask = (
-                (df['high'] <= df['prev_high']) &
-                (df['low'] >= df['prev_low'])
+                (df['high'] <= body_high) &
+                (df['close'] >= body_low) &
+                (df['close'] <= body_high)
             )
 
         # Ensure previous bar exists (not NaN)
-        inside_mask = inside_mask & df['prev_high'].notna() & df['prev_low'].notna()
+        inside_mask = (
+            inside_mask
+            & df['prev_high'].notna()
+            & df['prev_low'].notna()
+            & df['prev_open'].notna()
+            & df['prev_close'].notna()
+        )
 
         # Optional: Minimum mother bar size filter
         # (avoid patterns where mother bar is too small/noisy)
@@ -426,11 +440,21 @@ class InsideBarCore:
                     })
                     continue
 
-                # Check IB condition (inclusive mode)
-                is_inside = (
-                    current['high'] <= prev['high'] and
-                    current['low'] >= prev['low']
-                )
+                # Check IB condition (mother body rule)
+                body_low = min(prev['open'], prev['close'])
+                body_high = max(prev['open'], prev['close'])
+                if self.config.inside_bar_mode == "strict":
+                    is_inside = (
+                        current['high'] < body_high and
+                        current['close'] > body_low and
+                        current['close'] < body_high
+                    )
+                else:
+                    is_inside = (
+                        current['high'] <= body_high and
+                        current['close'] >= body_low and
+                        current['close'] <= body_high
+                    )
 
                 if is_inside:
                     # Check min mother bar size (only when filter enabled)

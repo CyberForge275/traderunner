@@ -94,10 +94,12 @@ class TestInsideBarDetection:
         dates = pd.date_range('2025-01-01', periods=5, freq='5min')
         return pd.DataFrame({
             'timestamp': dates,
-            'open': [100, 101, 100.5, 102, 103],
-            'high': [102, 103, 102.5, 104, 105],  # idx=2 is inside idx=1
-            'low': [99, 98, 99.5, 100, 101],      # idx=2 is inside idx=1
-            'close': [101, 102, 101, 103, 104],
+            # idx=1 is mother bar with body 100-102 (open=100, close=102)
+            # idx=2 is inside bar: high and close inside mother body; low can be outside
+            'open': [100, 100, 101.0, 102, 103],
+            'high': [102, 103, 101.5, 104, 105],
+            'low': [99, 98, 98.5, 100, 101],
+            'close': [101, 102, 101.2, 103, 104],
         })
 
     def test_detect_inside_bar_inclusive(self, inside_bar_data):
@@ -120,8 +122,9 @@ class TestInsideBarDetection:
         assert 'mother_bar_low' in result.columns
 
         # Index 2 should be inside bar (inside index 1)
-        # high[2]=102.5 <= high[1]=103 ✓
-        # low[2]=99.5 >= low[1]=98 ✓
+        # high[2]=101.5 <= body_high[1]=102 ✓
+        # close[2]=101.2 within body_low/high (100-102) ✓
+        # low[2]=98.5 outside body is allowed by new rule
         assert result.iloc[2]['is_inside_bar'] == True
         assert result.iloc[2]['mother_bar_high'] == 103.0
         assert result.iloc[2]['mother_bar_low'] == 98.0
@@ -145,10 +148,12 @@ class TestInsideBarDetection:
         dates = pd.date_range('2025-01-01', periods=4, freq='5min')
         data = pd.DataFrame({
             'timestamp': dates,
-            'open': [100, 101, 102, 103],
-            'high': [110, 110, 109, 111],  # idx=2 is inside idx=1
-            'low': [90, 100, 101, 102],
-            'close': [105, 105, 105, 106],
+            # mother bar (idx=1): open=100 close=110 => body 100-110
+            # inside bar (idx=2): high=109 close=105 inside body
+            'open': [100, 100, 102, 103],
+            'high': [110, 110, 109, 111],
+            'low': [90, 95, 90, 102],
+            'close': [105, 110, 105, 106],
         })
 
         config = InsideBarConfig(
@@ -197,10 +202,11 @@ class TestInsideBarDetection:
         dates = pd.date_range('2025-01-01', periods=3, freq='5min')
         data = pd.DataFrame({
             'timestamp': dates,
-            'open': [100, 101, 100.5],
-            'high': [102, 103, 103],  # idx=2 touches high of idx=1
+            # mother bar body: 100-102 (open=100, close=102)
+            'open': [100, 100, 100.5],
+            'high': [102, 103, 102],  # idx=2 touches body_high
             'low': [99, 98, 99],
-            'close': [101, 102, 101],
+            'close': [101, 102, 102],  # close touches body_high
         })
 
         config = InsideBarConfig(
@@ -213,6 +219,55 @@ class TestInsideBarDetection:
         result = core.detect_inside_bars(df)
 
         # Should NOT be inside bar in strict mode (touching is not allowed)
+        assert result.iloc[2]['is_inside_bar'] == False
+
+    def test_detect_inside_bar_bearish_mother_body(self):
+        """Inside bar detection should respect bearish mother body (open > close)."""
+        dates = pd.date_range('2025-01-02', periods=3, freq='5min')
+        data = pd.DataFrame({
+            'timestamp': dates,
+            # mother bar body: 101 (close) to 103 (open)
+            'open': [102, 103, 102.5],
+            'high': [104, 105, 103.0],
+            'low': [100, 100, 99.0],
+            'close': [101, 101, 101.5],
+        })
+        config = InsideBarConfig(inside_bar_mode="inclusive", min_mother_bar_size=0)
+        core = InsideBarCore(config)
+        df = core.calculate_atr(data)
+        result = core.detect_inside_bars(df)
+        assert result.iloc[2]['is_inside_bar'] == True
+
+    def test_inside_bar_high_outside_body_rejected(self):
+        """High above mother body_high should reject inside bar."""
+        dates = pd.date_range('2025-01-03', periods=3, freq='5min')
+        data = pd.DataFrame({
+            'timestamp': dates,
+            # mother body: 100-102
+            'open': [100, 100, 101.0],
+            'high': [102, 103, 103.5],  # idx=2 high outside body
+            'low': [99, 98, 97.0],
+            'close': [101, 102, 101.0],
+        })
+        core = InsideBarCore(InsideBarConfig(inside_bar_mode="inclusive", min_mother_bar_size=0))
+        df = core.calculate_atr(data)
+        result = core.detect_inside_bars(df)
+        assert result.iloc[2]['is_inside_bar'] == False
+
+    def test_inside_bar_close_outside_body_rejected(self):
+        """Close outside mother body should reject inside bar even if high is inside."""
+        dates = pd.date_range('2025-01-04', periods=3, freq='5min')
+        data = pd.DataFrame({
+            'timestamp': dates,
+            # mother body: 100-102
+            'open': [100, 100, 101.0],
+            'high': [102, 103, 101.5],
+            'low': [99, 98, 97.0],
+            'close': [101, 102, 102.5],  # close outside body_high
+        })
+        core = InsideBarCore(InsideBarConfig(inside_bar_mode="inclusive", min_mother_bar_size=0))
+        df = core.calculate_atr(data)
+        result = core.detect_inside_bars(df)
         assert result.iloc[2]['is_inside_bar'] == False
 
 
@@ -228,10 +283,11 @@ class TestSignalGeneration:
             # Bar 0-1: Normal
             # Bar 2: Inside bar (inside bar 1)
             # Bar 3: Breakout above (BUY signal expected)
-            'open':  [100, 101, 100.5, 104, 105, 106, 107, 108, 109, 110],
+            # mother (idx=1) body: 100-103, inside (idx=2) high/close inside body
+            'open':  [100, 100, 101.0, 104, 105, 106, 107, 108, 109, 110],
             'high':  [102, 103, 102.5, 106, 107, 108, 109, 110, 111, 112],
-            'low':   [99,  98,  99.5, 103, 104, 105, 106, 107, 108, 109],
-            'close': [101, 102, 101,  105, 106, 107, 108, 109, 110, 111],
+            'low':   [99,  98,  97.5, 103, 104, 105, 106, 107, 108, 109],
+            'close': [101, 103, 101.5, 105, 106, 107, 108, 109, 110, 111],
         })
 
     def test_generate_long_signal(self, breakout_data):
@@ -239,7 +295,10 @@ class TestSignalGeneration:
         config = InsideBarConfig(
             breakout_confirmation=True,
             min_mother_bar_size=0,
-            risk_reward_ratio=2.0
+            risk_reward_ratio=2.0,
+            session_timezone="UTC",
+            session_windows=["00:00-23:59"],
+            trigger_must_be_within_session=False,
         )
         core = InsideBarCore(config)
 
@@ -289,10 +348,11 @@ class TestSignalGeneration:
         # Bar 1 is mother, bar 2 is inside, bar 3 breaks above mother_high by high only.
         data = pd.DataFrame({
             'timestamp': dates,
-            'open':  [100, 101, 100.5, 102.5],
-            'high':  [102, 103, 102.5, 103.2],  # breakout by high
-            'low':   [99,  98,  99.5, 101.8],
-            'close': [101, 102, 101,  102.9],  # close below mother_high=103
+            # mother (idx=1) body: 101-102, inside (idx=2) high/close inside body
+            'open':  [100, 101, 101.0, 102.5],
+            'high':  [102, 103, 101.8, 103.2],  # breakout by high
+            'low':   [99,  98,  99.0, 101.8],
+            'close': [101, 102, 101.5, 102.9],  # close below mother_high=103
         })
 
         config = InsideBarConfig(
