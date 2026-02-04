@@ -3,7 +3,9 @@ import pandas as pd
 from trading_dashboard.components.signal_chart import (
     build_candlestick_figure,
     compute_bars_window,
+    compute_bars_window_union,
     resolve_inspector_timestamps,
+    build_marker,
 )
 
 
@@ -64,6 +66,32 @@ def test_resolve_inspector_timestamps_priority():
     assert mother_ts is not None
     assert inside_ts is not None
     assert exit_ts is not None
+
+
+def test_marker_alignment_non_exact_timestamp_floor_to_previous_bar():
+    bars = _make_bars()
+    ts_between = bars["timestamp"].iloc[10] + pd.Timedelta(seconds=30)
+    window, _meta = compute_bars_window_union(bars, [ts_between], pre_bars=0, post_bars=0)
+    marker = build_marker(window, "test", ts_between, "high", "#000000", "triangle-down", "M")
+    assert marker is not None
+    assert marker["ts"] == bars["timestamp"].iloc[10]
+
+
+def test_window_includes_all_markers_union_logic():
+    bars = _make_bars()
+    ts_a = bars["timestamp"].iloc[10]
+    ts_b = bars["timestamp"].iloc[40]
+    window, _meta = compute_bars_window_union(bars, [ts_a, ts_b], pre_bars=5, post_bars=5)
+    assert window["timestamp"].iloc[0] == bars["timestamp"].iloc[5]
+    assert window["timestamp"].iloc[-1] == bars["timestamp"].iloc[45]
+
+
+def test_marker_skip_out_of_dataset_returns_none():
+    bars = _make_bars()
+    window, _meta = compute_bars_window_union(bars, [bars["timestamp"].iloc[20]], pre_bars=0, post_bars=0)
+    ts_outside = bars["timestamp"].iloc[0] - pd.Timedelta(minutes=10)
+    marker = build_marker(window, "test", ts_outside, "high", "#000000", "triangle-down", "M")
+    assert marker is None
 
 
 def test_build_candlestick_figure_empty():
