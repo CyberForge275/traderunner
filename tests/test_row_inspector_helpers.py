@@ -4,6 +4,7 @@ from trading_dashboard.components.row_inspector import (
     INSPECT_COL,
     add_inspect_column,
     row_to_kv_items,
+    row_to_kv_sections_orders,
 )
 
 
@@ -35,3 +36,35 @@ def test_row_to_kv_items_ordering_and_nulls():
     assert keys == ["dbg_a", "dbg_b", "sig_a", "sig_x", "z"]
     values = {i["key"]: i["value"] for i in items}
     assert values["dbg_a"] == ""
+
+
+def test_row_to_kv_sections_orders_ordering():
+    row = {
+        "template_id": "t1",
+        "symbol": "HOOD",
+        "side": "BUY",
+        "qty": 1,
+        "entry_price": 10.0,
+        "dbg_mother_ts": "2025-01-01 14:30:00+00:00",
+        "dbg_inside_ts": "2025-01-01 14:35:00+00:00",
+        "dbg_trigger_ts": "2025-01-01 14:40:00+00:00",
+        "dbg_valid_to_ts_utc": "2025-01-01 15:00:00+00:00",
+        "exit_reason": "session_end",
+        "order_expired": False,
+    }
+    sections = row_to_kv_sections_orders(row)
+    flat = [item["key"] for section in sections for item in section["items"]]
+    assert flat.index("template_id") < flat.index("dbg_mother_ts")
+    assert "exit_ts (fallback)" in flat
+
+
+def test_row_to_kv_sections_orders_dbg_last():
+    row = {
+        "symbol": "HOOD",
+        "dbg_mother_ts": "2025-01-01 14:30:00+00:00",
+        "entry_price": 10.0,
+        "dbg_breakout_level": 11.0,
+    }
+    sections = row_to_kv_sections_orders(row)
+    titles = [s["title"] for s in sections]
+    assert titles[-1] == "Debug"

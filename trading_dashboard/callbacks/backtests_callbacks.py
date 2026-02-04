@@ -12,7 +12,9 @@ from ..ui_ids import BT, RUN
 from ..components.row_inspector import (
     INSPECT_COL,
     row_to_kv_items,
+    row_to_kv_sections_orders,
     render_kv_table,
+    render_kv_sections,
     log_open,
 )
 from ..components.signal_chart import (
@@ -280,9 +282,9 @@ def register_backtests_callbacks(app):
             return no_update, no_update, no_update, no_update
 
         row = rows[row_index]
-        items = row_to_kv_items(row)
+        sections = row_to_kv_sections_orders(row)
         title = f"Order Inspector — {row.get('template_id', '')} ({row.get('symbol', '')})"
-        body = render_kv_table(items)
+        body = render_kv_sections(sections)
         log_open("orders", row.get("template_id"), row.get("symbol"), row.get("signal_ts"))
 
         fig = build_candlestick_figure(pd.DataFrame())
