@@ -15,10 +15,10 @@ from ..components.row_inspector import (
     log_open,
 )
 from ..components.signal_chart import (
+    build_candlestick_figure,
+    compute_bars_window,
     infer_mother_ts,
     infer_exit_ts,
-    slice_bars_window_by_count,
-    build_candlestick_figure,
     log_chart_window,
     load_bars_for_run,
 )
@@ -290,10 +290,10 @@ def register_backtests_callbacks(app):
                 anchor_ts = infer_mother_ts(row) or pd.to_datetime(row.get("signal_ts"), utc=True, errors="coerce")
                 exit_ts = infer_exit_ts(row)
                 if pd.notna(anchor_ts):
-                    window = slice_bars_window_by_count(bars_df, anchor_ts, exit_ts)
+                    window, meta = compute_bars_window(bars_df, anchor_ts, exit_ts)
                     fig = build_candlestick_figure(window)
-                    start_ts = window["timestamp"].iloc[0] if not window.empty else None
-                    end_ts = window["timestamp"].iloc[-1] if not window.empty else None
+                    start_ts = meta.get("start_ts")
+                    end_ts = meta.get("end_ts")
                     log_chart_window(
                         "orders",
                         row.get("template_id"),
@@ -355,10 +355,10 @@ def register_backtests_callbacks(app):
                     anchor_ts = pd.to_datetime(row.get("entry_ts"), utc=True, errors="coerce")
                 exit_ts = pd.to_datetime(row.get("exit_ts"), utc=True, errors="coerce")
                 if pd.notna(anchor_ts):
-                    window = slice_bars_window_by_count(bars_df, anchor_ts, exit_ts)
+                    window, meta = compute_bars_window(bars_df, anchor_ts, exit_ts)
                     fig = build_candlestick_figure(window)
-                    start_ts = window["timestamp"].iloc[0] if not window.empty else None
-                    end_ts = window["timestamp"].iloc[-1] if not window.empty else None
+                    start_ts = meta.get("start_ts")
+                    end_ts = meta.get("end_ts")
                     log_chart_window(
                         "trades",
                         row.get("template_id"),

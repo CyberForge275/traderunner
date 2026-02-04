@@ -1,7 +1,7 @@
 """Signal inspector chart helpers."""
 from __future__ import annotations
 
-from typing import Iterable, Mapping, Optional
+from typing import Iterable, Mapping, Optional, Tuple
 import logging
 from pathlib import Path
 
@@ -10,15 +10,32 @@ import plotly.graph_objects as go
 
 logger = logging.getLogger(__name__)
 
-_MOTHER_KEYS = ["dbg_mother_ts", "mother_ts", "sig_mother_ts", "dbg_inside_ts", "signal_ts"]
-_EXIT_KEYS = ["exit_ts", "dbg_valid_to_ts_utc", "dbg_valid_to_ts"]
+_MOTHER_KEYS = ["dbg_mother_ts", "sig_mother_ts", "mother_ts"]
+_INSIDE_KEYS = ["dbg_inside_ts", "sig_inside_ts", "inside_ts"]
+_EXIT_KEYS = ["exit_ts", "dbg_valid_to_ts_utc", "dbg_exit_ts_utc", "dbg_valid_to_ts"]
+
+
+def _coerce_ts(value: object) -> Optional[pd.Timestamp]:
+    if value is None or value == "":
+        return None
+    ts = pd.to_datetime(value, utc=True, errors="coerce")
+    return ts if pd.notna(ts) else None
 
 
 def infer_mother_ts(row: Mapping[str, object]) -> Optional[pd.Timestamp]:
     for key in _MOTHER_KEYS:
         if key in row and row.get(key):
-            ts = pd.to_datetime(row.get(key), utc=True, errors="coerce")
-            if pd.notna(ts):
+            ts = _coerce_ts(row.get(key))
+            if ts is not None:
+                return ts
+    return None
+
+
+def infer_inside_ts(row: Mapping[str, object]) -> Optional[pd.Timestamp]:
+    for key in _INSIDE_KEYS:
+        if key in row and row.get(key):
+            ts = _coerce_ts(row.get(key))
+            if ts is not None:
                 return ts
     return None
 
@@ -26,8 +43,8 @@ def infer_mother_ts(row: Mapping[str, object]) -> Optional[pd.Timestamp]:
 def infer_exit_ts(row: Mapping[str, object]) -> Optional[pd.Timestamp]:
     for key in _EXIT_KEYS:
         if key in row and row.get(key):
-            ts = pd.to_datetime(row.get(key), utc=True, errors="coerce")
-            if pd.notna(ts):
+            ts = _coerce_ts(row.get(key))
+            if ts is not None:
                 return ts
     return None
 
@@ -39,22 +56,56 @@ def _find_nearest_previous_index(ts_series: pd.Series, target: pd.Timestamp) -> 
     return int(candidates.index[-1])
 
 
-def slice_bars_window_by_count(
+def _find_nearest_previous_row(
+    bars: pd.DataFrame, target: pd.Timestamp
+) -> Optional[pd.Series]:
+    ts_series = pd.to_datetime(bars["timestamp"], utc=True, errors="coerce")
+    idx = _find_nearest_previous_index(ts_series, target)
+    if bars.empty:
+        return None
+    return bars.iloc[idx]
+
+
+def resolve_marker_price(
+    bars_window_df: pd.DataFrame,
+    ts: Optional[pd.Timestamp],
+    price_col: str = "high",
+) -> Optional[float]:
+    if ts is None or bars_window_df.empty or price_col not in bars_window_df.columns:
+        return None
+    row = _find_nearest_previous_row(bars_window_df, ts)
+    if row is None:
+        return None
+    try:
+        return float(row[price_col])
+    except Exception:
+        return None
+
+
+def resolve_inspector_timestamps(row: Mapping[str, object]) -> Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp], Optional[pd.Timestamp]]:
+    """Resolve mother/inside/exit timestamps with stable priority for inspector."""
+    mother_ts = infer_mother_ts(row)
+    inside_ts = infer_inside_ts(row)
+    exit_ts = infer_exit_ts(row)
+    return mother_ts, inside_ts, exit_ts
+
+
+def compute_bars_window(
     bars_df: pd.DataFrame,
-    anchor_ts: pd.Timestamp,
+    mother_ts: pd.Timestamp,
     exit_ts: Optional[pd.Timestamp],
-    pre_bars: int = 20,
+    pre_bars: int = 5,
     post_bars: int = 5,
-) -> pd.DataFrame:
+) -> Tuple[pd.DataFrame, dict]:
     if bars_df.empty:
-        return bars_df
+        return bars_df, {"reason": "empty_bars_df"}
 
     if "timestamp" not in bars_df.columns:
-        return pd.DataFrame()
+        return pd.DataFrame(), {"reason": "missing_timestamp_col"}
 
     bars = bars_df.sort_values("timestamp").reset_index(drop=True)
     ts_series = pd.to_datetime(bars["timestamp"], utc=True, errors="coerce")
-    anchor_idx = _find_nearest_previous_index(ts_series, anchor_ts)
+    anchor_idx = _find_nearest_previous_index(ts_series, mother_ts)
 
     if exit_ts is None:
         exit_idx = anchor_idx
@@ -64,10 +115,22 @@ def slice_bars_window_by_count(
     start_idx = max(anchor_idx - pre_bars, 0)
     end_idx = min(exit_idx + post_bars, len(bars) - 1)
 
-    return bars.iloc[start_idx : end_idx + 1].copy()
+    window = bars.iloc[start_idx : end_idx + 1].copy()
+    meta = {
+        "reason": "ok",
+        "anchor_idx": anchor_idx,
+        "exit_idx": exit_idx,
+        "start_ts": window["timestamp"].iloc[0] if not window.empty else None,
+        "end_ts": window["timestamp"].iloc[-1] if not window.empty else None,
+    }
+    return window, meta
 
 
-def build_candlestick_figure(bars_window_df: pd.DataFrame, tz: str = "America/New_York") -> go.Figure:
+def build_candlestick_figure(
+    bars_window_df: pd.DataFrame,
+    tz: str = "America/New_York",
+    markers: Optional[Iterable[dict]] = None,
+) -> go.Figure:
     fig = go.Figure()
     if bars_window_df.empty:
         fig.update_layout(
@@ -100,6 +163,23 @@ def build_candlestick_figure(bars_window_df: pd.DataFrame, tz: str = "America/Ne
             name="price",
         )
     )
+    if markers:
+        for marker in markers:
+            marker_ts = _coerce_ts(marker.get("ts"))
+            if marker_ts is None:
+                continue
+            marker_ts_local = marker_ts.tz_convert(tz)
+            fig.add_trace(
+                go.Scatter(
+                    x=[marker_ts_local],
+                    y=[marker.get("price")],
+                    mode="markers+text",
+                    text=[marker.get("label", "")],
+                    textposition="top center",
+                    marker=dict(size=10, symbol=marker.get("symbol", "triangle-up"), color=marker.get("color", "#FF8800")),
+                    name=marker.get("label", ""),
+                )
+            )
     fig.update_layout(
         margin=dict(l=10, r=10, t=30, b=10),
         xaxis_title=f"Time ({tz})",
@@ -139,9 +219,14 @@ def load_bars_for_run(run_dir: Path) -> pd.DataFrame:
 
     pick = None
     for p in parquet:
-        if "bars_signal" in p.name:
+        if "bars_exec" in p.name:
             pick = p
             break
+    if pick is None:
+        for p in parquet:
+            if "bars_signal" in p.name:
+                pick = p
+                break
     if pick is None and parquet:
         pick = parquet[0]
     if pick is None:
@@ -152,12 +237,22 @@ def load_bars_for_run(run_dir: Path) -> pd.DataFrame:
     else:
         df = pd.read_csv(pick)
 
+    df = df.rename(columns={c: c.lower() for c in df.columns})
     if "timestamp" not in df.columns:
         for col in ["ts", "datetime", "time"]:
             if col in df.columns:
                 df = df.rename(columns={col: "timestamp"})
                 break
     if "timestamp" not in df.columns:
-        return pd.DataFrame()
+        try:
+            idx = pd.to_datetime(df.index, utc=True, errors="coerce")
+            df = df.reset_index().rename(columns={"index": "timestamp"})
+            df["timestamp"] = idx
+        except Exception:
+            return pd.DataFrame()
+    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+    for col in ["open", "high", "low", "close"]:
+        if col not in df.columns:
+            return pd.DataFrame()
 
     return df
