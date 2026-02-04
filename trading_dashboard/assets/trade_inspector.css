@@ -16,3 +16,9 @@
   width: 900px !important;
   max-width: 900px !important;
 }
+
+.trade-inspector-modal .modal-dialog {
+  width: min(95vw, 1800px) !important;
+  max-width: min(95vw, 1800px) !important;
+  --bs-modal-width: min(95vw, 1800px);
+}
