@@ -59,9 +59,11 @@ def _find_nearest_previous_index(ts_series: pd.Series, target: pd.Timestamp) -> 
 def _find_nearest_previous_row(
     bars: pd.DataFrame, target: pd.Timestamp
 ) -> Optional[pd.Series]:
+    if bars.empty or "timestamp" not in bars.columns:
+        return None
     ts_series = pd.to_datetime(bars["timestamp"], utc=True, errors="coerce")
     idx = _find_nearest_previous_index(ts_series, target)
-    if bars.empty:
+    if idx < 0 or idx >= len(bars):
         return None
     return bars.iloc[idx]
 
