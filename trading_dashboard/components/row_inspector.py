@@ -102,11 +102,11 @@ def build_inspector_modal(modal_id: str, title_id: str, body_id: str, chart_id: 
     close_id = f"{modal_id}__close"
     if chart_id:
         body = html.Div(
-            style={"display": "flex", "gap": "12px"},
+            style={"display": "grid", "gridTemplateColumns": "1fr 1.5fr", "gap": "16px"},
             children=[
-                html.Div(id=body_id, style={"flex": "1 1 45%"}),
+                html.Div(id=body_id, style={"minWidth": 0}),
                 html.Div(
-                    style={"flex": "1 1 55%"},
+                    style={"minWidth": 0},
                     children=[dcc.Graph(id=chart_id, figure={})],
                 ),
             ],
@@ -118,6 +118,7 @@ def build_inspector_modal(modal_id: str, title_id: str, body_id: str, chart_id: 
         is_open=False,
         size="xl",
         scrollable=True,
+        style={"width": "92vw", "maxWidth": "1600px"},
         children=[
             dbc.ModalHeader(dbc.ModalTitle(id=title_id)),
             dbc.ModalBody(body),

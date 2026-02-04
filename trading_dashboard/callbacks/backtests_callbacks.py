@@ -17,6 +17,9 @@ from ..components.row_inspector import (
 from ..components.signal_chart import (
     build_candlestick_figure,
     compute_bars_window,
+    resolve_inspector_timestamps,
+    resolve_marker_price,
+    align_marker_ts,
     infer_mother_ts,
     infer_exit_ts,
     log_chart_window,
@@ -287,18 +290,39 @@ def register_backtests_callbacks(app):
             from pathlib import Path
             bars_df = load_bars_for_run(Path("artifacts/backtests") / run_name)
             if not bars_df.empty:
-                anchor_ts = infer_mother_ts(row) or pd.to_datetime(row.get("signal_ts"), utc=True, errors="coerce")
-                exit_ts = infer_exit_ts(row)
-                if pd.notna(anchor_ts):
-                    window, meta = compute_bars_window(bars_df, anchor_ts, exit_ts)
-                    fig = build_candlestick_figure(window)
+                mother_ts, inside_ts, exit_ts = resolve_inspector_timestamps(row)
+                if mother_ts is None:
+                    mother_ts = pd.to_datetime(row.get("signal_ts"), utc=True, errors="coerce")
+                if pd.notna(mother_ts):
+                    window, meta = compute_bars_window(bars_df, mother_ts, exit_ts)
+                    markers = []
+                    if not window.empty:
+                        m_price = resolve_marker_price(window, mother_ts, "high")
+                        m_ts = align_marker_ts(window, mother_ts)
+                        if m_price is not None and m_ts is not None:
+                            markers.append({"ts": m_ts, "price": m_price * 1.002, "label": "M", "symbol": "triangle-down", "color": "#1f77b4"})
+                        else:
+                            log_open("orders", row.get("template_id"), row.get("symbol"), "marker_missing:mother")
+
+                        if inside_ts is not None:
+                            ib_price = resolve_marker_price(window, inside_ts, "high")
+                            ib_ts = align_marker_ts(window, inside_ts)
+                            if ib_price is not None and ib_ts is not None:
+                                markers.append({"ts": ib_ts, "price": ib_price * 1.002, "label": "IB", "symbol": "triangle-down", "color": "#000000"})
+                        entry_ts = pd.to_datetime(row.get("dbg_trigger_ts") or row.get("signal_ts"), utc=True, errors="coerce")
+                        if pd.notna(entry_ts):
+                            e_price = resolve_marker_price(window, entry_ts, "low")
+                            e_ts = align_marker_ts(window, entry_ts)
+                            if e_price is not None and e_ts is not None:
+                                markers.append({"ts": e_ts, "price": e_price * 0.998, "label": "Entry", "symbol": "triangle-up", "color": "#2ca02c"})
+                    fig = build_candlestick_figure(window, markers=markers)
                     start_ts = meta.get("start_ts")
                     end_ts = meta.get("end_ts")
                     log_chart_window(
                         "orders",
                         row.get("template_id"),
                         row.get("symbol"),
-                        anchor_ts,
+                        mother_ts,
                         exit_ts,
                         pd.to_datetime(start_ts, utc=True, errors="coerce") if start_ts is not None else None,
                         pd.to_datetime(end_ts, utc=True, errors="coerce") if end_ts is not None else None,
@@ -345,25 +369,43 @@ def register_backtests_callbacks(app):
             from pathlib import Path
             bars_df = load_bars_for_run(Path("artifacts/backtests") / run_name)
             if not bars_df.empty:
-                anchor_ts = None
+                mother_ts = None
+                inside_ts = None
                 if orders_rows and row.get("template_id") is not None:
                     for order_row in orders_rows:
                         if order_row.get("template_id") == row.get("template_id"):
-                            anchor_ts = infer_mother_ts(order_row)
+                            mother_ts, inside_ts, _ = resolve_inspector_timestamps(order_row)
                             break
-                if anchor_ts is None:
-                    anchor_ts = pd.to_datetime(row.get("entry_ts"), utc=True, errors="coerce")
+                if mother_ts is None:
+                    mother_ts = pd.to_datetime(row.get("entry_ts"), utc=True, errors="coerce")
                 exit_ts = pd.to_datetime(row.get("exit_ts"), utc=True, errors="coerce")
-                if pd.notna(anchor_ts):
-                    window, meta = compute_bars_window(bars_df, anchor_ts, exit_ts)
-                    fig = build_candlestick_figure(window)
+                if pd.notna(mother_ts):
+                    window, meta = compute_bars_window(bars_df, mother_ts, exit_ts)
+                    markers = []
+                    if not window.empty:
+                        m_price = resolve_marker_price(window, mother_ts, "high")
+                        m_ts = align_marker_ts(window, mother_ts)
+                        if m_price is not None and m_ts is not None:
+                            markers.append({"ts": m_ts, "price": m_price * 1.002, "label": "M", "symbol": "triangle-down", "color": "#1f77b4"})
+                        if inside_ts is not None:
+                            ib_price = resolve_marker_price(window, inside_ts, "high")
+                            ib_ts = align_marker_ts(window, inside_ts)
+                            if ib_price is not None and ib_ts is not None:
+                                markers.append({"ts": ib_ts, "price": ib_price * 1.002, "label": "IB", "symbol": "triangle-down", "color": "#000000"})
+                        entry_ts = pd.to_datetime(row.get("entry_ts"), utc=True, errors="coerce")
+                        if pd.notna(entry_ts):
+                            e_price = resolve_marker_price(window, entry_ts, "low")
+                            e_ts = align_marker_ts(window, entry_ts)
+                            if e_price is not None and e_ts is not None:
+                                markers.append({"ts": e_ts, "price": e_price * 0.998, "label": "Entry", "symbol": "triangle-up", "color": "#2ca02c"})
+                    fig = build_candlestick_figure(window, markers=markers)
                     start_ts = meta.get("start_ts")
                     end_ts = meta.get("end_ts")
                     log_chart_window(
                         "trades",
                         row.get("template_id"),
                         row.get("symbol"),
-                        anchor_ts,
+                        mother_ts,
                         exit_ts,
                         pd.to_datetime(start_ts, utc=True, errors="coerce") if start_ts is not None else None,
                         pd.to_datetime(end_ts, utc=True, errors="coerce") if end_ts is not None else None,

@@ -82,6 +82,19 @@ def resolve_marker_price(
         return None
 
 
+def align_marker_ts(bars_window_df: pd.DataFrame, ts: Optional[pd.Timestamp]) -> Optional[pd.Timestamp]:
+    """Align a marker timestamp to nearest previous bar in the current window."""
+    if ts is None or bars_window_df.empty or "timestamp" not in bars_window_df.columns:
+        return None
+    row = _find_nearest_previous_row(bars_window_df, ts)
+    if row is None:
+        return None
+    try:
+        return pd.to_datetime(row["timestamp"], utc=True, errors="coerce")
+    except Exception:
+        return None
+
+
 def resolve_inspector_timestamps(row: Mapping[str, object]) -> Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp], Optional[pd.Timestamp]]:
     """Resolve mother/inside/exit timestamps with stable priority for inspector."""
     mother_ts = infer_mother_ts(row)
