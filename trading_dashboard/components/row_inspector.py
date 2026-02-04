@@ -178,7 +178,7 @@ def row_to_kv_sections_orders(row: Mapping[str, Any]) -> list[dict[str, Any]]:
     return sections
 
 
-def render_kv_table(items: Iterable[Mapping[str, str]]) -> html.Div:
+def render_kv_table(items: Iterable[Mapping[str, str]], *, scrollable: bool = True) -> html.Div:
     """Render a simple two-column key/value table for a row."""
     rows = []
     for item in items:
@@ -199,16 +199,14 @@ def render_kv_table(items: Iterable[Mapping[str, str]]) -> html.Div:
             )
         )
 
-    return html.Div(
-        rows,
-        style={
-            "maxHeight": "65vh",
-            "overflowY": "auto",
-            "fontFamily": "monospace",
-            "wordBreak": "break-word",
-            "overflowWrap": "anywhere",
-        },
-    )
+    style = {
+        "fontFamily": "monospace",
+        "wordBreak": "break-word",
+        "overflowWrap": "anywhere",
+    }
+    if scrollable:
+        style.update({"maxHeight": "65vh", "overflowY": "auto"})
+    return html.Div(rows, style=style)
 
 
 def render_kv_sections(sections: Sequence[Mapping[str, Any]]) -> html.Div:
@@ -224,9 +222,16 @@ def render_kv_sections(sections: Sequence[Mapping[str, Any]]) -> html.Div:
                     style={"fontWeight": "600", "marginTop": "8px", "marginBottom": "4px"},
                 )
             )
-        blocks.append(render_kv_table(items))
+        blocks.append(render_kv_table(items, scrollable=False))
         blocks.append(html.Hr(style={"margin": "8px 0"}))
-    return html.Div(blocks)
+    return html.Div(
+        blocks,
+        style={
+            "maxHeight": "65vh",
+            "overflowY": "auto",
+            "fontFamily": "monospace",
+        },
+    )
 
 
 def build_inspector_modal(modal_id: str, title_id: str, body_id: str, chart_id: str | None = None) -> dbc.Modal:
