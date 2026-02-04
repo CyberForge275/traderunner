@@ -83,23 +83,27 @@ def row_to_kv_sections_orders(row: Mapping[str, Any]) -> list[dict[str, Any]]:
         "template_id",
         "symbol",
         "side",
+        "signal_ts",
         "qty",
         "entry_price",
         "stop_loss",
         "stop_price",
         "take_profit",
         "take_profit_price",
-        "exit_ts",
-        "exit_reason",
+        "order_valid_to_ts",
+        "order_valid_to_reason",
+        "dbg_mother_ts",
+        "dbg_inside_ts",
+        "dbg_mother_high",
+        "dbg_mother_low",
+        "dbg_mother_range",
     ]
     time_keys = [
-        "signal_ts",
         "entry_ts",
         "valid_from_ts",
         "dbg_valid_from_ts_utc",
         "dbg_signal_ts_ny",
         "dbg_signal_ts_berlin",
-        "dbg_exit_ts_ny",
         "dbg_valid_to_ts_utc",
     ]
     risk_keys = [
@@ -120,8 +124,10 @@ def row_to_kv_sections_orders(row: Mapping[str, Any]) -> list[dict[str, Any]]:
 
     sections: list[dict[str, Any]] = []
     core_items = _take_keys(row, core_keys, used)
-    if "exit_ts" not in row and "dbg_valid_to_ts_utc" in row:
-        core_items.append({"key": "exit_ts (fallback)", "value": _normalize_value(row.get("dbg_valid_to_ts_utc"))})
+    if "order_valid_to_ts" not in row and "dbg_valid_to_ts_utc" in row:
+        core_items.append(
+            {"key": "order_valid_to_ts (fallback)", "value": _normalize_value(row.get("dbg_valid_to_ts_utc"))}
+        )
     if core_items:
         sections.append({"title": "Order", "items": core_items})
 
@@ -144,13 +150,7 @@ def row_to_kv_sections_orders(row: Mapping[str, Any]) -> list[dict[str, Any]]:
 
     dbg_keys = sorted([k for k in row.keys() if k.startswith("dbg_") and k not in used])
     dbg_signal_order = [
-        "dbg_mother_ts",
-        "dbg_inside_ts",
-        "dbg_trigger_ts",
         "dbg_breakout_level",
-        "dbg_mother_high",
-        "dbg_mother_low",
-        "dbg_mother_range",
     ]
     dbg_validity_order = [
         "dbg_effective_valid_from_policy",

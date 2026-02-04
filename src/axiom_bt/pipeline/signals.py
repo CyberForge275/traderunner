@@ -14,6 +14,7 @@ import pandas as pd
 
 from trade.session_windows import session_window_end_for_ts
 
+from axiom_bt.artifacts.intent_contract import sanitize_intent
 logger = logging.getLogger(__name__)
 
 ORDER_CONTEXT_COLUMNS_DEFAULT = [
@@ -101,8 +102,6 @@ def generate_intent(signals_frame: pd.DataFrame, strategy_id: str, strategy_vers
                 "entry_price": float(sig["entry_price"]) if pd.notna(sig["entry_price"]) else None,
                 "stop_price": float(sig["stop_price"]) if pd.notna(sig["stop_price"]) else None,
                 "take_profit_price": float(sig["take_profit_price"]) if pd.notna(sig["take_profit_price"]) else None,
-                "exit_ts": pd.to_datetime(sig["exit_ts"], utc=True) if pd.notna(sig["exit_ts"]) else None,
-                "exit_reason": sig["exit_reason"] if pd.notna(sig["exit_reason"]) else None,
                 "strategy_id": strategy_id,
                 "strategy_version": strategy_version,
             }
@@ -121,12 +120,11 @@ def generate_intent(signals_frame: pd.DataFrame, strategy_id: str, strategy_vers
                         "order_validity_policy=session_end requires session_timezone and session_filter"
                     )
                 exit_ts = session_window_end_for_ts(signal_ts, session_filter, session_timezone)
-                intent["exit_ts"] = exit_ts
-                intent["exit_reason"] = "session_end"
+                intent["order_valid_to_ts"] = exit_ts
+                intent["order_valid_to_reason"] = "session_end"
                 intent["dbg_valid_to_ts_utc"] = exit_ts
                 intent["dbg_valid_to_ts_ny"] = exit_ts.tz_convert("America/New_York")
                 intent["dbg_valid_to_ts"] = exit_ts.tz_convert(session_timezone)
-                intent["dbg_exit_ts_ny"] = exit_ts.tz_convert("America/New_York")
 
             if effective_valid_from_policy in {"signal_ts", "next_bar"}:
                 if effective_valid_from_policy == "signal_ts":
@@ -158,10 +156,6 @@ def generate_intent(signals_frame: pd.DataFrame, strategy_id: str, strategy_vers
                 intent["dbg_inside_ts"] = pd.to_datetime(sig["inside_ts"], utc=True) if pd.notna(sig["inside_ts"]) else None
             if "mother_ts" in sig.index:
                 intent["dbg_mother_ts"] = pd.to_datetime(sig["mother_ts"], utc=True) if pd.notna(sig["mother_ts"]) else None
-            if "trigger_ts" in sig.index and pd.notna(sig["trigger_ts"]):
-                intent["dbg_trigger_ts"] = pd.to_datetime(sig["trigger_ts"], utc=True)
-            else:
-                intent["dbg_trigger_ts"] = signal_ts
             if "breakout_level" in sig.index and pd.notna(sig["breakout_level"]):
                 intent["dbg_breakout_level"] = float(sig["breakout_level"])
             elif pd.notna(sig.get("entry_price")):
@@ -173,7 +167,15 @@ def generate_intent(signals_frame: pd.DataFrame, strategy_id: str, strategy_vers
                 intent["dbg_order_expired"] = False
             if "order_expire_reason" in sig.index and pd.notna(sig["order_expire_reason"]):
                 intent["dbg_order_expire_reason"] = sig["order_expire_reason"]
-            intents.append(intent)
+            intents.append(
+                sanitize_intent(
+                    intent,
+                    intent_generated_ts=signal_ts,
+                    strict=bool(params.get("strict_intent_contract", False)),
+                    run_id=params.get("run_id"),
+                    template_id=intent.get("template_id"),
+                )
+            )
         events_intent = pd.DataFrame(intents)
 
     intent_hash = _hash_dataframe(events_intent)

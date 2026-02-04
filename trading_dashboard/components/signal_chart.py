@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 _MOTHER_KEYS = ["dbg_mother_ts", "sig_mother_ts", "mother_ts"]
 _INSIDE_KEYS = ["dbg_inside_ts", "sig_inside_ts", "inside_ts"]
-_EXIT_KEYS = ["exit_ts", "dbg_valid_to_ts_utc", "dbg_exit_ts_utc", "dbg_valid_to_ts"]
+_EXIT_KEYS = ["order_valid_to_ts", "exit_ts", "dbg_valid_to_ts_utc", "dbg_exit_ts_utc", "dbg_valid_to_ts"]
 
 
 def _coerce_ts(value: object) -> Optional[pd.Timestamp]:

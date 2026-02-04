@@ -109,7 +109,7 @@ def test_no_trigger_session_end():
     assert pd.to_datetime(exit_row["fill_ts"], utc=True) == t1
 
 
-def test_exit_ts_present_requires_no_session_params():
+def test_order_valid_to_ts_present_requires_no_session_params():
     t0 = pd.Timestamp("2025-04-03 14:35:00", tz="UTC")
     t1 = pd.Timestamp("2025-04-03 14:40:00", tz="UTC")
     bars = _bars([t0, t1], [100.0, 101.0], [100.5, 101.5], [99.5, 100.5])
@@ -123,7 +123,7 @@ def test_exit_ts_present_requires_no_session_params():
                 "entry_price": 100.0,
                 "stop_price": 98.0,
                 "take_profit_price": 104.0,
-                "exit_ts": t1,
+                "order_valid_to_ts": t1,
             }
         ]
     )

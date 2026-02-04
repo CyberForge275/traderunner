@@ -90,16 +90,19 @@ def _build_trades(
     intent_df = events_intent.copy()
     if "side" not in intent_df.columns:
         raise ValueError("events_intent missing required column: side")
-    if "exit_ts" not in intent_df.columns:
-        intent_df["exit_ts"] = pd.NA
-    if "exit_reason" not in intent_df.columns:
-        intent_df["exit_reason"] = pd.NA
-    intent_cols = ["template_id", "side", "exit_ts", "exit_reason"]
+    if "order_valid_to_ts" not in intent_df.columns:
+        intent_df["order_valid_to_ts"] = pd.NA
+    if "order_valid_to_reason" not in intent_df.columns:
+        intent_df["order_valid_to_reason"] = pd.NA
+    intent_cols = ["template_id", "side", "order_valid_to_ts", "order_valid_to_reason"]
     merged = (
         entry_fills.merge(exit_fills, on="template_id", how="left")
         .merge(
             intent_df[intent_cols].rename(
-                columns={"exit_ts": "intent_exit_ts", "exit_reason": "intent_exit_reason"}
+                columns={
+                    "order_valid_to_ts": "intent_exit_ts",
+                    "order_valid_to_reason": "intent_exit_reason",
+                }
             ),
             on="template_id",
             how="left",
@@ -114,12 +117,12 @@ def _build_trades(
     if merged["exit_ts"].isna().any():
         if order_validity_policy != "session_end":
             raise ValueError(
-                "exit_ts missing in intent and order_validity_policy is not session_end; "
+                "order_valid_to_ts missing in intent and order_validity_policy is not session_end; "
                 "cannot determine deterministic exit_ts"
             )
         if not session_filter or not session_timezone:
             raise ValueError(
-                "exit_ts missing in intent and session_end fallback requires "
+                "order_valid_to_ts missing in intent and session_end fallback requires "
                 "session_filter + session_timezone"
             )
         def _fallback_exit(row):

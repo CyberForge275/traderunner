@@ -86,13 +86,13 @@ def generate_fills(
                 "reason": "signal_fill",
             }
         )
-        # Determine valid_to for exit simulation
-        if pd.notna(intent.get("exit_ts")):
-            valid_to = pd.to_datetime(intent["exit_ts"], utc=True)
+        # Determine valid_to for exit simulation (contract: order_valid_to_ts)
+        if pd.notna(intent.get("order_valid_to_ts")):
+            valid_to = pd.to_datetime(intent["order_valid_to_ts"], utc=True)
         else:
             if order_validity_policy != "session_end":
                 raise FillModelError(
-                    "exit_ts missing and order_validity_policy is not session_end"
+                    "order_valid_to_ts missing and order_validity_policy is not session_end"
                 )
             if not session_timezone or not session_filter:
                 raise FillModelError(

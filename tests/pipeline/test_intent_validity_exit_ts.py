@@ -15,8 +15,6 @@ def test_intent_exit_ts_session_end_and_dbg_valid_to():
                 "entry_price": 100.0,
                 "stop_price": 99.0,
                 "take_profit_price": 102.0,
-                "exit_ts": pd.NaT,
-                "exit_reason": None,
             }
         ]
     )
@@ -33,7 +31,7 @@ def test_intent_exit_ts_session_end_and_dbg_valid_to():
     row = artifacts.events_intent.iloc[0]
 
     expected_exit = pd.Timestamp("2025-07-29 19:00:00+00:00")  # 15:00 NY
-    assert pd.Timestamp(row["exit_ts"]).tz_convert("UTC") == expected_exit
-    assert row["exit_reason"] == "session_end"
+    assert pd.Timestamp(row["order_valid_to_ts"]).tz_convert("UTC") == expected_exit
+    assert row["order_valid_to_reason"] == "session_end"
     assert pd.Timestamp(row["dbg_valid_to_ts_utc"]).tz_convert("UTC") == expected_exit
     assert pd.Timestamp(row["dbg_valid_to_ts_ny"]).tz_convert("America/New_York").time() == pd.Timestamp("15:00").time()

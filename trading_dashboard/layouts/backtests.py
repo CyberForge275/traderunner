@@ -466,7 +466,7 @@ def create_backtest_detail(
     orders_content = html.Div("No orders available.")
     if not orders_df.empty:
         display_orders = _format_numeric(orders_df, ["price", "stop_loss", "take_profit"])
-        display_orders = add_buy_sell_ny_columns(display_orders, "signal_ts", "exit_ts")
+        display_orders = add_buy_sell_ny_columns(display_orders, "signal_ts", "order_valid_to_ts")
         display_orders = add_inspect_column(display_orders)
         orders_content = dash_table.DataTable(
             id=BT.ORDERS_TABLE,

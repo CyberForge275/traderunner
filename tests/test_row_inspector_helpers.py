@@ -43,19 +43,19 @@ def test_row_to_kv_sections_orders_ordering():
         "template_id": "t1",
         "symbol": "HOOD",
         "side": "BUY",
+        "signal_ts": "2025-01-01 14:25:00+00:00",
         "qty": 1,
         "entry_price": 10.0,
         "dbg_mother_ts": "2025-01-01 14:30:00+00:00",
         "dbg_inside_ts": "2025-01-01 14:35:00+00:00",
-        "dbg_trigger_ts": "2025-01-01 14:40:00+00:00",
         "dbg_valid_to_ts_utc": "2025-01-01 15:00:00+00:00",
-        "exit_reason": "session_end",
+        "order_valid_to_reason": "session_end",
         "order_expired": False,
     }
     sections = row_to_kv_sections_orders(row)
     flat = [item["key"] for section in sections for item in section["items"]]
     assert flat.index("template_id") < flat.index("dbg_mother_ts")
-    assert "exit_ts (fallback)" in flat
+    assert "order_valid_to_ts (fallback)" in flat
 
 
 def test_row_to_kv_sections_orders_dbg_last():

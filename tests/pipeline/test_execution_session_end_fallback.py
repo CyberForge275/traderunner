@@ -34,8 +34,8 @@ def test_execution_fallback_to_session_end():
         {
             "template_id": ["t1"],
             "side": ["BUY"],
-            "exit_ts": [pd.NaT],
-            "exit_reason": [pd.NA],
+            "order_valid_to_ts": [pd.NaT],
+            "order_valid_to_reason": [pd.NA],
         }
     )
 
@@ -75,8 +75,8 @@ def test_execution_missing_params_raises():
         {
             "template_id": ["t1"],
             "side": ["BUY"],
-            "exit_ts": [pd.NaT],
-            "exit_reason": [pd.NA],
+            "order_valid_to_ts": [pd.NaT],
+            "order_valid_to_reason": [pd.NA],
         }
     )
 
@@ -92,6 +92,6 @@ def test_execution_missing_params_raises():
             session_filter=None,
         )
     except ValueError as exc:
-        assert "exit_ts missing" in str(exc) or "session_end fallback" in str(exc)
+        assert "order_valid_to_ts missing" in str(exc) or "session_end fallback" in str(exc)
     else:
         assert False, "Expected ValueError for missing validity/session params"

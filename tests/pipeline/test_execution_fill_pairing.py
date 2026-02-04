@@ -66,7 +66,7 @@ def test_execution_uses_exit_fill_reason_over_intent_fallback():
     )
     intents = pd.DataFrame(
         [
-            {"template_id": "t1", "side": "BUY", "exit_ts": t2, "exit_reason": "session_end"},
+            {"template_id": "t1", "side": "BUY", "order_valid_to_ts": t2, "order_valid_to_reason": "session_end"},
         ]
     )
 
