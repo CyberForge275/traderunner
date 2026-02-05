@@ -1,7 +1,7 @@
 """Unit tests for Inside Bar data loader."""
 import pytest
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 import tempfile
 import os
@@ -48,7 +48,7 @@ class TestInsideBarDataLoader:
         conn = sqlite3.connect(temp_db)
         cursor = conn.cursor()
 
-        base_ts = int(datetime(2025, 12, 11, 9, 30).timestamp() * 1000)
+        base_ts = int(datetime(2025, 12, 11, 14, 30, tzinfo=timezone.utc).timestamp() * 1000)
         for i in range(50):
             ts = base_ts + (i * 5 * 60 * 1000)
             cursor.execute(
@@ -87,7 +87,7 @@ class TestInsideBarDataLoader:
         conn = sqlite3.connect(temp_db)
         cursor = conn.cursor()
 
-        base_ts = int(datetime(2025, 12, 11, 9, 30).timestamp() * 1000)
+        base_ts = int(datetime(2025, 12, 11, 14, 30, tzinfo=timezone.utc).timestamp() * 1000)
         for i in range(50):
             ts = base_ts + (i * 5 * 60 * 1000)
             cursor.execute(
@@ -148,9 +148,9 @@ class TestInsideBarDataLoader:
         assert status['interval'] == 'M5'
 
     @pytest.mark.asyncio
-    async def test_not_initialized_error(self):
+    async def test_not_initialized_error(self, temp_db):
         """Should raise error if accessing before initialization."""
-        loader = InsideBarDataLoader(symbol='APP', backfill_enabled=False)
+        loader = InsideBarDataLoader(symbol='APP', db_path=temp_db, backfill_enabled=False)
 
         with pytest.raises(RuntimeError, match="not initialized"):
             loader.get_candles()
