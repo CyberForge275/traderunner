@@ -7,7 +7,8 @@ import logging
 import numpy as np
 import pandas as pd
 
-from .core import InsideBarCore, InsideBarConfig, RawSignal
+from .core import InsideBarCore, InsideBarConfig
+from .models import RawSignal
 from .config import load_config, get_default_config_path, load_default_config
 
 from strategies.registry import register_strategy

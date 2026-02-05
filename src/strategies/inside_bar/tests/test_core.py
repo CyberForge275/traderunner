@@ -9,7 +9,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-from ..core import InsideBarCore, InsideBarConfig, RawSignal
+from ..core import InsideBarCore, InsideBarConfig
+from ..models import RawSignal
 
 
 class TestInsideBarConfig:

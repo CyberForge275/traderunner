@@ -12,7 +12,8 @@ from typing import List, Dict, Any, Optional, Callable
 import pandas as pd
 
 from ..base import BaseStrategy, Signal
-from .core import InsideBarCore, InsideBarConfig, RawSignal
+from .core import InsideBarCore, InsideBarConfig
+from .models import RawSignal
 from .core import STRATEGY_VERSION as _IB_CORE_VERSION
 
 
