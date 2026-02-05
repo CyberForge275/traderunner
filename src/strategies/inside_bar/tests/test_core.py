@@ -106,10 +106,10 @@ class TestInsideBarDetection:
         return pd.DataFrame({
             'timestamp': dates,
             # idx=1 is mother bar with body 100-102 (open=100, close=102)
-            # idx=2 is inside bar: high and close inside mother body; low can be outside
+            # idx=2 is inside bar: full high/low inside mother body
             'open': [100, 100, 101.0, 102, 103],
             'high': [102, 103, 101.5, 104, 105],
-            'low': [99, 98, 98.5, 100, 101],
+            'low': [99, 98, 100.5, 100, 101],
             'close': [101, 102, 101.2, 103, 104],
         })
 
@@ -134,8 +134,8 @@ class TestInsideBarDetection:
 
         # Index 2 should be inside bar (inside index 1)
         # high[2]=101.5 <= body_high[1]=102 ✓
+        # low[2]=100.5 >= body_low[1]=100 ✓
         # close[2]=101.2 within body_low/high (100-102) ✓
-        # low[2]=98.5 outside body is allowed by new rule
         assert result.iloc[2]['is_inside_bar'] == True
         assert result.iloc[2]['mother_bar_high'] == 103.0
         assert result.iloc[2]['mother_bar_low'] == 98.0
@@ -160,10 +160,10 @@ class TestInsideBarDetection:
         data = pd.DataFrame({
             'timestamp': dates,
             # mother bar (idx=1): open=100 close=110 => body 100-110
-            # inside bar (idx=2): high=109 close=105 inside body
+            # inside bar (idx=2): full HL inside body
             'open': [100, 100, 102, 103],
             'high': [110, 110, 109, 111],
-            'low': [90, 95, 90, 102],
+            'low': [90, 95, 100.5, 102],
             'close': [105, 110, 105, 106],
         })
 
@@ -239,8 +239,8 @@ class TestInsideBarDetection:
             'timestamp': dates,
             # mother bar body: 101 (close) to 103 (open)
             'open': [102, 103, 102.5],
-            'high': [104, 105, 103.0],
-            'low': [100, 100, 99.0],
+            'high': [104, 105, 102.8],
+            'low': [100, 100, 101.2],
             'close': [101, 101, 101.5],
         })
         config = _cfg(inside_bar_mode="inclusive", min_mother_bar_size=0)
@@ -297,7 +297,7 @@ class TestSignalGeneration:
             # mother (idx=1) body: 100-103, inside (idx=2) high/close inside body
             'open':  [100, 100, 101.0, 104, 105, 106, 107, 108, 109, 110],
             'high':  [102, 103, 102.5, 106, 107, 108, 109, 110, 111, 112],
-            'low':   [99,  98,  97.5, 103, 104, 105, 106, 107, 108, 109],
+            'low':   [99,  98,  100.5, 103, 104, 105, 106, 107, 108, 109],
             'close': [101, 103, 101.5, 105, 106, 107, 108, 109, 110, 111],
         })
 
@@ -362,7 +362,7 @@ class TestSignalGeneration:
             # mother (idx=1) body: 101-102, inside (idx=2) high/close inside body
             'open':  [100, 101, 101.0, 102.5],
             'high':  [102, 103, 101.8, 103.2],  # breakout by high
-            'low':   [99,  98,  99.0, 101.8],
+            'low':   [99,  98,  101.2, 101.8],
             'close': [101, 102, 101.5, 102.9],  # close below mother_high=103
         })
 

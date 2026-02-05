@@ -3,6 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from .config import InsideBarConfig
+from .rules import eval_vectorized
 
 
 def detect_inside_bars(df: pd.DataFrame, config: InsideBarConfig) -> pd.DataFrame:
@@ -27,34 +28,8 @@ def detect_inside_bars(df: pd.DataFrame, config: InsideBarConfig) -> pd.DataFram
     df['prev_close'] = df['close'].shift(1)
     df['prev_range'] = df['prev_high'] - df['prev_low']
 
-    # Mother bar body (for inside-bar detection)
-    body_low = df[['prev_open', 'prev_close']].min(axis=1)
-    body_high = df[['prev_open', 'prev_close']].max(axis=1)
-
-    # Inside bar condition based on mother body (high + close)
-    if config.inside_bar_mode == "strict":
-        # Strict: Current MUST be strictly inside mother body
-        inside_mask = (
-            (df['high'] < body_high) &
-            (df['close'] > body_low) &
-            (df['close'] < body_high)
-        )
-    else:  # inclusive (default)
-        # Inclusive: Current can touch mother body edges
-        inside_mask = (
-            (df['high'] <= body_high) &
-            (df['close'] >= body_low) &
-            (df['close'] <= body_high)
-        )
-
-    # Ensure previous bar exists (not NaN)
-    inside_mask = (
-        inside_mask
-        & df['prev_high'].notna()
-        & df['prev_low'].notna()
-        & df['prev_open'].notna()
-        & df['prev_close'].notna()
-    )
+    strict = config.inside_bar_mode == "strict"
+    inside_mask = eval_vectorized(df, config.inside_bar_definition_mode, strict)
 
     # Optional: Minimum mother bar size filter
     # (avoid patterns where mother bar is too small/noisy)
