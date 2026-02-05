@@ -1,10 +1,16 @@
 strategy_id: insidebar_intraday
 canonical_name: inside_bar
+# ENUM inside_bar_definition_mode:
+# - mb_body_oc__ib_hl: IB High/Low inside MB body (Open/Close)
+# - mb_body_oc__ib_body: IB body (Open/Close) inside MB body (Open/Close)
+# - mb_range_hl__ib_hl: IB High/Low inside MB full range (High/Low)
 versions:
   1.0.0:
     required_warmup_bars: 40
     strategy_finalized: false
     core:
+      # inside_bar_definition_mode: REQUIRED (no code default)
+      inside_bar_definition_mode: mb_body_oc__ib_hl
       atr_period: 15
       risk_reward_ratio: 2.0
       min_mother_bar_size: 0.5
@@ -28,6 +34,8 @@ versions:
     required_warmup_bars: 40
     strategy_finalized: false
     core:
+      # inside_bar_definition_mode: REQUIRED (no code default)
+      inside_bar_definition_mode: mb_body_oc__ib_hl
       atr_period: 8
       risk_reward_ratio: 2.0
       min_mother_bar_size: 0.5
@@ -52,6 +60,8 @@ versions:
     required_warmup_bars: 40
     strategy_finalized: false
     core:
+      # inside_bar_definition_mode: REQUIRED (no code default)
+      inside_bar_definition_mode: mb_body_oc__ib_hl
       atr_period: 20
       risk_reward_ratio: 2.0
       min_mother_bar_size: 0.5

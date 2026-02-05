@@ -18,8 +18,13 @@ logger = logging.getLogger(__name__)
 
 def _core_config_from_params(params: dict) -> InsideBarConfig:
     # Keep mapping consistent with InsideBarStrategy.generate_signals()
+    if "inside_bar_definition_mode" not in params:
+        raise ValueError(
+            "inside_bar_definition_mode is required in params (no code default)"
+        )
     core_params = {
         # Core
+        "inside_bar_definition_mode": params["inside_bar_definition_mode"],
         "atr_period": params.get("atr_period", 14),
         "risk_reward_ratio": params.get("risk_reward_ratio", 2.0),
         "min_mother_bar_size": params.get("min_mother_bar_size", 0.5),

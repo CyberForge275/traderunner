@@ -7,6 +7,7 @@ class InsideBarSpec:
     """Specification for InsideBar strategy parameters."""
     
     REQUIRED_CORE_KEYS = {
+        "inside_bar_definition_mode",
         "atr_period",
         "risk_reward_ratio",
         "min_mother_bar_size",
@@ -30,6 +31,11 @@ class InsideBarSpec:
     }
     
     ALLOWED_MODES = {"inclusive", "strict"}
+    ALLOWED_DEFINITION_MODES = {
+        "mb_body_oc__ib_hl",
+        "mb_body_oc__ib_body",
+        "mb_range_hl__ib_hl",
+    }
     VALID_FROM_POLICY_OPTIONS = ("signal_ts", "next_bar")
     ORDER_VALIDITY_POLICY_OPTIONS = ("session_end", "one_bar", "fixed_minutes")
 
@@ -117,6 +123,14 @@ class InsideBarSpec:
                 raise ValueError(
                     f"inside_bar v{version} invalid inside_bar_mode: {val} "
                     f"(allowed: {', '.join(sorted(self.ALLOWED_MODES))})"
+                )
+
+        if "inside_bar_definition_mode" in data:
+            val = data["inside_bar_definition_mode"]
+            if val not in self.ALLOWED_DEFINITION_MODES:
+                raise ValueError(
+                    f"inside_bar v{version} invalid inside_bar_definition_mode: {val} "
+                    f"(allowed: {', '.join(sorted(self.ALLOWED_DEFINITION_MODES))})"
                 )
 
         # lookback_candles: int >= 1
@@ -213,6 +227,11 @@ class InsideBarSpec:
                 "inside_bar_mode": {
                     "kind": "enum",
                     "options": list(self.ALLOWED_MODES),
+                    "required": True
+                },
+                "inside_bar_definition_mode": {
+                    "kind": "enum",
+                    "options": list(self.ALLOWED_DEFINITION_MODES),
                     "required": True
                 },
                 "session_timezone": {"kind": "string", "required": True},

@@ -68,7 +68,11 @@ class InsideBarCore:
     4. Format-agnostic - returns raw data structures
 
     Usage:
-        config = InsideBarConfig(atr_period=14, risk_reward_ratio=2.0)
+        config = InsideBarConfig(
+            inside_bar_definition_mode="mb_body_oc__ib_hl",
+            atr_period=14,
+            risk_reward_ratio=2.0,
+        )
         core = InsideBarCore(config)
         signals = core.process_data(df, symbol='APP')
     """

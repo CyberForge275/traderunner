@@ -13,12 +13,22 @@ from ..core import InsideBarCore, InsideBarConfig
 from ..models import RawSignal
 
 
+def _cfg(**overrides):
+    base = {"inside_bar_definition_mode": "mb_body_oc__ib_hl"}
+    base.update(overrides)
+    return InsideBarConfig(**base)
+
+
 class TestInsideBarConfig:
     """Test configuration validation."""
 
+    def test_missing_definition_mode(self):
+        with pytest.raises(TypeError):
+            InsideBarConfig()  # type: ignore[call-arg]
+
     def test_default_config(self):
         """Default config should be valid."""
-        config = InsideBarConfig()
+        config = _cfg()
         assert config.atr_period == 14
         assert config.risk_reward_ratio == 2.0
         assert config.inside_bar_mode == "inclusive"
@@ -26,17 +36,17 @@ class TestInsideBarConfig:
     def test_invalid_atr_period(self):
         """Negative ATR period should raise error."""
         with pytest.raises(AssertionError):
-            InsideBarConfig(atr_period=-1)
+            _cfg(atr_period=-1)
 
     def test_invalid_risk_reward(self):
         """Zero risk/reward should raise error."""
         with pytest.raises(AssertionError):
-            InsideBarConfig(risk_reward_ratio=0)
+            _cfg(risk_reward_ratio=0)
 
     def test_invalid_mode(self):
         """Invalid mode should raise error."""
         with pytest.raises(AssertionError):
-            InsideBarConfig(inside_bar_mode="invalid")
+            _cfg(inside_bar_mode="invalid")
 
 
 class TestATRCalculation:
@@ -56,7 +66,7 @@ class TestATRCalculation:
 
     def test_atr_calculation(self, simple_data):
         """ATR should be calculated correctly."""
-        config = InsideBarConfig(atr_period=5)
+        config = _cfg(atr_period=5)
         core = InsideBarCore(config)
 
         result = core.calculate_atr(simple_data)
@@ -76,7 +86,7 @@ class TestATRCalculation:
 
     def test_atr_positive(self, simple_data):
         """ATR values should always be positive."""
-        config = InsideBarConfig()
+        config = _cfg()
         core = InsideBarCore(config)
 
         result = core.calculate_atr(simple_data)
@@ -105,7 +115,7 @@ class TestInsideBarDetection:
 
     def test_detect_inside_bar_inclusive(self, inside_bar_data):
         """Should detect inside bar in inclusive mode."""
-        config = InsideBarConfig(
+        config = _cfg(
             inside_bar_mode="inclusive",
             min_mother_bar_size=0  # Disable size filter
         )
@@ -132,7 +142,7 @@ class TestInsideBarDetection:
 
     def test_mother_size_filter_disabled_when_zero(self, inside_bar_data):
         """min_mother_bar_size=0 should disable size filter even if ATR is NaN."""
-        config = InsideBarConfig(
+        config = _cfg(
             inside_bar_mode="inclusive",
             min_mother_bar_size=0  # Disable size filter
         )
@@ -157,7 +167,7 @@ class TestInsideBarDetection:
             'close': [105, 110, 105, 106],
         })
 
-        config = InsideBarConfig(
+        config = _cfg(
             inside_bar_mode="inclusive",
             min_mother_bar_size=1.0,
             atr_period=2
@@ -185,7 +195,7 @@ class TestInsideBarDetection:
             'close': [105, 105, 105, 106],
         })
 
-        config = InsideBarConfig(
+        config = _cfg(
             inside_bar_mode="inclusive",
             min_mother_bar_size=1.0,
             atr_period=2
@@ -210,7 +220,7 @@ class TestInsideBarDetection:
             'close': [101, 102, 102],  # close touches body_high
         })
 
-        config = InsideBarConfig(
+        config = _cfg(
             inside_bar_mode="strict",
             min_mother_bar_size=0
         )
@@ -233,7 +243,7 @@ class TestInsideBarDetection:
             'low': [100, 100, 99.0],
             'close': [101, 101, 101.5],
         })
-        config = InsideBarConfig(inside_bar_mode="inclusive", min_mother_bar_size=0)
+        config = _cfg(inside_bar_mode="inclusive", min_mother_bar_size=0)
         core = InsideBarCore(config)
         df = core.calculate_atr(data)
         result = core.detect_inside_bars(df)
@@ -250,7 +260,7 @@ class TestInsideBarDetection:
             'low': [99, 98, 97.0],
             'close': [101, 102, 101.0],
         })
-        core = InsideBarCore(InsideBarConfig(inside_bar_mode="inclusive", min_mother_bar_size=0))
+        core = InsideBarCore(_cfg(inside_bar_mode="inclusive", min_mother_bar_size=0))
         df = core.calculate_atr(data)
         result = core.detect_inside_bars(df)
         assert result.iloc[2]['is_inside_bar'] == False
@@ -266,7 +276,7 @@ class TestInsideBarDetection:
             'low': [99, 98, 97.0],
             'close': [101, 102, 102.5],  # close outside body_high
         })
-        core = InsideBarCore(InsideBarConfig(inside_bar_mode="inclusive", min_mother_bar_size=0))
+        core = InsideBarCore(_cfg(inside_bar_mode="inclusive", min_mother_bar_size=0))
         df = core.calculate_atr(data)
         result = core.detect_inside_bars(df)
         assert result.iloc[2]['is_inside_bar'] == False
@@ -293,7 +303,7 @@ class TestSignalGeneration:
 
     def test_generate_long_signal(self, breakout_data):
         """Should generate LONG signal on upside breakout."""
-        config = InsideBarConfig(
+        config = _cfg(
             breakout_confirmation=True,
             min_mother_bar_size=0,
             risk_reward_ratio=2.0,
@@ -335,7 +345,7 @@ class TestSignalGeneration:
             'close': [101, 102, 101, 101, 101],
         })
 
-        config = InsideBarConfig(min_mother_bar_size=0)
+        config = _cfg(min_mother_bar_size=0)
         core = InsideBarCore(config)
 
         signals = core.process_data(data, 'TEST')
@@ -356,7 +366,7 @@ class TestSignalGeneration:
             'close': [101, 102, 101.5, 102.9],  # close below mother_high=103
         })
 
-        config = InsideBarConfig(
+        config = _cfg(
             breakout_confirmation=True,
             min_mother_bar_size=0,
             risk_reward_ratio=2.0
@@ -418,7 +428,7 @@ def test_deterministic_behavior():
         'close': np.random.rand(20) * 10 + 100,
     })
 
-    config = InsideBarConfig()
+    config = _cfg()
     core = InsideBarCore(config)
 
     # Run twice

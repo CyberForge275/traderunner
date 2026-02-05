@@ -50,7 +50,7 @@ class TestBacktestCoreParity:
 
         # Create clear inside bar pattern at index 20-21-22
         data.loc[20, ['open', 'high', 'low', 'close']] = [100, 105, 96, 102]  # Mother bar
-        data.loc[21, ['open', 'high', 'low', 'close']] = [101, 103, 98, 101]  # Inside bar
+        data.loc[21, ['open', 'high', 'low', 'close']] = [101, 101.5, 100.5, 101]  # Inside bar (within body)
         data.loc[22, ['open', 'high', 'low', 'close']] = [102, 108, 101, 106]  # Breakout
 
         return data
@@ -59,11 +59,16 @@ class TestBacktestCoreParity:
     def config(self):
         """Shared configuration for both systems."""
         return {
+            'inside_bar_definition_mode': 'mb_body_oc__ib_hl',
             'atr_period': 14,
             'risk_reward_ratio': 2.0,
             'min_mother_bar_size': 0.0,  # Disable to focus on pattern detection
             'breakout_confirmation': True,
-            'inside_bar_mode': 'inclusive'
+            'inside_bar_mode': 'inclusive',
+            'session_timezone': 'UTC',
+            'session_windows': ['00:00-23:59'],
+            'stop_distance_cap_ticks': 40,
+            'tick_size': 0.01
         }
 
     def test_backtest_adapter_matches_core(self, test_data, config):
@@ -107,11 +112,16 @@ class TestBacktestCoreParity:
     def test_parity_different_risk_rewards(self, test_data, risk_reward):
         """Test parity across different risk/reward ratios."""
         config = {
+            'inside_bar_definition_mode': 'mb_body_oc__ib_hl',
             'atr_period': 14,
             'risk_reward_ratio': risk_reward,
             'min_mother_bar_size': 0.0,
             'breakout_confirmation': True,
-            'inside_bar_mode': 'inclusive'
+            'inside_bar_mode': 'inclusive',
+            'session_timezone': 'UTC',
+            'session_windows': ['00:00-23:59'],
+            'stop_distance_cap_ticks': 40,
+            'tick_size': 0.01
         }
 
         backtest = InsideBarStrategy()
@@ -134,11 +144,16 @@ class TestBacktestCoreParity:
     def test_parity_different_modes(self, test_data, mode):
         """Test parity across different inside bar modes."""
         config = {
+            'inside_bar_definition_mode': 'mb_body_oc__ib_hl',
             'atr_period': 14,
             'risk_reward_ratio': 2.0,
             'min_mother_bar_size': 0.0,
             'breakout_confirmation': True,
-            'inside_bar_mode': mode
+            'inside_bar_mode': mode,
+            'session_timezone': 'UTC',
+            'session_windows': ['00:00-23:59'],
+            'stop_distance_cap_ticks': 40,
+            'tick_size': 0.01
         }
 
         backtest = InsideBarStrategy()
