@@ -185,6 +185,9 @@ class InsideBarConfig:
     This configuration implements the Inside Bar Strategy 1.0.0 spec with
     November-proven defaults (Europe/Berlin sessions, session-end validity).
     """
+    # === Rule Definition (REQUIRED; no code default) ===
+    inside_bar_definition_mode: str
+
     # === Core Parameters ===
     atr_period: int = 14
     risk_reward_ratio: float = 2.0
@@ -267,6 +270,14 @@ class InsideBarConfig:
 
     def validate(self) -> None:
         """Validate configuration parameters."""
+        if not self.inside_bar_definition_mode:
+            raise ValueError("inside_bar_definition_mode is required (no default)")
+        from .rules import ALLOWED_MODES
+        if self.inside_bar_definition_mode not in ALLOWED_MODES:
+            raise ValueError(
+                f"Invalid inside_bar_definition_mode: {self.inside_bar_definition_mode} "
+                f"(allowed: {', '.join(sorted(ALLOWED_MODES))})"
+            )
         # Core parameters
         assert self.atr_period > 0, "ATR period must be positive"
         assert self.risk_reward_ratio > 0, "Risk/reward ratio must be positive"

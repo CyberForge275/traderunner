@@ -12,7 +12,8 @@ from typing import List, Dict, Any, Optional, Callable
 import pandas as pd
 
 from ..base import BaseStrategy, Signal
-from .core import InsideBarCore, InsideBarConfig, RawSignal
+from .core import InsideBarCore, InsideBarConfig
+from .models import RawSignal
 from .core import STRATEGY_VERSION as _IB_CORE_VERSION
 
 
@@ -123,8 +124,11 @@ class InsideBarStrategy(BaseStrategy):
 
         # Create InsideBarConfig from dict
         # Extract only params supported by core
+        if "inside_bar_definition_mode" not in config:
+            raise ValueError("inside_bar_definition_mode is required (no code default)")
         core_params = {
             # Core
+            'inside_bar_definition_mode': config['inside_bar_definition_mode'],
             'atr_period': config.get('atr_period', 14),
             'risk_reward_ratio': config.get('risk_reward_ratio', 2.0),
             'min_mother_bar_size': config.get('min_mother_bar_size', 0.5),
