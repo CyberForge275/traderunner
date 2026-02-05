@@ -153,59 +153,26 @@ def generate_signals(
                     })
                     continue
 
-                # Check IB condition (mother body rule)
-                body_low = min(prev['open'], prev['close'])
-                body_high = max(prev['open'], prev['close'])
-                if config.inside_bar_mode == "strict":
-                    is_inside = (
-                        current['high'] < body_high and
-                        current['close'] > body_low and
-                        current['close'] < body_high
-                    )
-                else:
-                    is_inside = (
-                        current['high'] <= body_high and
-                        current['close'] >= body_low and
-                        current['close'] <= body_high
-                    )
+                # FIRST IB FOUND - ARM SESSION (SSOT: rely on is_inside_bar)
+                atr_val = prev['atr'] if 'atr' in prev and pd.notna(prev['atr']) else 0.0
+                state['armed'] = True
+                state['ib_idx'] = idx
+                state['levels'] = {
+                    'mother_high': float(prev['high']),
+                    'mother_low': float(prev['low']),
+                    'ib_high': float(current['high']),
+                    'ib_low': float(current['low']),
+                    'atr': float(atr_val)
+                }
 
-                if is_inside:
-                    # Check min mother bar size (only when filter enabled)
-                    mother_range = prev['high'] - prev['low']
-                    atr_val = prev['atr'] if 'atr' in prev and pd.notna(prev['atr']) else 0.0
-                    min_size = config.min_mother_bar_size * atr_val
-
-                    if config.min_mother_bar_size > 0:
-                        if atr_val <= 0 or mother_range < min_size:
-                            emit({
-                                'event': 'ib_rejected',
-                                'reason': 'mother_bar_too_small',
-                                'idx': int(idx),
-                                'mother_range': float(mother_range),
-                                'min_size': float(min_size),
-                                'atr': float(atr_val)
-                            })
-                            continue
-
-                    # FIRST IB FOUND - ARM SESSION
-                    state['armed'] = True
-                    state['ib_idx'] = idx
-                    state['levels'] = {
-                        'mother_high': float(prev['high']),
-                        'mother_low': float(prev['low']),
-                        'ib_high': float(current['high']),
-                        'ib_low': float(current['low']),
-                        'atr': float(atr_val)
-                    }
-
-                    emit({
-                        'event': 'ib_armed',
-                        'session_key': str(session_key),
-                        'ib_idx': int(idx),
-                        'ib_ts': ts.isoformat(),
-                        'levels': state['levels']
-                    })
-                    continue
+                emit({
+                    'event': 'ib_armed',
+                    'session_key': str(session_key),
+                    'ib_idx': int(idx),
+                    'ib_ts': ts.isoformat(),
+                    'levels': state['levels']
+                })
+                continue
 
         # === STATE: ARMED (watch for breakout of THE FIRST IB) ===
         if state['armed'] and not state['done']:
