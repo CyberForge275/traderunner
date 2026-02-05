@@ -32,6 +32,36 @@ def _hash_dataframe(df: pd.DataFrame) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _entry_fill_stop_cross(
+    side: str,
+    trigger_level: float,
+    bar: pd.Series,
+) -> Tuple[float, str]:
+    """Determine entry fill price for stop/crossing logic.
+
+    Returns (fill_price, reason_code). reason_code is for logging only.
+    """
+    try:
+        open_px = float(bar["open"])
+        high_px = float(bar["high"])
+        low_px = float(bar["low"])
+    except Exception:
+        return float(bar["close"]), "missing_ohlc"
+
+    if side == "SELL":
+        if open_px <= trigger_level:
+            return open_px, "gap_open"
+        if high_px >= trigger_level >= low_px:
+            return trigger_level, "cross_in_bar"
+        return float(bar["close"]), "no_cross"
+    # BUY
+    if open_px >= trigger_level:
+        return open_px, "gap_open"
+    if high_px >= trigger_level >= low_px:
+        return trigger_level, "cross_in_bar"
+    return float(bar["close"]), "no_cross"
+
+
 def generate_fills(
     events_intent: pd.DataFrame,
     bars: pd.DataFrame,
@@ -73,6 +103,29 @@ def generate_fills(
         side = intent.get("side")
         if side is None or pd.isna(side):
             raise FillModelError("intent missing side for exit simulation")
+        side = str(side).upper()
+        trigger_level = intent.get("entry_price")
+        if (
+            intent.get("strategy_id") == "insidebar_intraday"
+            and pd.notna(trigger_level)
+        ):
+            price, reason_code = _entry_fill_stop_cross(
+                side,
+                float(trigger_level),
+                bar,
+            )
+            logger.info(
+                "actions: entry_fill_stop_cross side=%s trig=%s open=%s high=%s low=%s fill=%s reason=%s template_id=%s signal_ts=%s",
+                side,
+                float(trigger_level),
+                float(bar.get("open", float("nan"))),
+                float(bar.get("high", float("nan"))),
+                float(bar.get("low", float("nan"))),
+                float(price),
+                reason_code,
+                intent.get("template_id"),
+                ts,
+            )
         stop_price = intent.get("stop_price")
         tp_price = intent.get("take_profit_price")
         if pd.isna(stop_price) or pd.isna(tp_price):
