@@ -73,8 +73,9 @@ def _build_trades(
     if entry_fills.empty:
         raise ValueError("no entry fills found to build trades")
 
+    exit_reasons = {"stop_loss", "take_profit", "session_end"}
     exit_fills = (
-        fills[fills["reason"] != "signal_fill"]
+        fills[fills["reason"].isin(exit_reasons)]
         .sort_values("fill_ts")
         .groupby("template_id", as_index=False)
         .first()

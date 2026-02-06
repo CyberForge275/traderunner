@@ -99,12 +99,15 @@ def generate_intent(signals_frame: pd.DataFrame, strategy_id: str, strategy_vers
                 "signal_ts": signal_ts,
                 "symbol": sig["symbol"],
                 "side": sig["signal_side"],
+                "oco_group_id": sig.get("oco_group_id"),
                 "entry_price": float(sig["entry_price"]) if pd.notna(sig["entry_price"]) else None,
                 "stop_price": float(sig["stop_price"]) if pd.notna(sig["stop_price"]) else None,
                 "take_profit_price": float(sig["take_profit_price"]) if pd.notna(sig["take_profit_price"]) else None,
                 "strategy_id": strategy_id,
                 "strategy_version": strategy_version,
             }
+            if pd.notna(intent.get("side")) and pd.isna(intent.get("oco_group_id")):
+                raise IntentGenerationError("missing oco_group_id for signal row")
             intent["breakout_confirmation"] = params.get("breakout_confirmation")
             intent["dbg_signal_ts_ny"] = signal_ts.tz_convert("America/New_York")
             intent["dbg_signal_ts_berlin"] = signal_ts.tz_convert("Europe/Berlin")
