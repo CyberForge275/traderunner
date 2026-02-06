@@ -16,14 +16,19 @@ from ..components.row_inspector import (
     render_kv_table,
     render_kv_sections,
     log_open,
+    resolve_oco_group,
+    derive_long_short_levels,
 )
 from ..components.signal_chart import (
     build_candlestick_figure,
     compute_bars_window_union,
     resolve_inspector_timestamps,
     build_marker,
+    build_vertical_marker,
+    build_level_markers_at_ts,
     infer_mother_ts,
     infer_exit_ts,
+    infer_signal_ts,
     log_chart_window,
     load_bars_for_run,
 )
@@ -267,6 +272,7 @@ def register_backtests_callbacks(app):
         prevent_initial_call=True,
     )
     def open_orders_inspector(active_cell, close_clicks, viewport_rows, all_rows, run_name):
+        logger = logging.getLogger(__name__)
         if not callback_context.triggered:
             raise PreventUpdate
         trigger_id = callback_context.triggered[0]["prop_id"].split(".")[0]
@@ -282,8 +288,10 @@ def register_backtests_callbacks(app):
             return no_update, no_update, no_update, no_update
 
         row = rows[row_index]
-        sections = row_to_kv_sections_orders(row)
-        title = f"Order Inspector — {row.get('template_id', '')} ({row.get('symbol', '')})"
+        group_rows = resolve_oco_group(all_rows or [], row.get("template_id"))
+        sections = row_to_kv_sections_orders(row, group_rows=group_rows)
+        oco_group_id = row.get("oco_group_id") or (group_rows[0].get("oco_group_id") if group_rows else "")
+        title = f"Order Inspector — {row.get('template_id', '')} (OCO: {oco_group_id})"
         body = render_kv_sections(sections)
         log_open("orders", row.get("template_id"), row.get("symbol"), row.get("signal_ts"))
 
@@ -295,8 +303,15 @@ def register_backtests_callbacks(app):
                 mother_ts, inside_ts, exit_ts = resolve_inspector_timestamps(row)
                 if mother_ts is None:
                     mother_ts = pd.to_datetime(row.get("signal_ts"), utc=True, errors="coerce")
-                entry_ts = pd.to_datetime(row.get("dbg_trigger_ts") or row.get("signal_ts"), utc=True, errors="coerce")
-                timestamps = [mother_ts, inside_ts, entry_ts, exit_ts]
+                signal_ts = infer_signal_ts(row)
+                if signal_ts is None:
+                    logger.warning(
+                        "actions: inspector_marker_missing_signal_ts template_id=%s oco_group_id=%s dbg_inside_ts=%s",
+                        row.get("template_id"),
+                        row.get("oco_group_id"),
+                        row.get("dbg_inside_ts"),
+                    )
+                timestamps = [mother_ts, inside_ts, signal_ts, exit_ts]
                 window, meta = compute_bars_window_union(bars_df, timestamps, pre_bars=5, post_bars=5)
                 markers = []
                 if not window.empty:
@@ -306,10 +321,29 @@ def register_backtests_callbacks(app):
                     ib = build_marker(window, "inside", inside_ts, "high", "#000000", "triangle-down", "IB")
                     if ib:
                         markers.append(ib)
-                    en = build_marker(window, "entry", entry_ts, "low", "#2ca02c", "triangle-up", "E")
-                    if en:
-                        markers.append(en)
-                fig = build_candlestick_figure(window, markers=markers)
+                    levels = derive_long_short_levels(group_rows or [row])
+                    logger.info(
+                        "actions: inspector_marker_ts template_id=%s oco_group_id=%s signal_ts=%s dbg_inside_ts=%s chosen_ts=%s",
+                        row.get("template_id"),
+                        row.get("oco_group_id"),
+                        signal_ts,
+                        row.get("dbg_inside_ts"),
+                        signal_ts,
+                    )
+                    if signal_ts is not None and pd.notna(signal_ts):
+                        markers.extend(build_level_markers_at_ts(signal_ts, levels["long"], levels["short"]))
+                        v = build_vertical_marker(signal_ts, label="signal_ts", color="#888888")
+                        if v:
+                            markers.append(v)
+                x_range = None
+                if signal_ts is not None and pd.notna(signal_ts) and not window.empty:
+                    start_ts = pd.to_datetime(meta.get("start_ts"), utc=True, errors="coerce")
+                    end_ts = pd.to_datetime(meta.get("end_ts"), utc=True, errors="coerce")
+                    if pd.notna(start_ts) and pd.notna(end_ts):
+                        x_min = min(start_ts, signal_ts)
+                        x_max = max(end_ts, signal_ts)
+                        x_range = (x_min, x_max)
+                fig = build_candlestick_figure(window, markers=markers, x_range=x_range)
                 start_ts = meta.get("start_ts")
                 end_ts = meta.get("end_ts")
                 log_chart_window(

@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 _MOTHER_KEYS = ["dbg_mother_ts", "sig_mother_ts", "mother_ts"]
 _INSIDE_KEYS = ["dbg_inside_ts", "sig_inside_ts", "inside_ts"]
 _EXIT_KEYS = ["order_valid_to_ts", "exit_ts", "dbg_valid_to_ts_utc", "dbg_exit_ts_utc", "dbg_valid_to_ts"]
+_SIGNAL_KEYS = ["signal_ts", "dbg_trigger_ts"]
 
 
 def _coerce_ts(value: object) -> Optional[pd.Timestamp]:
@@ -33,6 +34,15 @@ def infer_mother_ts(row: Mapping[str, object]) -> Optional[pd.Timestamp]:
 
 def infer_inside_ts(row: Mapping[str, object]) -> Optional[pd.Timestamp]:
     for key in _INSIDE_KEYS:
+        if key in row and row.get(key):
+            ts = _coerce_ts(row.get(key))
+            if ts is not None:
+                return ts
+    return None
+
+
+def infer_signal_ts(row: Mapping[str, object]) -> Optional[pd.Timestamp]:
+    for key in _SIGNAL_KEYS:
         if key in row and row.get(key):
             ts = _coerce_ts(row.get(key))
             if ts is not None:
@@ -225,6 +235,56 @@ def build_marker(
     return {"ts": aligned_ts, "price": y, "label": label, "symbol": symbol, "color": color}
 
 
+def build_vertical_marker(
+    ts: Optional[pd.Timestamp],
+    *,
+    label: str,
+    color: str,
+) -> Optional[dict]:
+    if ts is None or pd.isna(ts):
+        return None
+    return {"ts": ts, "label": label, "color": color, "mode": "vertical"}
+
+
+def build_level_markers_at_ts(
+    signal_ts: Optional[pd.Timestamp],
+    long_levels: Mapping[str, object],
+    short_levels: Mapping[str, object],
+    *,
+    long_color: str = "#2ca02c",
+    short_color: str = "#d62728",
+) -> list[dict]:
+    """Build entry/stop/tp markers for LONG/SHORT at a fixed signal timestamp."""
+    markers: list[dict] = []
+    if signal_ts is None or pd.isna(signal_ts):
+        logger.info("actions: inspector_level_markers reason=missing_signal_ts")
+        return markers
+
+    ts_long = signal_ts + pd.Timedelta(seconds=15)
+    ts_short = signal_ts - pd.Timedelta(seconds=15)
+
+    def _add(ts: pd.Timestamp, price: object, label: str, color: str, symbol: str) -> None:
+        if price is None or (isinstance(price, float) and pd.isna(price)):
+            return
+        markers.append({"ts": ts, "price": float(price), "label": label, "symbol": symbol, "color": color})
+
+    _add(ts_long, long_levels.get("entry"), "L entry", long_color, "triangle-up")
+    _add(ts_long, long_levels.get("stop"), "L stop", long_color, "triangle-down")
+    _add(ts_long, long_levels.get("tp"), "L tp", long_color, "diamond")
+
+    _add(ts_short, short_levels.get("entry"), "S entry", short_color, "triangle-up")
+    _add(ts_short, short_levels.get("stop"), "S stop", short_color, "triangle-down")
+    _add(ts_short, short_levels.get("tp"), "S tp", short_color, "diamond")
+
+    logger.info(
+        "actions: inspector_level_markers signal_ts=%s long=%s short=%s",
+        signal_ts,
+        {k: long_levels.get(k) for k in ("entry", "stop", "tp")},
+        {k: short_levels.get(k) for k in ("entry", "stop", "tp")},
+    )
+    return markers
+
+
 def resolve_inspector_timestamps(row: Mapping[str, object]) -> Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp], Optional[pd.Timestamp]]:
     """Resolve mother/inside/exit timestamps with stable priority for inspector."""
     mother_ts = infer_mother_ts(row)
@@ -273,6 +333,8 @@ def build_candlestick_figure(
     bars_window_df: pd.DataFrame,
     tz: str = "America/New_York",
     markers: Optional[Iterable[dict]] = None,
+    *,
+    x_range: Optional[Tuple[pd.Timestamp, pd.Timestamp]] = None,
 ) -> go.Figure:
     fig = go.Figure()
     if bars_window_df.empty:
@@ -312,6 +374,20 @@ def build_candlestick_figure(
             if marker_ts is None:
                 continue
             marker_ts_local = marker_ts.tz_convert(tz)
+            if marker.get("mode") == "vertical":
+                fig.add_trace(
+                    go.Scatter(
+                        x=[marker_ts_local, marker_ts_local],
+                        y=[bars_window_df["low"].min(), bars_window_df["high"].max()],
+                        mode="lines+text",
+                        line=dict(color=marker.get("color", "#AAAAAA"), width=1, dash="dot"),
+                        text=[marker.get("label", "")],
+                        textposition="top center",
+                        name=marker.get("label", ""),
+                        showlegend=False,
+                    )
+                )
+                continue
             fig.add_trace(
                 go.Scatter(
                     x=[marker_ts_local],
@@ -329,6 +405,9 @@ def build_candlestick_figure(
         yaxis_title="Price",
         height=420,
     )
+    if x_range and all(x_range):
+        x0, x1 = x_range
+        fig.update_xaxes(range=[x0.tz_convert(tz), x1.tz_convert(tz)])
     return fig
 
 

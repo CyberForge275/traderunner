@@ -1,0 +1,72 @@
+{
+  "strategy_id": "insidebar_intraday",
+  "strategy_version": "1.0.1",
+  "schema_source": "src/strategies/inside_bar/signal_schema.py",
+  "schema_version": "1.0.0",
+  "notes": [
+    "Schema v1.0.1 reuses v1.0.0 definition (only tunables differ).",
+    "All timestamps must be tz-aware UTC by validation time."
+  ],
+  "signal_frame_required_columns": {
+    "base": [
+      {"name": "timestamp", "dtype": "datetime64[ns, UTC]", "nullable": false},
+      {"name": "symbol", "dtype": "string", "nullable": false},
+      {"name": "open", "dtype": "float64", "nullable": false},
+      {"name": "high", "dtype": "float64", "nullable": false},
+      {"name": "low", "dtype": "float64", "nullable": false},
+      {"name": "close", "dtype": "float64", "nullable": false},
+      {"name": "volume", "dtype": "float64", "nullable": true}
+    ],
+    "indicator": [
+      {"name": "atr", "dtype": "float64", "nullable": false},
+      {"name": "inside_bar", "dtype": "bool", "nullable": false},
+      {"name": "mother_high", "dtype": "float64", "nullable": true},
+      {"name": "mother_low", "dtype": "float64", "nullable": true},
+      {"name": "breakout_long", "dtype": "bool", "nullable": false},
+      {"name": "breakout_short", "dtype": "bool", "nullable": false}
+    ],
+    "signal": [
+      {"name": "signal_side", "dtype": "string", "nullable": true},
+      {"name": "signal_reason", "dtype": "string", "nullable": true},
+      {"name": "entry_price", "dtype": "float64", "nullable": true},
+      {"name": "stop_price", "dtype": "float64", "nullable": true},
+      {"name": "take_profit_price", "dtype": "float64", "nullable": true},
+      {"name": "template_id", "dtype": "string", "nullable": true},
+      {"name": "exit_ts", "dtype": "datetime64[ns, UTC]", "nullable": true},
+      {"name": "exit_reason", "dtype": "string", "nullable": true}
+    ],
+    "generic": [
+      {"name": "timeframe", "dtype": "string", "nullable": false},
+      {"name": "strategy_id", "dtype": "string", "nullable": false},
+      {"name": "strategy_version", "dtype": "string", "nullable": false},
+      {"name": "strategy_tag", "dtype": "string", "nullable": false}
+    ]
+  },
+  "bars_input_contract": {
+    "source": "src/axiom_bt/pipeline/signal_frame_factory.py",
+    "required_columns": [
+      "timestamp",
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume"
+    ],
+    "timestamp_requirements": {
+      "tz_aware": true,
+      "timezone": "UTC",
+      "notes": [
+        "Validation rejects naive timestamps.",
+        "Factory coerces datetime columns to UTC before validation."
+      ]
+    },
+    "timeframe": {
+      "expected": "M5",
+      "resampling": "handled upstream by ensure_and_snapshot_bars; build_signal_frame does not resample"
+    }
+  },
+  "contract_vs_debug": {
+    "contract_columns": "only those listed in signal_frame_required_columns",
+    "debug_columns": "any additional columns not listed are non-contract and may change without breaking schema"
+  }
+}

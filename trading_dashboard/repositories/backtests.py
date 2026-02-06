@@ -488,9 +488,10 @@ def get_backtest_orders(run_name: str) -> Dict[str, pd.DataFrame]:
             "entry_price": "price",
             "stop_price": "stop_loss",
             "take_profit_price": "take_profit",
-            "signal_ts": "timestamp"
         }
         orders = orders.rename(columns={k: v for k, v in mapping.items() if k in orders.columns})
+        if "signal_ts" in orders.columns and "timestamp" not in orders.columns:
+            orders["timestamp"] = orders["signal_ts"]
 
     fills = _read_csv("fills", "fills.csv")
     if not fills.empty:

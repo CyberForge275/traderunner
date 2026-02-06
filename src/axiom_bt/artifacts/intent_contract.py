@@ -23,6 +23,7 @@ INTENT_ALLOWED_COLUMNS: set[str] = {
     "take_profit_price",
     "strategy_id",
     "strategy_version",
+    "oco_group_id",
     "breakout_confirmation",
     "order_valid_to_ts",
     "order_valid_to_reason",
