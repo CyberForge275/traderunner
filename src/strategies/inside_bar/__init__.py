@@ -126,7 +126,8 @@ def extend_insidebar_signal_frame_from_core(
         extra={"signals": len(signals)},
     )
 
-    # Map signals into frame
+    # Map signals into frame (allow multiple legs per bar via row append)
+    appended_rows = []
     for sig in signals:
         ts = pd.to_datetime(sig.timestamp, utc=True)
         meta = sig.metadata or {}
@@ -144,34 +145,43 @@ def extend_insidebar_signal_frame_from_core(
                 continue
             idx = int(match_idx[0])
 
-        df.at[idx, "signal_side"] = sig.side
-        df.at[idx, "signal_reason"] = "inside_bar"
-        df.at[idx, "entry_price"] = sig.entry_price
-        df.at[idx, "stop_price"] = sig.stop_loss
-        df.at[idx, "take_profit_price"] = sig.take_profit
-        df.at[idx, "template_id"] = f"ib_{df.at[idx, 'symbol']}_{ts.strftime('%Y%m%d_%H%M%S')}"
+        base_template_id = f"ib_{df.at[idx, 'symbol']}_{ts.strftime('%Y%m%d_%H%M%S')}"
+        oco_group_id = f"{df.at[idx, 'symbol']}_{ts.isoformat()}_{df.at[idx, 'strategy_id']}_{df.at[idx, 'strategy_version']}_{base_template_id}"
+        leg_suffix = "BUY" if sig.side == "BUY" else "SELL"
+
+        row = df.loc[idx].copy()
+        row["signal_side"] = sig.side
+        row["signal_reason"] = "inside_bar"
+        row["entry_price"] = sig.entry_price
+        row["stop_price"] = sig.stop_loss
+        row["take_profit_price"] = sig.take_profit
+        row["template_id"] = f"{base_template_id}_{leg_suffix}"
+        row["oco_group_id"] = oco_group_id
         # Debug-only: trigger timestamp uses the signal bar timestamp
-        df.at[idx, "trigger_ts"] = ts
+        row["trigger_ts"] = ts
         # Debug-only: breakout_level is entry basis if no explicit level exists
-        df.at[idx, "breakout_level"] = sig.entry_price
-        df.at[idx, "order_expired"] = False
-        df.at[idx, "order_expire_reason"] = pd.NA
+        row["breakout_level"] = sig.entry_price
+        row["order_expired"] = False
+        row["order_expire_reason"] = pd.NA
 
         if sig.side == "BUY":
-            df.at[idx, "breakout_long"] = True
+            row["breakout_long"] = True
+            row["breakout_short"] = False
         else:
-            df.at[idx, "breakout_short"] = True
+            row["breakout_long"] = False
+            row["breakout_short"] = True
 
         if "mother_high" in meta:
-            df.at[idx, "mother_high"] = meta["mother_high"]
+            row["mother_high"] = meta["mother_high"]
         if "mother_low" in meta:
-            df.at[idx, "mother_low"] = meta["mother_low"]
+            row["mother_low"] = meta["mother_low"]
         if "atr" in meta:
-            df.at[idx, "atr"] = meta["atr"]
+            row["atr"] = meta["atr"]
 
         ib_idx = meta.get("ib_idx")
         if isinstance(ib_idx, (int, float)) and 0 <= int(ib_idx) < len(df):
             ib_idx = int(ib_idx)
+            # Mark the IB row itself for indicators
             df.at[ib_idx, "inside_bar"] = True
             if "mother_high" in meta:
                 df.at[ib_idx, "mother_high"] = meta["mother_high"]
@@ -182,11 +192,16 @@ def extend_insidebar_signal_frame_from_core(
             # Debug-only: inside/mother timestamps from bar indices
             inside_ts = df.at[ib_idx, "timestamp"]
             df.at[ib_idx, "inside_ts"] = inside_ts
-            df.at[idx, "inside_ts"] = inside_ts
+            row["inside_ts"] = inside_ts
             if ib_idx > 0:
                 mother_ts = df.at[ib_idx - 1, "timestamp"]
                 df.at[ib_idx, "mother_ts"] = mother_ts
-                df.at[idx, "mother_ts"] = mother_ts
+                row["mother_ts"] = mother_ts
+
+        appended_rows.append(row)
+
+    if appended_rows:
+        df = pd.concat([df, pd.DataFrame(appended_rows)], ignore_index=True)
 
     return df
 
