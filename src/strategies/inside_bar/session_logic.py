@@ -76,11 +76,9 @@ def generate_signals(
     signals_per_session: Dict[tuple, int] = {}
     max_trades = getattr(config, 'max_trades_per_session', 1)
 
-    # MVP: Netting enforcement - conservative position window tracking
-    # When netting_mode='one_position_per_symbol', only 1 position allowed
+    # Netting is enforced in fill_model (SSOT). Strategy must not suppress signals.
     netting_mode = getattr(config, 'netting_mode', 'one_position_per_symbol')
     netting_open_until: Optional[pd.Timestamp] = None
-    # Conservative approach: Position "open" until validity window ends
 
     # Inside bar detection requires these columns; ensure present
     required_cols = ['timestamp', 'open', 'high', 'low', 'close', 'atr', 'is_inside_bar', 'mother_bar_high', 'mother_bar_low']
@@ -171,6 +169,134 @@ def generate_signals(
                     'ib_idx': int(idx),
                     'ib_ts': ts.isoformat(),
                     'levels': state['levels']
+                })
+                # NEW: Two-leg OCO signals created at IB detection (no breakout gating here)
+                levels = state['levels']
+                timeframe_minutes = int(getattr(config, 'timeframe_minutes', 5))
+                signal_ts = ts + pd.Timedelta(minutes=timeframe_minutes)
+                if entry_mode == "mother_bar":
+                    entry_long = levels['mother_high']
+                    entry_short = levels['mother_low']
+                else:  # inside_bar
+                    entry_long = levels['ib_high']
+                    entry_short = levels['ib_low']
+
+                # === MAX TRADES CHECK (hard limit) ===
+                if signals_per_session.get(session_key, 0) >= max_trades:
+                    emit({
+                        'event': 'signal_rejected',
+                        'reason': 'max_trades_reached',
+                        'session_key': str(session_key),
+                        'count': signals_per_session[session_key]
+                    })
+                    state['done'] = True
+                    continue
+
+            # Netting decision handled in fill_model; do not suppress here.
+
+                # Long leg SL/TP with cap
+                sl_long = levels['mother_low']
+                initial_risk_long = entry_long - sl_long
+                if initial_risk_long <= 0:
+                    emit({
+                        'event': 'signal_rejected',
+                        'reason': 'non_positive_risk',
+                        'idx': int(idx),
+                        'entry': entry_long,
+                        'sl': sl_long,
+                        'side': 'BUY'
+                    })
+                    state['done'] = True
+                    continue
+                effective_risk_long = initial_risk_long
+                stop_cap_applied_long = False
+                if initial_risk_long > max_risk:
+                    sl_long = entry_long - max_risk
+                    effective_risk_long = max_risk
+                    stop_cap_applied_long = True
+                tp_long = entry_long + (effective_risk_long * config.risk_reward_ratio)
+
+                # Short leg SL/TP with cap
+                sl_short = levels['mother_high']
+                initial_risk_short = sl_short - entry_short
+                if initial_risk_short <= 0:
+                    emit({
+                        'event': 'signal_rejected',
+                        'reason': 'non_positive_risk',
+                        'idx': int(idx),
+                        'entry': entry_short,
+                        'sl': sl_short,
+                        'side': 'SELL'
+                    })
+                    state['done'] = True
+                    continue
+                effective_risk_short = initial_risk_short
+                stop_cap_applied_short = False
+                if initial_risk_short > max_risk:
+                    sl_short = entry_short + max_risk
+                    effective_risk_short = max_risk
+                    stop_cap_applied_short = True
+                tp_short = entry_short - (effective_risk_short * config.risk_reward_ratio)
+
+                # Emit two legs (BUY + SELL) for OCO
+                signals.append(
+                    RawSignal(
+                        timestamp=signal_ts,
+                        side='BUY',
+                        entry_price=entry_long,
+                        stop_loss=sl_long,
+                        take_profit=tp_long,
+                        metadata={
+                            'pattern': 'inside_bar_breakout',
+                            'session_key': str(session_key),
+                            'ib_idx': state['ib_idx'],
+                            'entry_mode': entry_mode,
+                            'stop_cap_applied': stop_cap_applied_long,
+                            'initial_risk': initial_risk_long,
+                            'effective_risk': effective_risk_long,
+                            'mother_high': levels['mother_high'],
+                            'mother_low': levels['mother_low'],
+                            'atr': levels['atr'],
+                            'symbol': symbol
+                        }
+                    )
+                )
+                signals.append(
+                    RawSignal(
+                        timestamp=signal_ts,
+                        side='SELL',
+                        entry_price=entry_short,
+                        stop_loss=sl_short,
+                        take_profit=tp_short,
+                        metadata={
+                            'pattern': 'inside_bar_breakout',
+                            'session_key': str(session_key),
+                            'ib_idx': state['ib_idx'],
+                            'entry_mode': entry_mode,
+                            'stop_cap_applied': stop_cap_applied_short,
+                            'initial_risk': initial_risk_short,
+                            'effective_risk': effective_risk_short,
+                            'mother_high': levels['mother_high'],
+                            'mother_low': levels['mother_low'],
+                            'atr': levels['atr'],
+                            'symbol': symbol
+                        }
+                    )
+                )
+                state['done'] = True
+                signals_per_session[session_key] = signals_per_session.get(session_key, 0) + 1
+
+                # Netting open window tracked in fill_model; no strategy-level suppression.
+
+                emit({
+                    'event': 'signal_generated_oco',
+                    'session_key': str(session_key),
+                    'entry_long': entry_long,
+                    'entry_short': entry_short,
+                    'sl_long': sl_long,
+                    'tp_long': tp_long,
+                    'sl_short': sl_short,
+                    'tp_short': tp_short
                 })
                 continue
 
@@ -372,18 +498,7 @@ def generate_signals(
                 state['done'] = True
                 signals_per_session[session_key] = signals_per_session.get(session_key, 0) + 1
 
-                # === NETTING: Calculate position open_until (conservative) ===
-                if validity_policy == 'session_end':
-                    netting_open_until = session_filter.get_session_end(ts, session_tz)
-                elif validity_policy == 'one_bar':
-                    netting_open_until = ts + pd.Timedelta(minutes=5)
-                elif validity_policy == 'fixed_minutes':
-                    netting_open_until = ts + pd.Timedelta(minutes=validity_minutes)
-                    session_end = session_filter.get_session_end(ts, session_tz)
-                    if session_end and netting_open_until > session_end:
-                        netting_open_until = session_end
-                else:
-                    netting_open_until = session_filter.get_session_end(ts, session_tz)
+                # Netting open window tracked in fill_model; no strategy-level suppression.
 
                 emit({
                     'event': 'signal_generated',
