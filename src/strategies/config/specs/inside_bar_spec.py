@@ -35,6 +35,7 @@ class InsideBarSpec:
         "mb_body_oc__ib_hl",
         "mb_body_oc__ib_body",
         "mb_range_hl__ib_hl",
+        "mb_high__ib_high_and_close_in_mb_range",
     }
     VALID_FROM_POLICY_OPTIONS = ("signal_ts", "next_bar")
     ORDER_VALIDITY_POLICY_OPTIONS = ("session_end", "one_bar", "fixed_minutes")

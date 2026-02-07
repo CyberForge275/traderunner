@@ -18,6 +18,9 @@ def _create_input_for_param(key, value, section, spec):
     
     if kind == "enum":
         options = spec.get("options", [])
+        if key == "inside_bar_definition_mode":
+            if "mb_high__ib_high_and_close_in_mb_range" not in options:
+                options = list(options) + ["mb_high__ib_high_and_close_in_mb_range"]
         return html.Div([
             html.Label(key, style=label_style),
             dcc.Dropdown(

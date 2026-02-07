@@ -10,11 +10,13 @@ logger = logging.getLogger(__name__)
 MODE_MB_BODY_IB_HL = "mb_body_oc__ib_hl"
 MODE_MB_BODY_IB_BODY = "mb_body_oc__ib_body"
 MODE_MB_RANGE_IB_HL = "mb_range_hl__ib_hl"
+MODE_MB_HIGH_IB_HIGH_AND_CLOSE_IN_MB_RANGE = "mb_high__ib_high_and_close_in_mb_range"
 
 ALLOWED_MODES = {
     MODE_MB_BODY_IB_HL,
     MODE_MB_BODY_IB_BODY,
     MODE_MB_RANGE_IB_HL,
+    MODE_MB_HIGH_IB_HIGH_AND_CLOSE_IN_MB_RANGE,
 }
 
 
@@ -63,8 +65,15 @@ def eval_vectorized(
         inside_mask = _compare_bounds(df["low"], df["high"], mb_body_low, mb_body_high, strict)
     elif mode == MODE_MB_BODY_IB_BODY:
         inside_mask = _compare_bounds(ib_body_low, ib_body_high, mb_body_low, mb_body_high, strict)
-    else:  # MODE_MB_RANGE_IB_HL
+    elif mode == MODE_MB_RANGE_IB_HL:
         inside_mask = _compare_bounds(df["low"], df["high"], prev_low, prev_high, strict)
+    elif mode == MODE_MB_HIGH_IB_HIGH_AND_CLOSE_IN_MB_RANGE:
+        if strict:
+            inside_mask = (df["high"] < prev_high) & (df["close"] > prev_low) & (df["close"] < prev_high)
+        else:
+            inside_mask = (df["high"] <= prev_high) & (df["close"] >= prev_low) & (df["close"] <= prev_high)
+    else:
+        raise ValueError(f"Invalid inside_bar_definition_mode: {mode}")
 
     # Ensure previous bar exists
     inside_mask = inside_mask & prev_open.notna() & prev_close.notna() & prev_high.notna() & prev_low.notna()
@@ -101,7 +110,13 @@ def eval_scalar(
         if strict:
             return ib_body_high < mb_body_high and ib_body_low > mb_body_low
         return ib_body_high <= mb_body_high and ib_body_low >= mb_body_low
+    if mode == MODE_MB_RANGE_IB_HL:
+        if strict:
+            return ib_high < mb_high and ib_low > mb_low
+        return ib_high <= mb_high and ib_low >= mb_low
+    if mode == MODE_MB_HIGH_IB_HIGH_AND_CLOSE_IN_MB_RANGE:
+        if strict:
+            return ib_high < mb_high and mb_low < ib_close < mb_high
+        return ib_high <= mb_high and mb_low <= ib_close <= mb_high
 
-    if strict:
-        return ib_high < mb_high and ib_low > mb_low
-    return ib_high <= mb_high and ib_low >= mb_low
+    raise ValueError(f"Invalid inside_bar_definition_mode: {mode}")

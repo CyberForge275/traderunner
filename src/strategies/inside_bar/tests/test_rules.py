@@ -42,6 +42,29 @@ def test_mode3_mb_range_ib_hl_allows_body_outside():
     assert bool(mask.iloc[1]) is True
 
 
+def test_mode4_mb_high_ib_high_and_close_in_mb_range():
+    mb = [10.0, 14.0, 8.0, 12.0]  # range 8-14
+    ib = [11.0, 13.5, 7.5, 13.9]  # ib_high inside, ib_close inside, ib_low outside allowed
+    df = _make_df(mb, ib)
+    mask = rules.eval_vectorized(df, rules.MODE_MB_HIGH_IB_HIGH_AND_CLOSE_IN_MB_RANGE, strict=False)
+    assert bool(mask.iloc[1]) is True
+
+
+def test_mode4_rejects_ib_high_above_mb_high():
+    mb = [10.0, 14.0, 8.0, 12.0]  # range 8-14
+    ib = [11.0, 14.5, 9.0, 13.0]  # ib_high above mb_high
+    df = _make_df(mb, ib)
+    mask = rules.eval_vectorized(df, rules.MODE_MB_HIGH_IB_HIGH_AND_CLOSE_IN_MB_RANGE, strict=False)
+    assert bool(mask.iloc[1]) is False
+
+
+def test_mode4_rejects_ib_close_outside_mb_range():
+    mb = [10.0, 14.0, 8.0, 12.0]  # range 8-14
+    ib = [11.0, 13.5, 9.0, 7.5]  # ib_close below mb_low
+    df = _make_df(mb, ib)
+    mask = rules.eval_vectorized(df, rules.MODE_MB_HIGH_IB_HIGH_AND_CLOSE_IN_MB_RANGE, strict=False)
+    assert bool(mask.iloc[1]) is False
+
 def test_strict_vs_inclusive_boundary():
     mb = [10.0, 13.0, 9.0, 12.0]  # body 10-12
     ib = [10.5, 12.0, 10.0, 11.0]  # touches body bounds
