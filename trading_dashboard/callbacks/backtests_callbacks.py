@@ -18,14 +18,17 @@ from ..components.row_inspector import (
     log_open,
     resolve_oco_group,
     derive_long_short_levels,
+    resolve_trade_oco_levels,
 )
 from ..components.signal_chart import (
     build_candlestick_figure,
     compute_bars_window_union,
+    compute_trade_chart_window,
     resolve_inspector_timestamps,
     build_marker,
     build_vertical_marker,
     build_level_markers_at_ts,
+    build_price_marker,
     infer_mother_ts,
     infer_exit_ts,
     infer_signal_ts,
@@ -119,6 +122,7 @@ def register_backtests_callbacks(app):
         from ..repositories.backtests import (
             get_backtest_log,
             get_backtest_metrics,
+            get_backtest_strategy_params,
             get_backtest_summary,
             get_backtest_equity,
             get_backtest_orders,
@@ -207,6 +211,7 @@ def register_backtests_callbacks(app):
             # (equity, orders, etc. - still valuable even for new runs)
             log_df = get_backtest_log(run_name)  # May be empty
             metrics = get_backtest_metrics(run_name)
+            strategy_params = get_backtest_strategy_params(run_name)
             equity_df = get_backtest_equity(run_name)
             orders = get_backtest_orders(run_name)
             rk_df = get_rudometkin_candidates(run_name)
@@ -220,6 +225,7 @@ def register_backtests_callbacks(app):
                 run_name,
                 log_df,
                 metrics,
+                strategy_params=strategy_params,
                 summary=summary,
                 equity_df=equity_df,
                 orders_df=orders.get("orders"),
@@ -232,6 +238,7 @@ def register_backtests_callbacks(app):
         logger.info(f"⚠️ [backtests_detail] Falling back to legacy artifacts for {run_name}")
         log_df = get_backtest_log(run_name)
         metrics = get_backtest_metrics(run_name)
+        strategy_params = get_backtest_strategy_params(run_name)
         summary = get_backtest_summary(run_name)
         equity_df = get_backtest_equity(run_name)
         orders = get_backtest_orders(run_name)
@@ -241,6 +248,7 @@ def register_backtests_callbacks(app):
             run_name,
             log_df,
             metrics,
+            strategy_params=strategy_params,
             summary=summary,
             equity_df=equity_df,
             orders_df=orders.get("orders"),
@@ -387,9 +395,51 @@ def register_backtests_callbacks(app):
             return no_update, no_update, no_update, no_update
 
         row = rows[row_index]
-        items = row_to_kv_items(row)
+        oco = resolve_trade_oco_levels(row, orders_rows or [])
+        signal_ts = oco.get("signal_ts")
+        levels = oco.get("levels") or {"long": {}, "short": {}}
+        oco_group_id = oco.get("oco_group_id")
+
         title = f"Trade Inspector — {row.get('template_id', '')} ({row.get('symbol', '')})"
-        body = render_kv_table(items)
+        if oco_group_id:
+            title = f"{title} (OCO: {oco_group_id})"
+
+        sections = [
+            {
+                "title": "Trade",
+                "items": [
+                    {"key": "template_id", "value": row.get("template_id", "")},
+                    {"key": "oco_group_id", "value": oco_group_id or "—"},
+                    {"key": "symbol", "value": row.get("symbol", "")},
+                    {"key": "side", "value": row.get("side", "")},
+                    {"key": "signal_ts", "value": signal_ts or "—"},
+                    {"key": "entry_ts", "value": row.get("entry_ts", "")},
+                    {"key": "entry_price", "value": row.get("entry_price", "")},
+                    {"key": "exit_ts", "value": row.get("exit_ts", "")},
+                    {"key": "exit_price", "value": row.get("exit_price", "")},
+                    {"key": "exit_reason", "value": row.get("reason", "")},
+                ],
+            },
+            {
+                "title": "Levels (OCO)",
+                "items": [
+                    {"key": "LONG entry", "value": levels.get("long", {}).get("entry") or "—"},
+                    {"key": "LONG stop", "value": levels.get("long", {}).get("stop") or "—"},
+                    {"key": "LONG tp", "value": levels.get("long", {}).get("tp") or "—"},
+                    {"key": "SHORT entry", "value": levels.get("short", {}).get("entry") or "—"},
+                    {"key": "SHORT stop", "value": levels.get("short", {}).get("stop") or "—"},
+                    {"key": "SHORT tp", "value": levels.get("short", {}).get("tp") or "—"},
+                ],
+            },
+        ]
+        if signal_ts is None or pd.isna(signal_ts):
+            sections.append(
+                {
+                    "title": "Warning",
+                    "items": [{"key": "signal_ts missing", "value": "OCO level markers skipped"}],
+                }
+            )
+        body = render_kv_sections(sections)
         log_open("trades", row.get("template_id"), row.get("symbol"), row.get("entry_ts"))
 
         fig = build_candlestick_figure(pd.DataFrame())
@@ -408,8 +458,8 @@ def register_backtests_callbacks(app):
                     mother_ts = pd.to_datetime(row.get("entry_ts"), utc=True, errors="coerce")
                 exit_ts = pd.to_datetime(row.get("exit_ts"), utc=True, errors="coerce")
                 entry_ts = pd.to_datetime(row.get("entry_ts"), utc=True, errors="coerce")
-                timestamps = [mother_ts, inside_ts, entry_ts, exit_ts]
-                window, meta = compute_bars_window_union(bars_df, timestamps, pre_bars=5, post_bars=5)
+                anchor_ts = signal_ts if signal_ts is not None and not pd.isna(signal_ts) else entry_ts
+                window, meta = compute_trade_chart_window(bars_df, anchor_ts, exit_ts, pre_bars=10, post_bars=5)
                 markers = []
                 if not window.empty:
                     m = build_marker(window, "mother", mother_ts, "high", "#1f77b4", "triangle-down", "M")
@@ -418,9 +468,17 @@ def register_backtests_callbacks(app):
                     ib = build_marker(window, "inside", inside_ts, "high", "#000000", "triangle-down", "IB")
                     if ib:
                         markers.append(ib)
-                    en = build_marker(window, "entry", entry_ts, "low", "#2ca02c", "triangle-up", "E")
+                    if signal_ts is not None and pd.notna(signal_ts):
+                        markers.extend(build_level_markers_at_ts(signal_ts, levels["long"], levels["short"]))
+                    entry_price = pd.to_numeric(row.get("entry_price"), errors="coerce")
+                    exit_price = pd.to_numeric(row.get("exit_price"), errors="coerce")
+                    en = build_price_marker(entry_ts, entry_price, "E", "#2ca02c", "triangle-up")
                     if en:
                         markers.append(en)
+                    ex_label = f"X ({row.get('reason', '')})" if row.get("reason") else "X"
+                    ex = build_price_marker(exit_ts, exit_price, ex_label, "#d62728", "x")
+                    if ex:
+                        markers.append(ex)
                 fig = build_candlestick_figure(window, markers=markers)
                 start_ts = meta.get("start_ts")
                 end_ts = meta.get("end_ts")
@@ -434,4 +492,23 @@ def register_backtests_callbacks(app):
                         pd.to_datetime(end_ts, utc=True, errors="coerce") if end_ts is not None else None,
                         len(window),
                     )
+                logger = logging.getLogger(__name__)
+                logger.info(
+                    "actions: trade_inspector_marker_ts template_id=%s oco_group_id=%s signal_ts=%s entry_ts=%s exit_ts=%s exit_reason=%s",
+                    row.get("template_id"),
+                    oco_group_id,
+                    signal_ts,
+                    entry_ts,
+                    exit_ts,
+                    row.get("reason"),
+                )
+                logger.info(
+                    "actions: trade_inspector_window template_id=%s start_idx=%s exit_idx=%s end_idx=%s start_ts=%s end_ts=%s",
+                    row.get("template_id"),
+                    meta.get("start_idx"),
+                    meta.get("exit_idx"),
+                    meta.get("end_idx"),
+                    start_ts,
+                    end_ts,
+                )
         return True, title, body, fig

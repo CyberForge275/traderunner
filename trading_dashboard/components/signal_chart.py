@@ -167,6 +167,47 @@ def compute_bars_window_union(
     return window, meta
 
 
+def compute_trade_chart_window(
+    bars_df: pd.DataFrame,
+    anchor_ts: Optional[pd.Timestamp],
+    exit_ts: Optional[pd.Timestamp],
+    pre_bars: int = 10,
+    post_bars: int = 5,
+) -> Tuple[pd.DataFrame, dict]:
+    if bars_df.empty or "timestamp" not in bars_df.columns:
+        return pd.DataFrame(), {"reason": "empty_bars_df"}
+    if anchor_ts is None:
+        return pd.DataFrame(), {"reason": "missing_anchor_ts"}
+
+    bars = bars_df.sort_values("timestamp").reset_index(drop=True)
+    ts_series = pd.to_datetime(bars["timestamp"], utc=True, errors="coerce")
+    if ts_series.isna().all():
+        return pd.DataFrame(), {"reason": "missing_timestamp_col"}
+
+    anchor_idx = int(ts_series.searchsorted(anchor_ts, side="left"))
+    anchor_idx = max(min(anchor_idx, len(bars) - 1), 0)
+    start_idx = max(anchor_idx - pre_bars, 0)
+
+    if exit_ts is not None and not pd.isna(exit_ts):
+        exit_idx = int(ts_series.searchsorted(exit_ts, side="left"))
+        exit_idx = max(min(exit_idx, len(bars) - 1), 0)
+    else:
+        exit_idx = anchor_idx
+
+    end_idx = min(exit_idx + post_bars, len(bars) - 1)
+    window = bars.iloc[start_idx : end_idx + 1].copy()
+
+    meta = {
+        "reason": "ok",
+        "start_idx": start_idx,
+        "exit_idx": exit_idx,
+        "end_idx": end_idx,
+        "start_ts": window["timestamp"].iloc[0] if not window.empty else None,
+        "end_ts": window["timestamp"].iloc[-1] if not window.empty else None,
+    }
+    return window, meta
+
+
 def build_marker(
     bars_window_df: pd.DataFrame,
     key: str,
@@ -233,6 +274,18 @@ def build_marker(
         bars_window_df["timestamp"].iloc[-1] if not bars_window_df.empty else None,
     )
     return {"ts": aligned_ts, "price": y, "label": label, "symbol": symbol, "color": color}
+
+
+def build_price_marker(
+    ts: Optional[pd.Timestamp],
+    price: Optional[float],
+    label: str,
+    color: str,
+    symbol: str,
+) -> Optional[dict]:
+    if ts is None or price is None or pd.isna(ts) or pd.isna(price):
+        return None
+    return {"ts": ts, "price": float(price), "label": label, "symbol": symbol, "color": color}
 
 
 def build_vertical_marker(

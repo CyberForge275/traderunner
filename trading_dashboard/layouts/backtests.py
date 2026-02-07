@@ -161,6 +161,7 @@ def create_backtest_detail(
     run_name: str | None,
     log_df,
     metrics: dict | None,
+    strategy_params: dict | None = None,
     summary: dict | None = None,
     equity_df: pd.DataFrame | None = None,
     orders_df: pd.DataFrame | None = None,
@@ -189,6 +190,7 @@ def create_backtest_detail(
     fills_df = fills_df if fills_df is not None else pd.DataFrame()
     trades_df = trades_df if trades_df is not None else pd.DataFrame()
     rk_df = rk_df if rk_df is not None else pd.DataFrame()
+    strategy_params = strategy_params or {}
 
     # Top-level status + strategy info
     status = (summary.get("status") or "unknown").lower()
@@ -305,8 +307,9 @@ def create_backtest_detail(
 
 
     # Full metrics table (all metrics.json keys)
+    has_metrics = bool(metrics)
     metrics_table = html.Div()
-    if metrics:
+    if has_metrics:
         metrics_items = sorted(metrics.items())
         metrics_df = pd.DataFrame(metrics_items, columns=["Metric", "Value"])
         metrics_table = html.Div(
@@ -336,6 +339,60 @@ def create_backtest_detail(
                         "padding": "8px",
                     },
                 ),
+            ],
+        )
+
+    has_params = bool(strategy_params)
+    strategy_params_table = html.Div()
+    if has_params:
+        import json
+
+        params_items = sorted(strategy_params.items())
+        cleaned = []
+        for key, value in params_items:
+            if isinstance(value, (dict, list)):
+                value = json.dumps(value)
+            cleaned.append((key, value))
+        params_df = pd.DataFrame(cleaned, columns=["Parameter", "Value"])
+        strategy_params_table = html.Div(
+            className="dashboard-card",
+            children=[
+                html.H5("Strategy Parameters"),
+                dash_table.DataTable(
+                    columns=[
+                        {"name": "Parameter", "id": "Parameter"},
+                        {"name": "Value", "id": "Value"},
+                    ],
+                    data=params_df.to_dict("records"),
+                    page_size=20,
+                    style_table={"overflowX": "auto"},
+                    style_header={
+                        "backgroundColor": "var(--bg-secondary)",
+                        "color": "var(--text-secondary)",
+                        "fontWeight": "bold",
+                        "border": "1px solid var(--border-color)",
+                    },
+                    style_cell={
+                        "backgroundColor": "var(--bg-card)",
+                        "color": "var(--text-primary)",
+                        "border": "1px solid var(--border-color)",
+                        "textAlign": "left",
+                        "padding": "8px",
+                    },
+                ),
+            ],
+        )
+
+    if has_metrics or has_params:
+        metrics_table = html.Div(
+            style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "16px"},
+            children=[
+                metrics_table
+                if has_metrics
+                else html.Div(className="dashboard-card", children=[html.H5("Metrics"), html.P("No metrics found.")]),
+                strategy_params_table
+                if has_params
+                else html.Div(className="dashboard-card", children=[html.H5("Strategy Parameters"), html.P("No params found.")]),
             ],
         )
 

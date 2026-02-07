@@ -114,6 +114,33 @@ def derive_long_short_levels(group_rows: Sequence[Mapping[str, Any]]) -> dict[st
     }
 
 
+def resolve_trade_oco_levels(
+    trade_row: Mapping[str, Any],
+    orders_rows: Sequence[Mapping[str, Any]] | None,
+) -> dict[str, Any]:
+    """Resolve OCO signal levels and signal_ts for a trade row."""
+    if not trade_row or not orders_rows:
+        return {"signal_ts": None, "levels": {"long": {}, "short": {}}, "group_rows": [], "oco_group_id": None}
+
+    template_id = trade_row.get("template_id")
+    group_rows = resolve_oco_group(orders_rows, template_id)
+    levels = derive_long_short_levels(group_rows)
+
+    signal_ts = _first_non_null([row.get("signal_ts") for row in group_rows])
+    signal_ts = pd.to_datetime(signal_ts, utc=True, errors="coerce") if signal_ts is not None else None
+    if signal_ts is not None and pd.isna(signal_ts):
+        signal_ts = None
+
+    oco_group_id = _first_non_null([row.get("oco_group_id") for row in group_rows])
+
+    return {
+        "signal_ts": signal_ts,
+        "levels": levels,
+        "group_rows": group_rows,
+        "oco_group_id": oco_group_id,
+    }
+
+
 def row_to_kv_items(row: Mapping[str, Any]) -> list[dict[str, str]]:
     """Convert row dict to sorted key/value items.
 

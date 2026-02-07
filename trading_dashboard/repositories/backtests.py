@@ -312,6 +312,29 @@ def get_backtest_metrics(run_name: str) -> Dict[str, Any]:
         return {}
 
 
+def get_backtest_strategy_params(run_name: str) -> Dict[str, Any]:
+    """Return strategy_params from run_meta.json for a run if available."""
+    runner_dir = _find_runner_dir(run_name)
+    if runner_dir is None:
+        return {}
+
+    meta_path = runner_dir / "run_meta.json"
+    if not meta_path.exists():
+        return {}
+
+    try:
+        with open(meta_path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    params = payload.get("params") or {}
+    strategy_params = params.get("strategy_params") or {}
+    if not isinstance(strategy_params, dict):
+        return {}
+    return strategy_params
+
+
 def _find_runner_dir(run_name: str) -> Optional[Path]:
     """Locate the axiom_bt runner directory for a given UI run name.
 
