@@ -13,6 +13,7 @@ from .config import load_config, get_default_config_path, load_default_config
 
 from strategies.registry import register_strategy
 from .signal_schema import get_signal_frame_schema
+from .intent_generation import generate_intent
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +217,10 @@ class InsideBarPlugin:
     @staticmethod
     def extend_signal_frame(bars, params: dict):
         return extend_insidebar_signal_frame_from_core(bars, params)
+
+    @staticmethod
+    def generate_intent(signals_frame, strategy_id: str, strategy_version: str, params: dict):
+        return generate_intent(signals_frame, strategy_id, strategy_version, params)
 
 
 register_strategy(InsideBarPlugin())
