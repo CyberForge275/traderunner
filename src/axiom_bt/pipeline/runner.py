@@ -11,7 +11,7 @@ from .data_prep import load_bars_snapshot
 from .data_fetcher import ensure_and_snapshot_bars, DataFetcherError
 from .warmup_calc import warmup_days_from_bars, WarmupError
 from .signal_frame_factory import build_signal_frame
-from .signals import generate_intent
+from strategies.intent_registry import get_strategy_adapter
 from .fill_model import generate_fills
 from axiom_bt.contracts.signal_frame_contract_v1 import compute_schema_fingerprint
 from .execution import execute
@@ -188,7 +188,13 @@ def run_pipeline(
     )
 
     # [Framework Layer]: Transform the strategy-specific SignalFrame into a normalized, generic intent stream (events_intent) understood by the execution engine.
-    intent_art = generate_intent(signals_frame, strategy_id, strategy_version, {**strategy_params, "symbol": strategy_params.get("symbol")})
+    strategy_adapter = get_strategy_adapter(strategy_id)
+    intent_art = strategy_adapter.generate_intent(
+        signals_frame,
+        strategy_id,
+        strategy_version,
+        {**strategy_params, "symbol": strategy_params.get("symbol")},
+    )
     trace_ui(
         step="pipeline_intent_generated",
         run_id=run_id,
