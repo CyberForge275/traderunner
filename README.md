@@ -50,3 +50,29 @@ signal = Signal(
     symbol="AAPL",
     signal_type="LONG",
     strategy="inside_bar",
+
+## Offline Smoke (no network)
+
+A minimal offline sanity run that reuses an existing bars snapshot and sets `EODHD_OFFLINE=1`.
+
+Required:
+- `bars_path` must exist (pre-cached parquet/csv)
+
+Example:
+```
+EODHD_OFFLINE=1 PYTHONPATH=src:. \
+  python scripts/offline_smoke.py \
+    --run-id smoke_YYYYMMDD_HHMM \
+    --out-dir artifacts/backtests/smoke_run \
+    --bars-path /path/to/bars_exec_M5_rth.parquet \
+    --strategy-id insidebar_intraday \
+    --strategy-version 1.0.1 \
+    --symbol HOOD \
+    --timeframe M5 \
+    --requested-end 2025-06-01 \
+    --lookback-days 30
+```
+
+Expected:
+- `artifacts/backtests/<run_id>/events_intent.csv`
+- `intent_hash` log line in output

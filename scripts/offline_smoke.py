@@ -7,8 +7,8 @@ import logging
 import os
 from pathlib import Path
 
-from .runner import run_pipeline
-from .strategy_config_loader import load_strategy_params_from_ssot
+from axiom_bt.pipeline.runner import run_pipeline
+from axiom_bt.pipeline.strategy_config_loader import load_strategy_params_from_ssot
 
 
 def build_parser() -> argparse.ArgumentParser:
