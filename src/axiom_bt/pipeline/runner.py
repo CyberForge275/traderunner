@@ -220,7 +220,7 @@ def run_pipeline(
         strategy_version=strategy_version,
         file=__file__,
         func="run_pipeline",
-        extra={"rows": len(fills_art.fills)},
+        extra={"rows": len(fills_art.fills), **(fills_art.gap_stats or {})},
     )
     
     # [Engine Layer]: Portfolio Management: Apply position sizing, risk rules, and derive actual trades, equity curve, and the portfolio ledger.

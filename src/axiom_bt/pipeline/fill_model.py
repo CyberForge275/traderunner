@@ -25,6 +25,7 @@ class FillModelError(ValueError):
 class FillArtifacts:
     fills: pd.DataFrame
     fills_hash: str
+    gap_stats: Dict[str, float | int] | None = None
 
 
 def _hash_dataframe(df: pd.DataFrame) -> str:
@@ -83,7 +84,7 @@ def generate_fills(
         )
         fills_hash = _hash_dataframe(fills)
         logger.warning("actions: fills_empty_intent fills_hash=%s", fills_hash)
-        return FillArtifacts(fills=fills, fills_hash=fills_hash)
+        return FillArtifacts(fills=fills, fills_hash=fills_hash, gap_stats=None)
     if bars.empty:
         raise FillModelError("bars empty; cannot generate fills")
 
@@ -92,6 +93,13 @@ def generate_fills(
     bars = bars.sort_values("timestamp").reset_index(drop=True)
     bar_idx = bars.set_index("timestamp")
     rows: List[Dict] = []
+    session_end_snap_count = 0
+    diffs = bars["timestamp"].diff().dt.total_seconds().dropna()
+    median_step_s = float(diffs.median()) if len(diffs) else None
+    gap_max_s = float(diffs.max()) if len(diffs) else 0.0
+    gap_count_gt_2x_median = (
+        int((diffs > (2 * median_step_s)).sum()) if median_step_s else 0
+    )
 
     def _valid_to_for(intent_row: pd.Series, signal_ts: pd.Timestamp) -> pd.Timestamp:
         if pd.notna(intent_row.get("order_valid_to_ts")):
@@ -283,16 +291,42 @@ def generate_fills(
                 }
                 break
         if exit_row is None:
-            if valid_to not in bar_idx.index:
-                raise FillModelError(f"exit bar not found for valid_to={valid_to}")
-            exit_bar = bar_idx.loc[valid_to]
+            requested_valid_to = valid_to
+            if requested_valid_to in bar_idx.index:
+                effective_valid_to = requested_valid_to
+            else:
+                idx = bar_idx.index.searchsorted(requested_valid_to, side="right") - 1
+                if idx < 0:
+                    raise FillModelError(
+                        "session_end exit: no bar <= valid_to. "
+                        f"template_id={intent.get('template_id')} symbol={symbol} "
+                        f"valid_to={requested_valid_to} min_ts={bar_idx.index.min()} max_ts={bar_idx.index.max()}"
+                    )
+                effective_valid_to = bar_idx.index[idx]
+                session_end_snap_count += 1
+                gap_s = int((requested_valid_to - effective_valid_to).total_seconds())
+                logger.info(
+                    "actions: session_end_snap_valid_to template_id=%s symbol=%s requested=%s effective=%s gap_s=%s",
+                    intent.get("template_id"),
+                    symbol,
+                    requested_valid_to,
+                    effective_valid_to,
+                    gap_s,
+                )
+            exit_bar = bar_idx.loc[effective_valid_to]
             exit_row = {
                 "template_id": intent["template_id"],
                 "symbol": intent.get("symbol", "UNKNOWN"),
-                "fill_ts": valid_to,
+                "fill_ts": effective_valid_to,
                 "fill_price": float(exit_bar["close"]),
                 "reason": "session_end",
             }
+            if requested_valid_to != effective_valid_to:
+                exit_row["dbg_valid_to_requested_ts"] = requested_valid_to
+                exit_row["dbg_valid_to_effective_ts"] = effective_valid_to
+                exit_row["dbg_valid_to_gap_seconds"] = int(
+                    (requested_valid_to - effective_valid_to).total_seconds()
+                )
         rows.append(exit_row)
         # Update netting window after exit determination
         if netting_mode == "one_position_per_symbol":
@@ -306,8 +340,14 @@ def generate_fills(
         )
         fills_hash = _hash_dataframe(fills)
         logger.warning("actions: fills_empty_no_match fills_hash=%s", fills_hash)
-        return FillArtifacts(fills=fills, fills_hash=fills_hash)
+        return FillArtifacts(fills=fills, fills_hash=fills_hash, gap_stats=None)
 
     fills_hash = _hash_dataframe(fills)
     logger.info("actions: fills_generated fills_hash=%s fills=%d", fills_hash, len(fills))
-    return FillArtifacts(fills=fills, fills_hash=fills_hash)
+    gap_stats = {
+        "bars_gap_median_seconds": median_step_s if median_step_s is not None else 0.0,
+        "bars_gap_max_seconds": gap_max_s,
+        "bars_gap_count_gt_2x_median": gap_count_gt_2x_median,
+        "session_end_snap_count": session_end_snap_count,
+    }
+    return FillArtifacts(fills=fills, fills_hash=fills_hash, gap_stats=gap_stats)
