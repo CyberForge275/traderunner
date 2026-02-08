@@ -38,7 +38,8 @@ def is_strategy_config(file_path):
 
 def test_strategy_yaml_location_guardrail():
     """
-    Guardrail: All strategy YAML files must be in configs/strategies/.
+    Guardrail: All strategy YAML files must live under
+    src/strategies/<strategy>/.
     Fail if any tracked strategy YAML is found elsewhere.
     """
     tracked_yamls = get_tracked_yaml_files()
@@ -52,7 +53,8 @@ def test_strategy_yaml_location_guardrail():
     illegal_locations = []
     for f in strategy_yamls:
         path = Path(f)
-        if 'configs/strategies' not in str(path.parent):
+        parent_str = str(path.parent)
+        if 'src/strategies' not in parent_str:
             illegal_locations.append(f)
             
     assert not illegal_locations, f"Strategy YAMLs found in illegal locations: {illegal_locations}"

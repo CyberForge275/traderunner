@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import logging
+import socket
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -11,6 +12,9 @@ import pandas as pd
 import requests
 
 logger = logging.getLogger(__name__)
+
+class NetworkUnavailableError(RuntimeError):
+    pass
 
 
 __all__ = [
@@ -235,7 +239,28 @@ def _generate_sample_daily(
 
 
 def _request(url: str, params: dict) -> list:
-    response = requests.get(url, params=params, timeout=30)
+    try:
+        socket.socket()
+    except OSError as exc:
+        if "Operation not permitted" in str(exc):
+            raise NetworkUnavailableError(
+                "Network disabled in this runner (socket blocked). Run backtest outside sandbox or enable offline cache mode."
+            ) from exc
+    safe_params = dict(params)
+    if "api_token" in safe_params:
+        safe_params["api_token"] = "***"
+    try:
+        response = requests.get(url, params=params, timeout=30)
+    except Exception as exc:
+        # Provide transparent network error details (DNS, TLS, proxy, etc.)
+        logger.error(
+            "EODHD request failed: url=%s params=%s error_type=%s error=%r",
+            url,
+            safe_params,
+            type(exc).__name__,
+            exc,
+        )
+        raise
     """
     Make HTTP GET request to EODHD API with 30s timeout.
 
@@ -250,7 +275,23 @@ def _request(url: str, params: dict) -> list:
         requests.HTTPError: If status 4xx/5xx
         requests.Timeout: If exceeds 30s
     """
-    response.raise_for_status()
+    logger.info(
+        "EODHD response: url=%s params=%s status=%s",
+        url,
+        safe_params,
+        response.status_code,
+    )
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        logger.error(
+            "EODHD HTTP error: url=%s params=%s status=%s body=%s",
+            url,
+            safe_params,
+            response.status_code,
+            (response.text or "")[:500],
+        )
+        raise
     return response.json()
 
 
@@ -319,6 +360,19 @@ def fetch_intraday_1m_to_parquet(
         ... )
     """
     out_dir.mkdir(parents=True, exist_ok=True)
+    if os.environ.get("EODHD_OFFLINE") == "1":
+        cached_path = out_dir / f"{symbol}.parquet"
+        if cached_path.exists():
+            logger.info("[%s] EODHD offline: using cached data %s", symbol, cached_path)
+            return cached_path
+        raw_path = out_dir / f"{symbol}_raw.parquet"
+        if raw_path.exists():
+            logger.info("[%s] EODHD offline: using cached data %s", symbol, raw_path)
+            return raw_path
+        raise FileNotFoundError(
+            f"EODHD offline mode enabled but cache missing for {symbol}.{exchange}. "
+            f"Expected {cached_path} or {raw_path}."
+        )
     token = _read_token()
 
     if use_sample or not token:
@@ -505,6 +559,15 @@ def fetch_eod_daily_to_parquet(
     use_sample: bool = False,
 ) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
+    if os.environ.get("EODHD_OFFLINE") == "1":
+        cached_path = out_dir / f"{symbol}.parquet"
+        if cached_path.exists():
+            logger.info("[%s] EODHD offline: using cached data %s", symbol, cached_path)
+            return cached_path
+        raise FileNotFoundError(
+            f"EODHD offline mode enabled but cache missing for {symbol}.{exchange}. "
+            f"Expected {cached_path}."
+        )
     token = _read_token()
 
     if use_sample or not token:

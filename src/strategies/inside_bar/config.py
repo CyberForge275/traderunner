@@ -380,8 +380,8 @@ def load_config(config_path: Path) -> dict:
     if not versions:
         return {}
 
-    # Prefer latest stable (1.0.1) if present, else first sorted key
-    version_key = "1.0.1" if "1.0.1" in versions else sorted(versions.keys())[0]
+    # Prefer v1.0.0 if present (baseline defaults), else first sorted key
+    version_key = "1.0.0" if "1.0.0" in versions else sorted(versions.keys())[0]
     node = versions.get(version_key, {})
     core = node.get("core", {})
     tunable = node.get("tunable", {})

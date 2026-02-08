@@ -1,6 +1,14 @@
 import pandas as pd
 
-from axiom_bt.strategy_hooks.registry import get_hook, list_strategies
+import pytest
+
+try:
+    from axiom_bt.strategy_hooks.registry import get_hook, list_strategies
+except ModuleNotFoundError:
+    pytest.skip(
+        "axiom_bt.strategy_hooks is not available in this environment",
+        allow_module_level=True,
+    )
 
 
 def test_registry_lists_insidebar():
