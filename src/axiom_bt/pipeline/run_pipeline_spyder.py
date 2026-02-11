@@ -24,7 +24,7 @@ if __name__ == "__main__":
     ts = datetime.now().strftime("%y%m%d_%H%M%S")
     strategy_id = "insidebar_intraday"
     strategy_version = "1.0.1"
-    requested_end = "2026-01-30"
+    requested_end = "2026-02-06"
     symbols_path = Path(__file__).with_name("symbols.txt")
     symbols = []
     if symbols_path.exists():
@@ -47,7 +47,7 @@ if __name__ == "__main__":
             "symbol": symbol,
             "timeframe": "M5",
             "requested_end": requested_end,
-            "lookback_days": 300,
+            "lookback_days": 0,
             "valid_from_policy": "signal_ts",
             "order_validity_policy": "session_end",
         }
