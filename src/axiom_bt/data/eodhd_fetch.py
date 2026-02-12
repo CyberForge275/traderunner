@@ -305,6 +305,7 @@ def fetch_intraday_1m_to_parquet(
     use_sample: bool = False,
     save_raw: bool = True,
     filter_rth: bool = True,
+    allow_legacy_http_backfill: bool = False,
 ) -> Path:
     """
     Fetch 1-minute intraday OHLCV data from EODHD and save as parquet.
@@ -372,6 +373,11 @@ def fetch_intraday_1m_to_parquet(
         raise FileNotFoundError(
             f"EODHD offline mode enabled but cache missing for {symbol}.{exchange}. "
             f"Expected {cached_path} or {raw_path}."
+        )
+    if not allow_legacy_http_backfill and os.environ.get("ALLOW_LEGACY_HTTP_BACKFILL") != "1":
+        raise RuntimeError(
+            "Legacy EODHD HTTP backfill is disabled (Option B). "
+            "Run marketdata_service.backfill_cli and ensure data exists in MARKETDATA_DATA_ROOT."
         )
     token = _read_token()
 

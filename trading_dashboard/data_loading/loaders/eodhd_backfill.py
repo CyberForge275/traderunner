@@ -6,6 +6,7 @@ import logging
 import aiohttp
 
 from ..filters.session_filter import SessionFilter
+from trading_dashboard.services.errors import MissingHistoricalDataError
 
 
 logger = logging.getLogger(__name__)
@@ -21,16 +22,16 @@ class EODHDBackfill:
         Args:
             api_key: EODHD API key (optional, reads from env if None)
         """
-        if api_key is None:
-            import os
-            api_key = os.getenv('EODHD_API_KEY')
-
-        if not api_key:
-            raise ValueError("EODHD_API_KEY not provided and not found in environment")
-
-        self.api_key = api_key
-        self.session_filter = SessionFilter()
-        self.base_url = "https://eodhd.com/api/intraday"
+        # Option B: producer is marketdata_service; dashboard is consumer-only.
+        raise MissingHistoricalDataError(
+            symbol="UNKNOWN",
+            requested_range="UNKNOWN",
+            reason="legacy_dashboard_backfill_disabled",
+            hint=(
+                "Backfill required (Option B): run marketdata_service.backfill_cli "
+                "and ensure data exists in MARKETDATA_DATA_ROOT."
+            ),
+        )
 
     async def fetch_rth_candles(
         self,

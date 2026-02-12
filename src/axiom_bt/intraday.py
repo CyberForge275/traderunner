@@ -238,6 +238,7 @@ class IntradayStore:
         force: bool = False,
         use_sample: bool = False,
         auto_fill_gaps: bool = True,
+        allow_legacy_http_backfill: bool = False,
     ) -> Dict[str, List[str]]:
         """Ensure required intraday data exists on disk.
 
@@ -248,6 +249,7 @@ class IntradayStore:
             force: Force rebuild even if cache exists
             use_sample: Use sample data (testing only)
             auto_fill_gaps: If True, automatically fetch missing data from EODHD
+            allow_legacy_http_backfill: Option-B guard. Must be True to permit HTTP fetch.
 
         Returns:
             Dict mapping symbol -> list of actions taken
@@ -322,6 +324,7 @@ class IntradayStore:
                                 use_sample=use_sample,
                                 save_raw=True,   # Save raw data with Pre/After-Market
                                 filter_rth=(spec.session_mode == "rth"),  # Dynamic based on session_mode
+                                allow_legacy_http_backfill=allow_legacy_http_backfill,
                             )
 
 
@@ -370,6 +373,7 @@ class IntradayStore:
                     use_sample=use_sample,
                     save_raw=True,   # Save raw data with Pre/After-Market
                     filter_rth=(spec.session_mode == "rth"),  # Dynamic based on session_mode
+                    allow_legacy_http_backfill=allow_legacy_http_backfill,
                 )
 
                 sym_actions.append("fetch_m1")

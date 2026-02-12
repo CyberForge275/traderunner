@@ -145,6 +145,9 @@ def run_pipeline(
                 session_mode=session_mode,
                 warmup_days=warmup_days,
                 auto_fill_gaps=not bool(strategy_params.get("consumer_only", False)),
+                allow_legacy_http_backfill=bool(
+                    strategy_params.get("allow_legacy_http_backfill", False)
+                ),
             )
             snapshot_path = Path(snap_info["exec_path"])
             bars_hash = snap_info["bars_hash"]

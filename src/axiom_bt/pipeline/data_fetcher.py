@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 from pathlib import Path
 from typing import Dict
@@ -72,6 +73,7 @@ def ensure_and_snapshot_bars(
     use_sample: bool = False,
     force: bool = False,
     auto_fill_gaps: bool = True,
+    allow_legacy_http_backfill: bool = False,
 ) -> Dict[str, str]:
     """Ensure bars via IntradayStore and write per-run snapshots + meta.
 
@@ -143,21 +145,32 @@ def ensure_and_snapshot_bars(
         session_mode=session_mode,
     )
 
-    if not force and not auto_fill_gaps:
+    legacy_http_backfill_allowed = (
+        os.getenv("ALLOW_LEGACY_HTTP_BACKFILL") == "1"
+        or bool(allow_legacy_http_backfill)
+    )
+    if not force:
         coverage = check_local_m1_coverage(
             symbol=symbol,
             start=effective_start.date().isoformat(),
             end=end_ts.date().isoformat(),
             tz=market_tz,
         )
-        if coverage.get("has_gap"):
+        if coverage.get("has_gap") and (
+            not auto_fill_gaps or not legacy_http_backfill_allowed
+        ):
             hint = (
-                "Backfill required (Option B): run marketdata-backfill CLI/service "
+                "Backfill required (Option B): run marketdata_service.backfill_cli "
                 "and ensure data exists in MARKETDATA_DATA_ROOT."
             )
             requested_range = f"{effective_start.date()}..{end_ts.date()}"
+            reason = (
+                "legacy_http_backfill_disabled"
+                if auto_fill_gaps and not legacy_http_backfill_allowed
+                else "missing historical bars"
+            )
             raise MissingHistoricalDataError(
-                f"missing historical bars for {symbol} range={requested_range}; "
+                f"{reason} for {symbol} range={requested_range}; "
                 f"gaps={coverage.get('gaps', [])}. {hint}"
             )
 
@@ -166,6 +179,7 @@ def ensure_and_snapshot_bars(
         spec,
         force=force,
         auto_fill_gaps=auto_fill_gaps,
+        allow_legacy_http_backfill=legacy_http_backfill_allowed,
         use_sample=use_sample,
     )
     logger.info(
