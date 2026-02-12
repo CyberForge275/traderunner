@@ -7,6 +7,7 @@ Created on Mon Jan 12 22:19:59 2026
 """
 
 # run_pipeline_spyder.py
+import os
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -26,6 +27,13 @@ if __name__ == "__main__":
     strategy_id = "insidebar_intraday"
     strategy_version = "1.0.1"
     requested_end = "2026-02-06"
+    consumer_only = os.getenv("PIPELINE_CONSUMER_ONLY", "0").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "y",
+        "on",
+    )
     symbols_path = Path(__file__).with_name("symbols.txt")
     symbols = []
     if symbols_path.exists():
@@ -51,6 +59,7 @@ if __name__ == "__main__":
             "lookback_days": 0,
             "valid_from_policy": "signal_ts",
             "order_validity_policy": "session_end",
+            "consumer_only": consumer_only,
         }
         params.setdefault("strategy_version", strategy_version)
         params.setdefault("backtesting", {})

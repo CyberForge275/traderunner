@@ -23,6 +23,7 @@ from axiom_bt.intraday import (
     _normalize_ohlcv_frame,
     check_local_m1_coverage,
 )
+from axiom_bt.data.session_filter import filter_rth_session
 from axiom_bt.fs import DATA_D1
 from .data_prep import _sha256_file
 
@@ -134,6 +135,113 @@ def ensure_and_snapshot_bars(
     warmup_days_calc = max(0, int((warmup_days or 0)))
     requested_start = (end_ts - pd.Timedelta(days=int(lookback_days))).normalize()
     effective_start = (requested_start - pd.Timedelta(days=warmup_days_calc)).normalize()
+
+    # Option B SSOT path: consume marketdata_service HTTP M1 raw parquet first.
+    md_root = os.getenv("MARKETDATA_DATA_ROOT", "").strip()
+    if md_root:
+        raw_dir = Path(md_root) / "eodhd_http" / "m1"
+        raw_candidates = [
+            raw_dir / f"{symbol.upper()}_raw.parquet",
+            raw_dir / f"{symbol.upper()}.parquet",
+            raw_dir / f"{symbol.upper()}.US_raw.parquet",
+        ]
+        raw_source = next((p for p in raw_candidates if p.exists()), None)
+        if raw_source is not None:
+            logger.info(
+                "actions: pipeline_option_b_source symbol=%s source=%s",
+                symbol,
+                raw_source,
+            )
+
+            df_raw = pd.read_parquet(raw_source)
+            if "ts" in df_raw.columns:
+                df_raw = df_raw.copy()
+                df_raw["timestamp"] = pd.to_datetime(df_raw["ts"], unit="s", utc=True, errors="coerce")
+                df_raw = df_raw.dropna(subset=["timestamp"]).set_index("timestamp")
+            elif "timestamp" in df_raw.columns:
+                df_raw = df_raw.copy()
+                df_raw["timestamp"] = pd.to_datetime(df_raw["timestamp"], utc=True, errors="coerce")
+                df_raw = df_raw.dropna(subset=["timestamp"]).set_index("timestamp")
+            elif isinstance(df_raw.index, pd.DatetimeIndex):
+                if df_raw.index.tz is None:
+                    df_raw.index = pd.to_datetime(df_raw.index, utc=True, errors="coerce")
+                else:
+                    df_raw.index = df_raw.index.tz_convert("UTC")
+            else:
+                raise DataFetcherError(f"unsupported option-b raw schema: {raw_source}")
+
+            if session_mode == "rth":
+                df_raw = filter_rth_session(df_raw, tz=market_tz)
+
+            df_norm = _normalize_ohlcv_frame(df_raw, target_tz=market_tz, symbol=symbol)
+            if df_norm.empty:
+                raise MissingHistoricalDataError(
+                    f"missing historical bars for {symbol} range={effective_start.date()}..{end_ts.date()} "
+                    "in option-b source. Backfill required (Option B): run marketdata_service.backfill_cli "
+                    "and ensure data exists in MARKETDATA_DATA_ROOT."
+                )
+
+            # Build execution timeframe from M1 canonical frame.
+            if tf_upper == "M1":
+                df_exec = df_norm
+            else:
+                interval = "5min" if tf_upper == "M5" else "15min" if tf_upper == "M15" else "60min"
+                agg = {
+                    "open": "first",
+                    "high": "max",
+                    "low": "min",
+                    "close": "last",
+                    "volume": "sum",
+                }
+                df_exec = df_norm.resample(interval).agg(agg).dropna(how="any")
+                if df_exec.empty:
+                    raise DataFetcherError(
+                        f"option-b resample produced empty frame for {symbol} tf={tf_upper} from {raw_source}"
+                    )
+
+            start_local = effective_start.tz_convert(market_tz)
+            end_local = end_ts.tz_convert(market_tz)
+            df_filtered = df_exec.loc[start_local:end_local].copy()
+            if df_filtered.empty:
+                raise MissingHistoricalDataError(
+                    f"missing historical bars for {symbol} range={effective_start.date()}..{end_ts.date()}; "
+                    "Backfill required (Option B): run marketdata_service.backfill_cli and ensure data exists in MARKETDATA_DATA_ROOT."
+                )
+
+            target_exec = bars_dir / f"bars_exec_{tf_upper}_rth.parquet"
+            signal_target = None
+            if tf_upper in {"M5", "M15"}:
+                signal_target = bars_dir / f"bars_signal_{tf_upper}_rth.parquet"
+            elif tf_upper == "M1":
+                signal_target = target_exec
+            elif tf_upper == "H1":
+                signal_target = target_exec
+
+            df_filtered.attrs = {}
+            df_filtered.to_parquet(target_exec)
+            if signal_target and signal_target != target_exec:
+                df_filtered.to_parquet(signal_target)
+
+            bars_hash = _sha256_file(target_exec)
+            meta = {
+                "market_tz": market_tz,
+                "timeframe": tf_upper,
+                "warmup_days": warmup_days,
+                "lookback_days": lookback_days,
+                "exec_bars": target_exec.name,
+                "signal_bars": signal_target.name if signal_target else None,
+                "session_mode": session_mode,
+                "rth_only": session_mode == "rth",
+                "option_b_source": str(raw_source),
+            }
+            meta_path = bars_dir / "bars_slice_meta.json"
+            meta_path.write_text(json.dumps(meta, indent=2))
+            return {
+                "exec_path": str(target_exec),
+                "signal_path": str(signal_target) if signal_target else None,
+                "bars_hash": bars_hash,
+                "meta_path": str(meta_path),
+            }
 
     # Ensure underlying data (M1 as base); resample M5/M15 handled by store.ensure
     spec = IntradaySpec(
