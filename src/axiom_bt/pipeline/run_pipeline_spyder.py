@@ -18,6 +18,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from axiom_bt.pipeline.runner import run_pipeline
+from axiom_bt.pipeline.paths import get_backtest_run_dir
 from axiom_bt.pipeline.strategy_config_loader import load_strategy_params_from_ssot
 
 if __name__ == "__main__":
@@ -39,7 +40,7 @@ if __name__ == "__main__":
     cfg = load_strategy_params_from_ssot(strategy_id, strategy_version)
     for symbol in symbols:
         run_id = f"dev_{ts}_{symbol}"
-        out_dir = ROOT / "artifacts" / "backtests" / run_id
+        out_dir = get_backtest_run_dir(run_id)
         bars_path = out_dir / "bars_snapshot.parquet"
         params = {
             **cfg.get("core", {}),

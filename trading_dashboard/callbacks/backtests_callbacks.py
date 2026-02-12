@@ -8,6 +8,7 @@ import logging
 import pandas as pd
 from dash import Input, Output, State, no_update, callback_context
 from dash.exceptions import PreventUpdate
+from ..config import BACKTESTS_DIR
 from ..ui_ids import BT, RUN
 from ..components.row_inspector import (
     INSPECT_COL,
@@ -135,7 +136,8 @@ def register_backtests_callbacks(app):
             return create_backtest_detail(None, None, None)
 
         # Resolve run_dir and check existence
-        run_dir = Path("artifacts/backtests") / run_name
+        from pathlib import Path
+        run_dir = Path(BACKTESTS_DIR) / run_name
         run_dir_exists = run_dir.exists()
         logger.info(f"🔍 [backtests_detail] run_dir={run_dir}, exists={run_dir_exists}")
 
@@ -306,7 +308,7 @@ def register_backtests_callbacks(app):
         fig = build_candlestick_figure(pd.DataFrame())
         if run_name:
             from pathlib import Path
-            bars_df = load_bars_for_run(Path("artifacts/backtests") / run_name)
+            bars_df = load_bars_for_run(Path(BACKTESTS_DIR) / run_name)
             if not bars_df.empty:
                 mother_ts, inside_ts, exit_ts = resolve_inspector_timestamps(row)
                 if mother_ts is None:
@@ -445,7 +447,7 @@ def register_backtests_callbacks(app):
         fig = build_candlestick_figure(pd.DataFrame())
         if run_name:
             from pathlib import Path
-            bars_df = load_bars_for_run(Path("artifacts/backtests") / run_name)
+            bars_df = load_bars_for_run(Path(BACKTESTS_DIR) / run_name)
             if not bars_df.empty:
                 mother_ts = None
                 inside_ts = None

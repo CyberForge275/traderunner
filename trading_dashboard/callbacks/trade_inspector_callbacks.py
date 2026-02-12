@@ -7,9 +7,10 @@ import dash_bootstrap_components as dbc
 from trading_dashboard.repositories.trade_repository import TradeRepository
 from trading_dashboard.services.trade_detail_service import TradeDetailService
 from trading_dashboard.plots.trade_inspector_plot import build_trade_chart
+from trading_dashboard.config import BACKTESTS_DIR
 
 
-ARTIFACTS_ROOT = Path("artifacts/backtests")
+ARTIFACTS_ROOT = Path(BACKTESTS_DIR)
 
 
 def _list_runs() -> list[dict]:

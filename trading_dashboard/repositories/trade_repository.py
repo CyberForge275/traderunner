@@ -6,6 +6,8 @@ from typing import Optional
 
 import pandas as pd
 
+from trading_dashboard.config import BACKTESTS_DIR
+
 
 class ArtifactMissing(Exception):
     pass
@@ -23,7 +25,7 @@ class RunArtifacts:
 
 
 class TradeRepository:
-    def __init__(self, artifacts_root: Path = Path("artifacts/backtests")):
+    def __init__(self, artifacts_root: Path = Path(BACKTESTS_DIR)):
         self.artifacts_root = artifacts_root
 
     def _run_dir(self, run_id: str) -> Path:

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import sys
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Callable
 
@@ -26,8 +27,11 @@ if str(SRC) not in sys.path:
 
 from core.settings import DEFAULT_INITIAL_CASH, DEFAULT_FEE_BPS, DEFAULT_SLIPPAGE_BPS
 from axiom_bt.pipeline.runner import run_pipeline, PipelineError
+from axiom_bt.pipeline.paths import get_artifacts_root, get_backtest_run_dir
 from axiom_bt.pipeline.data_fetcher import MissingHistoricalDataError as PipelineMissingHistoricalDataError
 from trading_dashboard.services.errors import MissingHistoricalDataError
+
+logger = logging.getLogger(__name__)
 
 
 class NewPipelineAdapter:
@@ -84,11 +88,12 @@ class NewPipelineAdapter:
 
             # Validate inputs
             if not symbols or len(symbols) == 0:
+                run_dir = get_backtest_run_dir(run_name)
                 return {
                     "status": "failed",
                     "error": "No symbols provided",
                     "run_name": run_name,
-                    "run_dir": f"artifacts/backtests/{run_name}"
+                    "run_dir": str(run_dir)
                 }
 
             symbol = symbols[0]  # Single symbol for now
@@ -118,9 +123,13 @@ class NewPipelineAdapter:
 
             self.progress_callback(f"📊 Running pipeline for {symbol} ({lookback_days}d)...")
 
-            # Create run directory
-            run_dir = Path("artifacts/backtests") / run_name
-            run_dir.mkdir(parents=True, exist_ok=True)
+            # Resolve artifacts root once per run.
+            run_dir = get_backtest_run_dir(run_name)
+            logger.info(
+                "actions: artifacts_root resolved_root=%s run=%s",
+                get_artifacts_root(),
+                run_name,
+            )
 
             # Extract compound config from strategy_params
             backtesting_config = strategy_params.get("backtesting", {})
@@ -243,8 +252,7 @@ class NewPipelineAdapter:
             self.progress_callback(f"❌ Pipeline failed: {error_msg}")
             
             # Ensure run_dir exists
-            run_dir = Path("artifacts/backtests") / run_name
-            run_dir.mkdir(parents=True, exist_ok=True)
+            run_dir = get_backtest_run_dir(run_name)
             
             # Write error stacktrace
             error_trace_path = run_dir / "error_stacktrace.txt"
@@ -293,8 +301,7 @@ class NewPipelineAdapter:
             self.progress_callback(f"❌ Pipeline failed: {error_type}: {error_msg}")
             
             # Ensure run_dir exists even if pipeline failed early
-            run_dir = Path("artifacts/backtests") / run_name
-            run_dir.mkdir(parents=True, exist_ok=True)
+            run_dir = get_backtest_run_dir(run_name)
             
             # Write error stacktrace for debugging
             error_trace_path = run_dir / "error_stacktrace.txt"

@@ -126,6 +126,13 @@ class TradingSettings:
         if data_d1 := os.getenv("TRADING_DATA_D1_DIR"):
             self.data_d1_dir = Path(data_d1)
 
+        # Artifacts root (Option B / SSOT)
+        if artifacts_root := (
+            os.getenv("TRADING_ARTIFACTS_ROOT")
+            or os.getenv("TRADERUNNER_ARTIFACTS_ROOT")
+        ):
+            self.artifacts_root = Path(artifacts_root)
+
         # Databases
         if signals_db := os.getenv("TRADING_SIGNALS_DB_PATH"):
             self.signals_db_path = Path(signals_db)

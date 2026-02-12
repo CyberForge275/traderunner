@@ -213,10 +213,11 @@ def register_run_backtest_callback(app):
         # SSOT: Store run_dir immediately for UI binding
         # Note: Adapter will return run_dir, but service wraps it
         # For now, derive run_dir from run_name (service doesn't pass back adapter response yet)
+        from axiom_bt.pipeline.paths import get_backtest_run_dir
         active_run = {
             "job_id": job_id,
             "run_name": run_name,
-            "run_dir": f"artifacts/backtests/{run_name}",  # SSOT for all UI lookups
+            "run_dir": str(get_backtest_run_dir(run_name)),  # SSOT for all UI lookups
             "started_at": datetime.now().isoformat()
         }
 
