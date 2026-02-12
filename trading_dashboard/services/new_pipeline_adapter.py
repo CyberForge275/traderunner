@@ -238,7 +238,7 @@ class NewPipelineAdapter:
                         symbol=symbol,
                         requested_range=f"{ensure_req.start_date}..{ensure_req.end_date}",
                         reason="ensure_bars_failed",
-                        hint=f"marketdata-service /ensure_bars failed: {ensure_err}",
+                        hint=f"marketdata-service /ensure_timeframe_bars failed: {ensure_err}",
                     ) from ensure_err
                 logger.info(
                     "actions: ensure_bars_result run=%s symbol=%s status=%s gaps_before=%s gaps_after=%s",
