@@ -235,7 +235,19 @@ def register_run_backtest_callback(app):
                 equity_basis_val
             )
             if date_mode == "days_back":
-                config_params["lookback_days"] = int(days_back or 30)
+                if days_back in (None, ""):
+                    return (
+                        html.Div(
+                            "❌ days_back is required in days_back mode",
+                            style={"color": "red"},
+                        ),
+                        run_name,
+                        {"bt_job_running": False},
+                        "",
+                        None,
+                        "",
+                    )
+                config_params["lookback_days"] = int(days_back)
 
         logger.info(
             f"actions: backtest_params_from_ssot strategy_id={strategy} version={version_to_use} "
