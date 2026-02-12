@@ -861,7 +861,7 @@ def create_backtests_layout():
 
             # NEW: Generic Version Selector
             html.Label("Version (Required)", id=RUN.VERSION_LABEL, 
-                       style={"fontWeight": "bold", "marginTop": "8px", "color": "var(--accent-red)"}),
+                       style={"fontWeight": "bold", "marginTop": "8px"}),
             dcc.Dropdown(
                 id=RUN.VERSION_DROPDOWN,
                 options=[],  # Will be populated by callback
