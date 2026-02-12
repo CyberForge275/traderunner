@@ -1,9 +1,4 @@
-"""Data fetcher for pipeline: wraps IntradayStore/Spec and snapshots bars.
-
-Reads/writes only via existing SSOT storage; does not change parquet generation logic.
-Supports intraday (M1/M5/M15/H1) via IntradayStore.ensure (M1 as base) and daily (D1) via existing cached file.
-H1 is derived by resampling M1 locally (no external fetch).
-"""
+"""Data fetcher wrapper for pipeline bars snapshots (Option B consumer-only)."""
 
 from __future__ import annotations
 
@@ -16,14 +11,6 @@ from typing import Dict
 
 import pandas as pd
 
-from axiom_bt.intraday import (
-    IntradaySpec,
-    IntradayStore,
-    Timeframe,
-    _normalize_ohlcv_frame,
-    check_local_m1_coverage,
-)
-from axiom_bt.data.session_filter import filter_rth_session
 from axiom_bt.fs import DATA_D1
 from .data_prep import _sha256_file
 
@@ -35,7 +22,7 @@ class DataFetcherError(RuntimeError):
 
 
 class MissingHistoricalDataError(DataFetcherError):
-    """Raised when required historical bars are missing and auto-fetch is disabled."""
+    """Raised when required historical bars are missing and producer artifacts are unavailable."""
 
 
 def _timeframe_minutes(timeframe: str) -> int:
@@ -53,14 +40,6 @@ def _timeframe_minutes(timeframe: str) -> int:
     raise DataFetcherError(f"unsupported timeframe '{timeframe}' (expected M1/M5/M15/H1/D1)")
 
 
-def _resolve_timeframe(timeframe: str) -> Timeframe:
-    tf = timeframe.upper()
-    try:
-        return Timeframe[tf]
-    except Exception as exc:
-        raise DataFetcherError(f"unsupported timeframe '{timeframe}' (expected M1/M5/M15/D1)") from exc
-
-
 def ensure_and_snapshot_bars(
     *,
     run_dir: Path,
@@ -76,25 +55,24 @@ def ensure_and_snapshot_bars(
     auto_fill_gaps: bool = True,
     allow_legacy_http_backfill: bool = False,
 ) -> Dict[str, str]:
-    """Ensure bars via IntradayStore and write per-run snapshots + meta.
+    """Load producer-built bars and write per-run snapshots.
 
-    - Intraday: uses IntradayStore.ensure (base M1) and snapshots M1/M5/M15; H1 is resampled from M1 on the fly.
-    - Daily: copies cached D1 parquet into run_dir.
-
-    Returns:
-        Dict with keys: exec_path, signal_path (may be None for D1), bars_hash, meta_path
+    Consumer-only by contract:
+    - No HTTP fetch
+    - No local gap/backfill logic
+    - Producer must have materialized derived timeframe parquet already
     """
+    del use_sample, force, auto_fill_gaps, allow_legacy_http_backfill
 
     bars_dir = run_dir / "bars"
     bars_dir.mkdir(parents=True, exist_ok=True)
 
     tf_upper = timeframe.upper()
     if tf_upper == "D1":
-        # Daily: expect cached parquet in DATA_D1
         source_path = DATA_D1 / f"{symbol}.parquet"
         if not source_path.exists():
             raise DataFetcherError(f"daily bars not found: {source_path}")
-        # Snapshot into run dir
+
         target_exec = bars_dir / f"bars_exec_{tf_upper}.parquet"
         shutil.copyfile(source_path, target_exec)
         bars_hash = _sha256_file(source_path)
@@ -110,14 +88,6 @@ def ensure_and_snapshot_bars(
         }
         meta_path = bars_dir / "bars_slice_meta.json"
         meta_path.write_text(json.dumps(meta, indent=2))
-        logger.info(
-            "actions: pipeline_bars_snapshot_daily symbol=%s tf=%s src=%s dst=%s hash=%s",
-            symbol,
-            tf_upper,
-            source_path,
-            target_exec,
-            bars_hash,
-        )
         return {
             "exec_path": str(target_exec),
             "signal_path": None,
@@ -125,254 +95,71 @@ def ensure_and_snapshot_bars(
             "meta_path": str(meta_path),
         }
 
-    base_tf = tf_upper if tf_upper in {"M1", "M5", "M15"} else "M1"
-    tf_enum = _resolve_timeframe(base_tf)
+    tf_minutes = _timeframe_minutes(tf_upper)
     end_ts = pd.Timestamp(requested_end)
     if end_ts.tz is None:
         end_ts = end_ts.tz_localize("UTC")
     else:
         end_ts = end_ts.tz_convert("UTC")
-    warmup_days_calc = max(0, int((warmup_days or 0)))
+
+    warmup_days_calc = max(0, int(warmup_days or 0))
     requested_start = (end_ts - pd.Timedelta(days=int(lookback_days))).normalize()
     effective_start = (requested_start - pd.Timedelta(days=warmup_days_calc)).normalize()
 
-    # Option B SSOT path: consume marketdata_service HTTP M1 raw parquet first.
-    md_root = os.getenv("MARKETDATA_DATA_ROOT", "").strip()
-    if md_root:
-        raw_dir = Path(md_root) / "eodhd_http" / "m1"
-        raw_candidates = [
-            raw_dir / f"{symbol.upper()}_raw.parquet",
-            raw_dir / f"{symbol.upper()}.parquet",
-            raw_dir / f"{symbol.upper()}.US_raw.parquet",
-        ]
-        raw_source = next((p for p in raw_candidates if p.exists()), None)
-        if raw_source is not None:
-            logger.info(
-                "actions: pipeline_option_b_source symbol=%s source=%s",
-                symbol,
-                raw_source,
-            )
-
-            df_raw = pd.read_parquet(raw_source)
-            if "ts" in df_raw.columns:
-                df_raw = df_raw.copy()
-                df_raw["timestamp"] = pd.to_datetime(df_raw["ts"], unit="s", utc=True, errors="coerce")
-                df_raw = df_raw.dropna(subset=["timestamp"]).set_index("timestamp")
-            elif "timestamp" in df_raw.columns:
-                df_raw = df_raw.copy()
-                df_raw["timestamp"] = pd.to_datetime(df_raw["timestamp"], utc=True, errors="coerce")
-                df_raw = df_raw.dropna(subset=["timestamp"]).set_index("timestamp")
-            elif isinstance(df_raw.index, pd.DatetimeIndex):
-                if df_raw.index.tz is None:
-                    df_raw.index = pd.to_datetime(df_raw.index, utc=True, errors="coerce")
-                else:
-                    df_raw.index = df_raw.index.tz_convert("UTC")
-            else:
-                raise DataFetcherError(f"unsupported option-b raw schema: {raw_source}")
-
-            if session_mode == "rth":
-                df_raw = filter_rth_session(df_raw, tz=market_tz)
-
-            df_norm = _normalize_ohlcv_frame(df_raw, target_tz=market_tz, symbol=symbol)
-            if df_norm.empty:
-                raise MissingHistoricalDataError(
-                    f"missing historical bars for {symbol} range={effective_start.date()}..{end_ts.date()} "
-                    "in option-b source. Backfill required (Option B): run marketdata_service.backfill_cli "
-                    "and ensure data exists in MARKETDATA_DATA_ROOT."
-                )
-
-            # Build execution timeframe from M1 canonical frame.
-            if tf_upper == "M1":
-                df_exec = df_norm
-            else:
-                interval = "5min" if tf_upper == "M5" else "15min" if tf_upper == "M15" else "60min"
-                agg = {
-                    "open": "first",
-                    "high": "max",
-                    "low": "min",
-                    "close": "last",
-                    "volume": "sum",
-                }
-                df_exec = df_norm.resample(interval).agg(agg).dropna(how="any")
-                if df_exec.empty:
-                    raise DataFetcherError(
-                        f"option-b resample produced empty frame for {symbol} tf={tf_upper} from {raw_source}"
-                    )
-
-            start_local = effective_start.tz_convert(market_tz)
-            end_local = end_ts.tz_convert(market_tz)
-            df_filtered = df_exec.loc[start_local:end_local].copy()
-            if df_filtered.empty:
-                raise MissingHistoricalDataError(
-                    f"missing historical bars for {symbol} range={effective_start.date()}..{end_ts.date()}; "
-                    "Backfill required (Option B): run marketdata_service.backfill_cli and ensure data exists in MARKETDATA_DATA_ROOT."
-                )
-
-            target_exec = bars_dir / f"bars_exec_{tf_upper}_rth.parquet"
-            signal_target = None
-            if tf_upper in {"M5", "M15"}:
-                signal_target = bars_dir / f"bars_signal_{tf_upper}_rth.parquet"
-            elif tf_upper == "M1":
-                signal_target = target_exec
-            elif tf_upper == "H1":
-                signal_target = target_exec
-
-            df_filtered.attrs = {}
-            df_filtered.to_parquet(target_exec)
-            if signal_target and signal_target != target_exec:
-                df_filtered.to_parquet(signal_target)
-
-            bars_hash = _sha256_file(target_exec)
-            meta = {
-                "market_tz": market_tz,
-                "timeframe": tf_upper,
-                "warmup_days": warmup_days,
-                "lookback_days": lookback_days,
-                "exec_bars": target_exec.name,
-                "signal_bars": signal_target.name if signal_target else None,
-                "session_mode": session_mode,
-                "rth_only": session_mode == "rth",
-                "option_b_source": str(raw_source),
-            }
-            meta_path = bars_dir / "bars_slice_meta.json"
-            meta_path.write_text(json.dumps(meta, indent=2))
-            return {
-                "exec_path": str(target_exec),
-                "signal_path": str(signal_target) if signal_target else None,
-                "bars_hash": bars_hash,
-                "meta_path": str(meta_path),
-            }
-
-    # Ensure underlying data (M1 as base); resample M5/M15 handled by store.ensure
-    spec = IntradaySpec(
-        symbols=[symbol],
-        start=effective_start.date().isoformat(),
-        end=end_ts.date().isoformat(),
-        timeframe=tf_enum,
-        tz=market_tz,
-        session_mode=session_mode,
+    md_root = (
+        Path(os.environ.get("MARKETDATA_DATA_ROOT", "").strip())
+        if os.environ.get("MARKETDATA_DATA_ROOT", "").strip()
+        else None
     )
-
-    legacy_http_backfill_allowed = (
-        os.getenv("ALLOW_LEGACY_HTTP_BACKFILL") == "1"
-        or bool(allow_legacy_http_backfill)
-    )
-    if not force:
-        coverage = check_local_m1_coverage(
-            symbol=symbol,
-            start=effective_start.date().isoformat(),
-            end=end_ts.date().isoformat(),
-            tz=market_tz,
+    if md_root is None:
+        raise MissingHistoricalDataError(
+            f"missing historical bars for {symbol} range={effective_start.date()}..{end_ts.date()}. "
+            "MARKETDATA_DATA_ROOT is not configured. Backfill required (Option B): "
+            "run marketdata_service.backfill_cli and ensure data exists in MARKETDATA_DATA_ROOT."
         )
-        if coverage.get("has_gap") and (
-            not auto_fill_gaps or not legacy_http_backfill_allowed
-        ):
-            hint = (
-                "Backfill required (Option B): run marketdata_service.backfill_cli "
-                "and ensure data exists in MARKETDATA_DATA_ROOT."
-            )
-            requested_range = f"{effective_start.date()}..{end_ts.date()}"
-            reason = (
-                "legacy_http_backfill_disabled"
-                if auto_fill_gaps and not legacy_http_backfill_allowed
-                else "missing historical bars"
-            )
-            raise MissingHistoricalDataError(
-                f"{reason} for {symbol} range={requested_range}; "
-                f"gaps={coverage.get('gaps', [])}. {hint}"
-            )
 
-    store = IntradayStore(default_tz=market_tz)
-    actions = store.ensure(
-        spec,
-        force=force,
-        auto_fill_gaps=auto_fill_gaps,
-        allow_legacy_http_backfill=legacy_http_backfill_allowed,
-        use_sample=use_sample,
-    )
-    logger.info(
-        "actions: pipeline_intraday_ensured symbol=%s tf=%s actions=%s range=%s..%s warmup=%d",
-        symbol,
-        tf_upper,
-        actions,
-        spec.start,
-        spec.end,
-        warmup_days,
-    )
+    derived_source = md_root / "derived" / f"tf_m{tf_minutes}" / f"{symbol.upper()}.parquet"
+    if not derived_source.exists():
+        raise MissingHistoricalDataError(
+            f"missing historical bars for {symbol} range={effective_start.date()}..{end_ts.date()}; "
+            f"derived bars missing at {derived_source}. Backfill required (Option B): "
+            "run marketdata_service.backfill_cli or call producer /ensure_timeframe_bars."
+        )
 
-    # Resolve source paths
-    exec_source = store.path_for(symbol, timeframe=tf_enum, session_mode=session_mode)
-    if not exec_source.exists():
-        raise DataFetcherError(f"expected exec bars parquet missing: {exec_source}")
+    logger.info("actions: pipeline_option_b_source symbol=%s source=%s", symbol, derived_source)
 
-    # CRITICAL FIX: Load bars and filter to requested date range
-    # Previously: shutil.copyfile(exec_source, target_exec) copied EVERYTHING
-    # Now: Load → Filter → Save only requested range
-    logger.info(
-        f"actions: pipeline_loading_bars symbol={symbol} tf={tf_upper} source={exec_source}"
-    )
-    
-    df_exec = pd.read_parquet(exec_source)
-    
-    # Convert to datetime index if needed
-    if "timestamp" in df_exec.columns:
-        df_exec = df_exec.set_index("timestamp")
-    
-    # Ensure timezone-aware index (SSOT: UTC)
-    if df_exec.index.tz is None:
-        df_exec.index = pd.to_datetime(df_exec.index, utc=True)
+    df = pd.read_parquet(derived_source)
+    if "ts" in df.columns:
+        idx = pd.to_datetime(df["ts"], unit="s", utc=True, errors="coerce")
+        df = df.drop(columns=[c for c in ["ts", "timestamp"] if c in df.columns])
+        df.index = idx
+    elif "timestamp" in df.columns:
+        idx = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+        df = df.drop(columns=["timestamp"])
+        df.index = idx
+    elif isinstance(df.index, pd.DatetimeIndex):
+        if df.index.tz is None:
+            df.index = pd.to_datetime(df.index, utc=True, errors="coerce")
+        else:
+            df.index = df.index.tz_convert("UTC")
     else:
-        df_exec.index = df_exec.index.tz_convert("UTC")
+        raise DataFetcherError(f"unsupported derived schema: {derived_source}")
 
-    # SSOT Snapshot Window:
-    # Snapshot covers EFFECTIVE window (requested + warmup) in UTC.
-    # Non-goal: no signal logic changes, only deterministic window definition.
-    df_filtered = df_exec.loc[effective_start:end_ts].copy()
-    
-    logger.info(
-        f"actions: pipeline_bars_filtered symbol={symbol} tf={tf_upper} "
-        f"original_bars={len(df_exec)} filtered_bars={len(df_filtered)} "
-        f"range={effective_start.date()}..{end_ts.date()} "
-        f"actual_range={df_filtered.index.min().date() if not df_filtered.empty else 'N/A'}..{df_filtered.index.max().date() if not df_filtered.empty else 'N/A'}"
-    )
-    
+    df = df[~df.index.isna()].sort_index()
+    df_filtered = df.loc[effective_start:end_ts].copy()
     if df_filtered.empty:
-        raise DataFetcherError(
-            f"No bars found for {symbol} tf={tf_upper} in window "
-            f"{effective_start.date()}..{end_ts.date()} "
-            f"(requested_start={requested_start.date()}, warmup_days={warmup_days_calc}). "
-            f"Source has {len(df_exec)} bars from {df_exec.index.min().date()} to {df_exec.index.max().date()}."
+        raise MissingHistoricalDataError(
+            f"missing historical bars for {symbol} range={effective_start.date()}..{end_ts.date()}. "
+            "Backfill required (Option B): run marketdata_service.backfill_cli or call producer /ensure_timeframe_bars."
         )
 
     target_exec = bars_dir / f"bars_exec_{tf_upper}_rth.parquet"
-    signal_target = None
-
-    if tf_upper == "H1":
-        # Resample from M1 to H1
-        df_norm = _normalize_ohlcv_frame(df_filtered, target_tz=market_tz, symbol=symbol)
-
-        agg = {
-            "open": "first",
-            "high": "max",
-            "low": "min",
-            "close": "last",
-            "volume": "sum",
-        }
-        resampled = df_norm.resample("60min").agg(agg).dropna(how="any")
-        if resampled.empty:
-            raise DataFetcherError(f"resample to H1 produced empty frame for {symbol}")
-        resampled.attrs = {}
-        resampled.to_parquet(target_exec)
-        signal_target = target_exec
-    else:
-        # Save filtered bars directly (NOT copy entire source!)
-        df_filtered.to_parquet(target_exec)
-        signal_target = bars_dir / f"bars_signal_{tf_upper}_rth.parquet"
+    signal_target = target_exec if tf_upper in {"M1", "H1"} else bars_dir / f"bars_signal_{tf_upper}_rth.parquet"
+    df_filtered.to_parquet(target_exec)
+    if signal_target != target_exec:
         df_filtered.to_parquet(signal_target)
 
     bars_hash = _sha256_file(target_exec)
-
-
     meta = {
         "market_tz": market_tz,
         "timeframe": tf_upper,
@@ -382,7 +169,8 @@ def ensure_and_snapshot_bars(
         "signal_bars": signal_target.name if signal_target else None,
         "session_mode": session_mode,
         "rth_only": session_mode == "rth",
-        "actions": actions,
+        "option_b_source": str(derived_source),
+        "consumer_only": True,
     }
     meta_path = bars_dir / "bars_slice_meta.json"
     meta_path.write_text(json.dumps(meta, indent=2))

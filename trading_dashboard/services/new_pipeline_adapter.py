@@ -213,7 +213,9 @@ class NewPipelineAdapter:
                     start_date=start_date or requested_end,
                     end_date=requested_end,
                     lookback_candles=lookback_candles,
+                    session_timezone=str(strategy_params.get("session_timezone", "America/New_York")),
                     session_mode=session_mode,
+                    session_filter=strategy_params.get("session_filter"),
                     data_root=os.getenv("MARKETDATA_DATA_ROOT"),
                 )
                 logger.info(

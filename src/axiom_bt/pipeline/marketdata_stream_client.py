@@ -31,6 +31,9 @@ class EnsureBarsRequest:
     timeframe_minutes: int
     start_date: dt.date
     end_date: dt.date
+    session_timezone: str = "America/New_York"
+    session_mode: str = "rth"
+    session_filter: Optional[list[str]] = None
     data_root: Optional[str] = None
 
     def to_json(self) -> Dict[str, Any]:
@@ -39,7 +42,11 @@ class EnsureBarsRequest:
             "timeframe_minutes": int(self.timeframe_minutes),
             "start_date": self.start_date.isoformat(),
             "end_date": self.end_date.isoformat(),
+            "session_timezone": self.session_timezone,
+            "session_mode": self.session_mode,
         }
+        if self.session_filter is not None:
+            payload["session_filter"] = list(self.session_filter)
         if self.data_root:
             payload["data_root"] = self.data_root
         return payload
@@ -71,7 +78,7 @@ class MarketdataStreamClient:
         if not self.is_configured():
             return {"ok": False, "skipped": True, "reason": "MARKETDATA_STREAM_URL not set or disabled"}
 
-        url = f"{self.base_url}/ensure_bars"
+        url = f"{self.base_url}/ensure_timeframe_bars"
         r = requests.post(url, json=req.to_json(), timeout=self.timeout_sec)
         try:
             data = r.json()
@@ -91,7 +98,9 @@ def build_ensure_request_for_pipeline(
     start_date: Any,
     end_date: Any,
     lookback_candles: int = 0,
+    session_timezone: str = "America/New_York",
     session_mode: str = "rth",
+    session_filter: Optional[list[str]] = None,
     data_root: Optional[str] = None,
 ) -> EnsureBarsRequest:
     """
@@ -109,5 +118,8 @@ def build_ensure_request_for_pipeline(
         timeframe_minutes=int(timeframe_minutes),
         start_date=ensure_start,
         end_date=e,
+        session_timezone=session_timezone,
+        session_mode=session_mode,
+        session_filter=session_filter,
         data_root=data_root or os.getenv("MARKETDATA_DATA_ROOT"),
     )
