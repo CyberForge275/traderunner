@@ -9,6 +9,14 @@ from ..ui_ids import Nav, BT, RUN
 
 logger = logging.getLogger(__name__)
 
+try:
+    from axiom_bt.utils.trace import trace_ui
+except ModuleNotFoundError:
+    logger.warning("trace_ui unavailable; continuing without tracing")
+
+    def trace_ui(*args, **kwargs):
+        return None
+
 
 def register_run_backtest_callback(app):
     """Register callback for running backtests from the UI.
@@ -29,6 +37,7 @@ def register_run_backtest_callback(app):
         Output(BT.RUN_STATUS_ICON, "children", allow_duplicate=True),
         Input(RUN.START_BUTTON, "n_clicks"),
         State(RUN.STRATEGY_DROPDOWN, "value"),
+        State(RUN.VERSION_DROPDOWN, "value"),
         State(RUN.SYMBOL_INPUT, "value"),
         State(RUN.TIMEFRAME_DROPDOWN, "value"),
         State(RUN.DATE_MODE_RADIO, "value"),
@@ -45,6 +54,7 @@ def register_run_backtest_callback(app):
     def run_backtest(
         n_clicks,
         strategy,
+        selected_version,
         symbols_str,
         timeframe,
         date_mode,
@@ -75,7 +85,6 @@ def register_run_backtest_callback(app):
         # Prepend timestamp to run name
         timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
         run_name = f"{timestamp}_{run_name.strip()}"
-        from axiom_bt.utils.trace import trace_ui
         trace_ui(
             step="ui_callback_entry",
             run_id=run_name,
@@ -91,13 +100,32 @@ def register_run_backtest_callback(app):
         # SSOT: Logic for migrated strategies (InsideBar)
         if strategy == "insidebar_intraday":
             if not bt_config_snapshot or bt_config_snapshot.get("strategy_id") != strategy:
-                error_msg = html.Div([
-                    html.Span("❌ Configuration snapshot missing. ", style={"color": "red", "fontWeight": "bold"}),
-                    html.Span("Please select Strategy and Version to load parameters first."),
-                ])
-                return error_msg, run_name, {"bt_job_running": False}, "", None, ""
-            
-            version_to_use = bt_config_snapshot.get("version")
+                if selected_version:
+                    try:
+                        from trading_dashboard.config_store.strategy_config_store import StrategyConfigStore
+                        defaults = StrategyConfigStore.get_defaults(strategy, selected_version)
+                        bt_config_snapshot = {
+                            "strategy_id": strategy,
+                            "version": selected_version,
+                            "required_warmup_bars": defaults.get("required_warmup_bars", 0),
+                            "core": defaults.get("core", {}),
+                            "tunable": defaults.get("tunable", {}),
+                            "strategy_finalized": defaults.get("strategy_finalized", False),
+                        }
+                    except Exception:
+                        error_msg = html.Div([
+                            html.Span("❌ Configuration snapshot missing. ", style={"color": "red", "fontWeight": "bold"}),
+                            html.Span("Please select Strategy and Version to load parameters first."),
+                        ])
+                        return error_msg, run_name, {"bt_job_running": False}, "", None, ""
+                else:
+                    error_msg = html.Div([
+                        html.Span("❌ Configuration snapshot missing. ", style={"color": "red", "fontWeight": "bold"}),
+                        html.Span("Please select Strategy and Version to load parameters first."),
+                    ])
+                    return error_msg, run_name, {"bt_job_running": False}, "", None, ""
+
+            version_to_use = bt_config_snapshot.get("version") or selected_version
             if not version_to_use:
                 error_msg = html.Div("❌ Strategy version missing in snapshot", style={"color": "red"})
                 return error_msg, run_name, {"bt_job_running": False}, "", None, ""
