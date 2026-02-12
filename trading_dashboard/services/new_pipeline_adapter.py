@@ -26,6 +26,10 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from core.settings import DEFAULT_INITIAL_CASH, DEFAULT_FEE_BPS, DEFAULT_SLIPPAGE_BPS
+from axiom_bt.pipeline.marketdata_stream_client import (
+    MarketdataStreamClient,
+    build_ensure_request_for_pipeline,
+)
 from axiom_bt.pipeline.runner import run_pipeline, PipelineError
 from axiom_bt.pipeline.paths import get_artifacts_root, get_backtest_run_dir
 from axiom_bt.pipeline.data_fetcher import MissingHistoricalDataError as PipelineMissingHistoricalDataError
@@ -83,6 +87,24 @@ class NewPipelineAdapter:
             - error: Error message if failed (optional)
             - traceback: Full stacktrace if failed (optional)
         """
+        # UI/Spyder parity for multi-symbol behavior: run once per symbol.
+        if isinstance(symbols, (list, tuple)) and len(symbols) > 1:
+            import copy
+
+            last_result = None
+            for sym in symbols:
+                nested_run_name = f"{run_name}__{sym}" if run_name else run_name
+                last_result = self.execute_backtest(
+                    run_name=nested_run_name,
+                    strategy=strategy,
+                    symbols=[sym],
+                    timeframe=timeframe,
+                    start_date=start_date,
+                    end_date=end_date,
+                    config_params=copy.deepcopy(config_params or {}),
+                )
+            return last_result
+
         try:
             self.progress_callback("🚀 Initializing modular pipeline...")
 
@@ -110,14 +132,16 @@ class NewPipelineAdapter:
                 func="execute_backtest",
             )
 
-            # Calculate lookback from date range
-            from datetime import datetime, date
-
-            lookback_days = 30  # Default
-            if start_date and end_date:
-                start = datetime.fromisoformat(start_date)
-                end = datetime.fromisoformat(end_date)
-                lookback_days = max((end - start).days, 1)
+            from datetime import date, datetime
+            lookback_days = strategy_params.get("lookback_days")
+            if lookback_days is not None:
+                lookback_days = max(int(lookback_days), 1)
+            else:
+                lookback_days = 30
+                if start_date and end_date:
+                    start = datetime.fromisoformat(start_date)
+                    end = datetime.fromisoformat(end_date)
+                    lookback_days = max((end - start).days, 1)
 
             requested_end = end_date if end_date else date.today().isoformat()
 
@@ -141,6 +165,14 @@ class NewPipelineAdapter:
             
             # Prepare bars_path (will be created by data_fetcher)
             bars_snapshot_path = run_dir / "bars_snapshot.parquet"
+
+            consumer_only = os.getenv("PIPELINE_CONSUMER_ONLY", "0").strip().lower() in (
+                "1",
+                "true",
+                "yes",
+                "y",
+                "on",
+            )
             
             # CRITICAL: Pipeline expects requested_end and lookback_days in strategy_params!
             # Also needs symbol and timeframe for data fetching
@@ -150,7 +182,7 @@ class NewPipelineAdapter:
                 "lookback_days": lookback_days,
                 "symbol": symbol,
                 "timeframe": timeframe,
-                "consumer_only": True,
+                "consumer_only": consumer_only,
             }
             
             # Extract core and tunable for SSOT structure
@@ -166,6 +198,28 @@ class NewPipelineAdapter:
             tunable_config = {k: strategy_params[k] for k in tunable_keys if k in strategy_params}
             
             self.progress_callback("⚙️ Executing modular pipeline stages...")
+
+            # Optional ensure/backfill via marketdata-stream before pipeline run.
+            marketdata_stream_url = os.getenv("MARKETDATA_STREAM_URL", "http://127.0.0.1:8090")
+            ensure_req = None
+            try:
+                md_client = MarketdataStreamClient(base_url=marketdata_stream_url)
+                if md_client.is_configured():
+                    timeframe_minutes = int(strategy_params.get("timeframe_minutes", 5))
+                    lookback_candles = int(strategy_params.get("lookback_candles", 0))
+                    session_mode = str(strategy_params.get("session_mode", "rth"))
+                    ensure_req = build_ensure_request_for_pipeline(
+                        symbol=symbol,
+                        timeframe_minutes=timeframe_minutes,
+                        start_date=start_date or requested_end,
+                        end_date=requested_end,
+                        lookback_candles=lookback_candles,
+                        session_mode=session_mode,
+                        data_root=os.getenv("MARKETDATA_DATA_ROOT"),
+                    )
+                    md_client.ensure_bars(ensure_req)
+            except Exception as e:
+                logger.error("actions: marketdata_stream_ensure_failed symbol=%s err=%s", symbol, e)
             
             # Call NEW MODULAR PIPELINE (CORRECT!)
             # This function returns void - writes all artifacts directly
@@ -177,24 +231,62 @@ class NewPipelineAdapter:
                 file=__file__,
                 func="execute_backtest",
             )
-            run_pipeline(
-                run_id=run_name,
-                out_dir=run_dir,
-                bars_path=bars_snapshot_path,
-                strategy_id=strategy,  # Use strategy name from UI
-                strategy_version=strategy_version,
-                strategy_params=strategy_params_with_meta,  # Includes requested_end, lookback_days, symbol, timeframe
-                strategy_meta={
-                    "core": core_config,
-                    "tunable": tunable_config,
-                    "required_warmup_bars": strategy_params.get("required_warmup_bars", 0),
-                },
-                compound_enabled=compound_enabled,
-                compound_equity_basis=compound_equity_basis,
-                initial_cash=DEFAULT_INITIAL_CASH,
-                fees_bps=DEFAULT_FEE_BPS,
-                slippage_bps=DEFAULT_SLIPPAGE_BPS,
-            )
+            attempted_recovery = False
+            while True:
+                try:
+                    logger.info(
+                        "actions: ui_backtest_range_resolved run=%s symbol=%s lookback_days=%s start=%s end=%s",
+                        run_name,
+                        symbol,
+                        lookback_days,
+                        start_date,
+                        requested_end,
+                    )
+                    run_pipeline(
+                        run_id=run_name,
+                        out_dir=run_dir,
+                        bars_path=bars_snapshot_path,
+                        strategy_id=strategy,  # Use strategy name from UI
+                        strategy_version=strategy_version,
+                        strategy_params=strategy_params_with_meta,  # Includes requested_end, lookback_days, symbol, timeframe
+                        strategy_meta={
+                            "core": core_config,
+                            "tunable": tunable_config,
+                            "required_warmup_bars": strategy_params.get("required_warmup_bars", 0),
+                        },
+                        compound_enabled=compound_enabled,
+                        compound_equity_basis=compound_equity_basis,
+                        initial_cash=DEFAULT_INITIAL_CASH,
+                        fees_bps=DEFAULT_FEE_BPS,
+                        slippage_bps=DEFAULT_SLIPPAGE_BPS,
+                    )
+                    break
+                except PipelineError as run_err:
+                    cause = run_err.__cause__
+                    if (
+                        not attempted_recovery
+                        and isinstance(cause, PipelineMissingHistoricalDataError)
+                        and ensure_req is not None
+                    ):
+                        try:
+                            md_client = MarketdataStreamClient(base_url=marketdata_stream_url)
+                            if md_client.is_configured():
+                                logger.info(
+                                    "actions: marketdata_stream_ensure_retry run=%s symbol=%s",
+                                    run_name,
+                                    symbol,
+                                )
+                                md_client.ensure_bars(ensure_req)
+                                attempted_recovery = True
+                                continue
+                        except Exception as ensure_err:
+                            logger.error(
+                                "actions: marketdata_stream_ensure_retry_failed run=%s symbol=%s err=%s",
+                                run_name,
+                                symbol,
+                                ensure_err,
+                            )
+                    raise
 
 
 
