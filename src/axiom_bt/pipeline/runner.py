@@ -144,6 +144,7 @@ def run_pipeline(
                 market_tz=market_tz,
                 session_mode=session_mode,
                 warmup_days=warmup_days,
+                auto_fill_gaps=not bool(strategy_params.get("consumer_only", False)),
             )
             snapshot_path = Path(snap_info["exec_path"])
             bars_hash = snap_info["bars_hash"]

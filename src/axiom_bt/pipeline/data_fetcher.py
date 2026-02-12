@@ -15,7 +15,13 @@ from typing import Dict
 
 import pandas as pd
 
-from axiom_bt.intraday import IntradaySpec, IntradayStore, Timeframe, _normalize_ohlcv_frame
+from axiom_bt.intraday import (
+    IntradaySpec,
+    IntradayStore,
+    Timeframe,
+    _normalize_ohlcv_frame,
+    check_local_m1_coverage,
+)
 from axiom_bt.fs import DATA_D1
 from .data_prep import _sha256_file
 
@@ -24,6 +30,10 @@ logger = logging.getLogger(__name__)
 
 class DataFetcherError(RuntimeError):
     """Raised when bars cannot be ensured or snapshotted."""
+
+
+class MissingHistoricalDataError(DataFetcherError):
+    """Raised when required historical bars are missing and auto-fetch is disabled."""
 
 
 def _timeframe_minutes(timeframe: str) -> int:
@@ -61,6 +71,7 @@ def ensure_and_snapshot_bars(
     warmup_days: int = 0,
     use_sample: bool = False,
     force: bool = False,
+    auto_fill_gaps: bool = True,
 ) -> Dict[str, str]:
     """Ensure bars via IntradayStore and write per-run snapshots + meta.
 
@@ -132,8 +143,31 @@ def ensure_and_snapshot_bars(
         session_mode=session_mode,
     )
 
+    if not force and not auto_fill_gaps:
+        coverage = check_local_m1_coverage(
+            symbol=symbol,
+            start=effective_start.date().isoformat(),
+            end=end_ts.date().isoformat(),
+            tz=market_tz,
+        )
+        if coverage.get("has_gap"):
+            hint = (
+                "Backfill required (Option B): run marketdata-backfill CLI/service "
+                "and ensure data exists in MARKETDATA_DATA_ROOT."
+            )
+            requested_range = f"{effective_start.date()}..{end_ts.date()}"
+            raise MissingHistoricalDataError(
+                f"missing historical bars for {symbol} range={requested_range}; "
+                f"gaps={coverage.get('gaps', [])}. {hint}"
+            )
+
     store = IntradayStore(default_tz=market_tz)
-    actions = store.ensure(spec, force=force, auto_fill_gaps=True, use_sample=use_sample)
+    actions = store.ensure(
+        spec,
+        force=force,
+        auto_fill_gaps=auto_fill_gaps,
+        use_sample=use_sample,
+    )
     logger.info(
         "actions: pipeline_intraday_ensured symbol=%s tf=%s actions=%s range=%s..%s warmup=%d",
         symbol,

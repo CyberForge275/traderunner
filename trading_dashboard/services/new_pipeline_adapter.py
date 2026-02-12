@@ -26,6 +26,8 @@ if str(SRC) not in sys.path:
 
 from core.settings import DEFAULT_INITIAL_CASH, DEFAULT_FEE_BPS, DEFAULT_SLIPPAGE_BPS
 from axiom_bt.pipeline.runner import run_pipeline, PipelineError
+from axiom_bt.pipeline.data_fetcher import MissingHistoricalDataError as PipelineMissingHistoricalDataError
+from trading_dashboard.services.errors import MissingHistoricalDataError
 
 
 class NewPipelineAdapter:
@@ -139,6 +141,7 @@ class NewPipelineAdapter:
                 "lookback_days": lookback_days,
                 "symbol": symbol,
                 "timeframe": timeframe,
+                "consumer_only": True,
             }
             
             # Extract core and tunable for SSOT structure
@@ -218,6 +221,24 @@ class NewPipelineAdapter:
                 f"  Error: {error_msg}\n"
                 f"  Traceback:\n{full_traceback}"
             )
+            if isinstance(e.__cause__, PipelineMissingHistoricalDataError):
+                hint = (
+                    "Backfill required (Option B): run marketdata-backfill CLI/service "
+                    "and ensure data exists in MARKETDATA_DATA_ROOT."
+                )
+                logger.exception(
+                    "actions: missing_historical_data run=%s symbol=%s range=%s hint=%s",
+                    run_name,
+                    symbol,
+                    f"{start_date}..{end_date}",
+                    hint,
+                )
+                raise MissingHistoricalDataError(
+                    symbol=symbol,
+                    requested_range=f"{start_date}..{end_date}",
+                    reason="gap detected",
+                    hint=hint,
+                ) from e
             
             self.progress_callback(f"❌ Pipeline failed: {error_msg}")
             
