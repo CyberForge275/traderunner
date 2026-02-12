@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 import sys
 import threading
+import logging
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -15,6 +17,8 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.append(str(SRC))
 os.environ.setdefault("PYTHONPATH", str(SRC))
+
+logger = logging.getLogger(__name__)
 
 
 class BacktestService:
@@ -201,31 +205,46 @@ class BacktestService:
                 return
             elif result.get("status") == "failed":
                 # Adapter-reported failure: preserve error payload and never mark completed.
+                run_dir = result.get("run_dir")
+                error_message = result.get("error", "Backtest failed")
+                error_stacktrace_path = result.get("error_stacktrace_path")
+                if not error_stacktrace_path and run_dir:
+                    error_stacktrace_path = str(Path(run_dir) / "error_stacktrace.txt")
                 with self._lock:
                     job_data = self.running_jobs.pop(job_id, {})
                     self.completed_jobs[job_id] = {
                         **job_data,
                         "status": "failed",
-                        "error": result.get("error", "Backtest failed"),
+                        "error": error_message,
+                        "error_message": error_message,
+                        "error_type": str(result.get("error_type", "PipelineError")),
                         "traceback": result.get("traceback"),
                         "run_name": result.get("run_name", run_name),
-                        "run_dir": result.get("run_dir"),
+                        "run_dir": run_dir,
+                        "error_stacktrace_path": error_stacktrace_path,
                         "ended_at": datetime.now().isoformat(),
-                        "progress": f"Error: {result.get('error', 'Backtest failed')}",
+                        "progress": f"Error: {error_message}",
                     }
                 return
             elif result.get("status") not in {"success", "completed"}:
                 # Unknown adapter status must fail closed (never silently complete).
                 unknown_status = result.get("status")
+                run_dir = result.get("run_dir")
+                error_stacktrace_path = result.get("error_stacktrace_path")
+                if not error_stacktrace_path and run_dir:
+                    error_stacktrace_path = str(Path(run_dir) / "error_stacktrace.txt")
                 with self._lock:
                     job_data = self.running_jobs.pop(job_id, {})
                     self.completed_jobs[job_id] = {
                         **job_data,
                         "status": "failed",
                         "error": f"unknown status: {unknown_status}",
+                        "error_message": f"unknown status: {unknown_status}",
+                        "error_type": "UnknownStatusError",
                         "traceback": result.get("traceback"),
                         "run_name": result.get("run_name", run_name),
-                        "run_dir": result.get("run_dir"),
+                        "run_dir": run_dir,
+                        "error_stacktrace_path": error_stacktrace_path,
                         "ended_at": datetime.now().isoformat(),
                         "progress": f"Error: unknown status: {unknown_status}",
                     }
@@ -247,17 +266,32 @@ class BacktestService:
                 }
 
         except Exception as e:
-            # Error - capture full traceback
-            import traceback
-            error_msg = f"{type(e).__name__}: {str(e)}"
+            # Error - capture full traceback and persist diagnostics.
+            error_type = type(e).__name__
+            error_msg = f"{error_type}: {str(e)}"
             full_traceback = traceback.format_exc()
+            logger.exception(
+                "actions: backtest_service_pipeline_exception job_id=%s run=%s strategy=%s symbols=%s timeframe=%s",
+                job_id,
+                run_name,
+                strategy,
+                ",".join(symbols),
+                timeframe,
+            )
+            error_trace_path = None
+            try:
+                from axiom_bt.pipeline.paths import get_backtest_run_dir
 
-            # Log to console for debugging
-            print(f"\n{'='*60}")
-            print(f"BACKTEST ERROR - Job ID: {job_id}")
-            print(f"{'='*60}")
-            print(full_traceback)
-            print(f"{'='*60}\n")
+                run_dir = get_backtest_run_dir(run_name)
+                error_trace_path = run_dir / "error_stacktrace.txt"
+                with open(error_trace_path, "w", encoding="utf-8") as f:
+                    f.write(full_traceback)
+            except Exception:
+                logger.exception(
+                    "actions: backtest_service_stacktrace_persist_failed job_id=%s run=%s",
+                    job_id,
+                    run_name,
+                )
 
             with self._lock:
                 job_data = self.running_jobs.pop(job_id, {})
@@ -265,7 +299,10 @@ class BacktestService:
                     **job_data,
                     "status": "failed",
                     "error": error_msg,
+                    "error_message": error_msg,
+                    "error_type": error_type,
                     "traceback": full_traceback,  # Store full traceback
+                    "error_stacktrace_path": str(error_trace_path) if error_trace_path else None,
                     "ended_at": datetime.now().isoformat(),
                     "progress": f"Error: {error_msg}",
                 }
