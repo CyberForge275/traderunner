@@ -218,9 +218,6 @@ class NewPipelineAdapter:
         except PipelineError as e:
             # Pipeline-specific error (data fetching, warmup, signals, execution, etc.)
             import traceback
-            import logging
-            
-            logger = logging.getLogger(__name__)
             error_msg = str(e)
             full_traceback = traceback.format_exc()
             
@@ -280,9 +277,6 @@ class NewPipelineAdapter:
             # CRITICAL: Catch ALL exceptions (not just PipelineError)
             # This prevents silent thread deaths in Dashboard context
             import traceback
-            import logging
-            
-            logger = logging.getLogger(__name__)
             
             # Log the full exception with traceback
             error_type = type(e).__name__
