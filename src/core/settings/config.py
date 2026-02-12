@@ -101,6 +101,17 @@ class TradingSettings:
 
     def _load_from_env(self):
         """Load settings from environment variables."""
+        # Runtime config is SSOT for non-secret roots (config-first with env fallback).
+        try:
+            from core.settings.runtime_config import load_runtime_config
+
+            runtime_cfg = load_runtime_config()
+            if runtime_cfg.paths.trading_artifacts_root is not None:
+                self.artifacts_root = runtime_cfg.paths.trading_artifacts_root
+        except Exception:
+            # Keep legacy behavior if runtime config is not available/valid.
+            pass
+
         # Environment
         env_str = os.getenv("TRADING_ENVIRONMENT", "dev")
         try:
@@ -127,10 +138,10 @@ class TradingSettings:
             self.data_d1_dir = Path(data_d1)
 
         # Artifacts root (Option B / SSOT)
-        if artifacts_root := (
+        if self.artifacts_root is None and (artifacts_root := (
             os.getenv("TRADING_ARTIFACTS_ROOT")
             or os.getenv("TRADERUNNER_ARTIFACTS_ROOT")
-        ):
+        )):
             self.artifacts_root = Path(artifacts_root)
 
         # Databases
