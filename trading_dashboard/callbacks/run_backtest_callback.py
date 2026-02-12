@@ -8,6 +8,7 @@ from ..ui_ids import Nav, BT, RUN
 
 
 logger = logging.getLogger(__name__)
+TERMINAL_JOB_STATUSES = {"completed", "failed", "error", "failed_precondition"}
 
 try:
     from axiom_bt.utils.trace import trace_ui
@@ -16,6 +17,35 @@ except ModuleNotFoundError:
 
     def trace_ui(*args, **kwargs):
         return None
+
+
+def _collect_jobs_for_polling(all_jobs, current_time: float, window_seconds: int = 30):
+    """Select running jobs and recently finished terminal jobs for UI polling."""
+    running_jobs = {jid: j for jid, j in all_jobs.items() if j.get("status") == "running"}
+    recent_jobs = {}
+    for jid, job in all_jobs.items():
+        if job.get("status") not in TERMINAL_JOB_STATUSES:
+            continue
+        ended_at = job.get("ended_at")
+        if not ended_at:
+            continue
+        try:
+            end_time = datetime.fromisoformat(ended_at).timestamp()
+        except Exception:
+            continue
+        if current_time - end_time < window_seconds:
+            recent_jobs[jid] = job
+    return running_jobs, recent_jobs
+
+
+def _status_text(status: str) -> str:
+    mapping = {
+        "completed": "Completed Successfully",
+        "failed": "Failed",
+        "error": "Error",
+        "failed_precondition": "Failed Precondition (Gates Blocked)",
+    }
+    return mapping.get(status, status.replace("_", " ").title() if status else "Unknown")
 
 
 def register_run_backtest_callback(app):
@@ -650,25 +680,9 @@ def register_run_backtest_callback(app):
         service = get_backtest_service()
         all_jobs = service.get_all_jobs()
 
-        # Check if there are any running jobs
-        running_jobs = {jid: j for jid, j in all_jobs.items() if j.get("status") == "running"}
-
-        # Also show recently completed/failed jobs (last 30 seconds)
-        recent_jobs = {}
         import time
         current_time = time.time()
-        for jid, job in all_jobs.items():
-            if job.get("status") in ["completed", "failed"]:
-                # Check if completed/failed recently
-                ended_at = job.get("ended_at")
-                if ended_at:
-                    try:
-                        from datetime import datetime
-                        end_time = datetime.fromisoformat(ended_at).timestamp()
-                        if current_time - end_time < 30:  # Show for 30 seconds
-                            recent_jobs[jid] = job
-                    except:
-                        pass
+        running_jobs, recent_jobs = _collect_jobs_for_polling(all_jobs, current_time)
 
         if not running_jobs and not recent_jobs:
             # No jobs to display - clear progress and icon
@@ -709,11 +723,16 @@ def register_run_backtest_callback(app):
             if status == "completed":
                 icon = "✅"
                 color = "var(--accent-green)"
-                status_text = "Completed Successfully"
+                status_text = _status_text(status)
                 details = []
-            else:  # failed
-                # Failed job - show detailed error with traceback
-                error_msg = job.get("error", "Unknown error")
+            else:  # failed/error/failed_precondition
+                # Terminal non-success job: show detailed context where available.
+                error_msg = (
+                    job.get("error")
+                    or job.get("details")
+                    or job.get("reason")
+                    or "Unknown error"
+                )
                 traceback_text = job.get("traceback", "No traceback available")
 
                 # Also include command output if available (from run_log.json)
@@ -723,7 +742,7 @@ def register_run_backtest_callback(app):
 
                 progress_display = html.Div([
                     dbc.Alert([
-                        html.H5("Failed", className="alert-heading mb-2"),
+                        html.H5(_status_text(status), className="alert-heading mb-2"),
                         html.P(f"Error: {error_msg}", className="mb-2"),
                         html.Small([
                             html.Strong("Job ID: "), job_id, html.Br(),
@@ -777,7 +796,7 @@ def register_run_backtest_callback(app):
         elif recent_jobs:
             # Check if any completed successfully
             completed_jobs = [j for j in recent_jobs.values() if j.get("status") == "completed"]
-            failed_jobs = [j for j in recent_jobs.values() if j.get("status") == "failed"]
+            failed_jobs = [j for j in recent_jobs.values() if j.get("status") != "completed"]
 
             if completed_jobs and not failed_jobs:
                 status_icon = html.Span(
