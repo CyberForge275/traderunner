@@ -199,6 +199,37 @@ class BacktestService:
                         "progress": f"Error (ID: {error_id})",
                     }
                 return
+            elif result.get("status") == "failed":
+                # Adapter-reported failure: preserve error payload and never mark completed.
+                with self._lock:
+                    job_data = self.running_jobs.pop(job_id, {})
+                    self.completed_jobs[job_id] = {
+                        **job_data,
+                        "status": "failed",
+                        "error": result.get("error", "Backtest failed"),
+                        "traceback": result.get("traceback"),
+                        "run_name": result.get("run_name", run_name),
+                        "run_dir": result.get("run_dir"),
+                        "ended_at": datetime.now().isoformat(),
+                        "progress": f"Error: {result.get('error', 'Backtest failed')}",
+                    }
+                return
+            elif result.get("status") not in {"success", "completed"}:
+                # Unknown adapter status must fail closed (never silently complete).
+                unknown_status = result.get("status")
+                with self._lock:
+                    job_data = self.running_jobs.pop(job_id, {})
+                    self.completed_jobs[job_id] = {
+                        **job_data,
+                        "status": "failed",
+                        "error": f"unknown status: {unknown_status}",
+                        "traceback": result.get("traceback"),
+                        "run_name": result.get("run_name", run_name),
+                        "run_dir": result.get("run_dir"),
+                        "ended_at": datetime.now().isoformat(),
+                        "progress": f"Error: unknown status: {unknown_status}",
+                    }
+                return
 
             # Legacy adapter result format is no longer supported.
 
