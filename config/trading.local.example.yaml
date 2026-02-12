@@ -1,0 +1,10 @@
+paths:
+  marketdata_data_root: /var/lib/trading/marketdata
+  trading_artifacts_root: /var/lib/trading/artifacts
+
+services:
+  marketdata_stream_url: http://127.0.0.1:8090
+
+runtime:
+  pipeline_consumer_only: true
+  pipeline_auto_ensure_bars: false
