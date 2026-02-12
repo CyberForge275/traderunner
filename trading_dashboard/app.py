@@ -3,6 +3,15 @@
 Automatic Trading Factory Dashboard
 Real-time monitoring for trading signals, orders, and portfolio
 """
+import sys
+from pathlib import Path
+
+# Ensure traderunner local src wins import resolution for axiom_bt.
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
 import dash
 from dash import html, dcc, Input, Output
 import dash_bootstrap_components as dbc
