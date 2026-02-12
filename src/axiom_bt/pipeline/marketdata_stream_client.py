@@ -59,7 +59,10 @@ class MarketdataStreamClient:
     ) -> None:
         self.base_url = (base_url or os.getenv("MARKETDATA_STREAM_URL") or "").rstrip("/")
         self.timeout_sec = int(timeout_sec or os.getenv("MARKETDATA_STREAM_TIMEOUT_SEC") or "180")
-        self.enabled = _env_bool("PIPELINE_ENSURE_BARS_ENABLED", True) if enabled is None else enabled
+        if enabled is None:
+            self.enabled = _env_bool("PIPELINE_AUTO_ENSURE_BARS", False)
+        else:
+            self.enabled = enabled
 
     def is_configured(self) -> bool:
         return bool(self.base_url) and self.enabled
@@ -75,7 +78,9 @@ class MarketdataStreamClient:
         except Exception:
             data = {"ok": False, "status_code": r.status_code, "text": r.text}
 
-        if r.status_code >= 400 or not data.get("ok", False):
+        status = str(data.get("status", "")).lower()
+        ok = status in {"ok", "backfilled"} or bool(data.get("ok", False))
+        if r.status_code >= 400 or not ok:
             raise RuntimeError(f"marketdata-stream ensure_bars failed: status={r.status_code} body={data}")
         return data
 

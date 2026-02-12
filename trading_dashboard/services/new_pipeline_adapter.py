@@ -199,27 +199,53 @@ class NewPipelineAdapter:
             
             self.progress_callback("⚙️ Executing modular pipeline stages...")
 
-            # Optional ensure/backfill via marketdata-stream before pipeline run.
-            marketdata_stream_url = os.getenv("MARKETDATA_STREAM_URL", "http://127.0.0.1:8090")
+            # Optional ensure/backfill via marketdata-service before pipeline run.
+            marketdata_stream_url = os.getenv("MARKETDATA_STREAM_URL")
             ensure_req = None
-            try:
-                md_client = MarketdataStreamClient(base_url=marketdata_stream_url)
-                if md_client.is_configured():
-                    timeframe_minutes = int(strategy_params.get("timeframe_minutes", 5))
-                    lookback_candles = int(strategy_params.get("lookback_candles", 0))
-                    session_mode = str(strategy_params.get("session_mode", "rth"))
-                    ensure_req = build_ensure_request_for_pipeline(
-                        symbol=symbol,
-                        timeframe_minutes=timeframe_minutes,
-                        start_date=start_date or requested_end,
-                        end_date=requested_end,
-                        lookback_candles=lookback_candles,
-                        session_mode=session_mode,
-                        data_root=os.getenv("MARKETDATA_DATA_ROOT"),
+            md_client = MarketdataStreamClient(base_url=marketdata_stream_url)
+            if md_client.is_configured():
+                timeframe_minutes = int(strategy_params.get("timeframe_minutes", 5))
+                lookback_candles = int(strategy_params.get("lookback_candles", 0))
+                session_mode = str(strategy_params.get("session_mode", "rth"))
+                ensure_req = build_ensure_request_for_pipeline(
+                    symbol=symbol,
+                    timeframe_minutes=timeframe_minutes,
+                    start_date=start_date or requested_end,
+                    end_date=requested_end,
+                    lookback_candles=lookback_candles,
+                    session_mode=session_mode,
+                    data_root=os.getenv("MARKETDATA_DATA_ROOT"),
+                )
+                logger.info(
+                    "actions: ensure_bars_request run=%s symbol=%s range=%s..%s url=%s",
+                    run_name,
+                    symbol,
+                    ensure_req.start_date.isoformat(),
+                    ensure_req.end_date.isoformat(),
+                    md_client.base_url,
+                )
+                try:
+                    ensure_res = md_client.ensure_bars(ensure_req)
+                except Exception as ensure_err:
+                    logger.exception(
+                        "actions: ensure_bars_failed run=%s symbol=%s",
+                        run_name,
+                        symbol,
                     )
-                    md_client.ensure_bars(ensure_req)
-            except Exception as e:
-                logger.error("actions: marketdata_stream_ensure_failed symbol=%s err=%s", symbol, e)
+                    raise MissingHistoricalDataError(
+                        symbol=symbol,
+                        requested_range=f"{ensure_req.start_date}..{ensure_req.end_date}",
+                        reason="ensure_bars_failed",
+                        hint=f"marketdata-service /ensure_bars failed: {ensure_err}",
+                    ) from ensure_err
+                logger.info(
+                    "actions: ensure_bars_result run=%s symbol=%s status=%s gaps_before=%s gaps_after=%s",
+                    run_name,
+                    symbol,
+                    ensure_res.get("status"),
+                    len(ensure_res.get("gaps_before", []) or []),
+                    len(ensure_res.get("gaps_after", []) or []),
+                )
             
             # Call NEW MODULAR PIPELINE (CORRECT!)
             # This function returns void - writes all artifacts directly
