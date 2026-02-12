@@ -14,10 +14,14 @@ def _base_params():
 
 
 def test_adapter_preflight_ensure_bars_flag_off_skips_http(monkeypatch):
+    from core.settings.runtime_config import reset_runtime_config_for_tests
+
     calls = {"ensure": 0, "run": 0}
 
+    reset_runtime_config_for_tests()
     monkeypatch.setenv("PIPELINE_AUTO_ENSURE_BARS", "0")
     monkeypatch.setenv("MARKETDATA_STREAM_URL", "http://127.0.0.1:8090")
+    monkeypatch.setenv("MARKETDATA_DATA_ROOT", "/tmp/marketdata")
 
     def _fake_ensure(self, req):
         calls["ensure"] += 1
@@ -54,10 +58,14 @@ def test_adapter_preflight_ensure_bars_flag_off_skips_http(monkeypatch):
 
 
 def test_adapter_preflight_ensure_bars_flag_on_calls_http(monkeypatch):
+    from core.settings.runtime_config import reset_runtime_config_for_tests
+
     calls = {"ensure": 0, "run": 0}
 
+    reset_runtime_config_for_tests()
     monkeypatch.setenv("PIPELINE_AUTO_ENSURE_BARS", "1")
     monkeypatch.setenv("MARKETDATA_STREAM_URL", "http://127.0.0.1:8090")
+    monkeypatch.setenv("MARKETDATA_DATA_ROOT", "/tmp/marketdata")
 
     def _fake_ensure(self, req):
         calls["ensure"] += 1

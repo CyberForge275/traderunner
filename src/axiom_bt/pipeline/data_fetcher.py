@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import shutil
 from pathlib import Path
 from typing import Dict
 
 import pandas as pd
 
+from core.settings.runtime_config import (
+    RuntimeConfigError,
+    get_marketdata_data_root,
+)
 from axiom_bt.fs import DATA_D1
 from .data_prep import _sha256_file
 
@@ -106,17 +109,13 @@ def ensure_and_snapshot_bars(
     requested_start = (end_ts - pd.Timedelta(days=int(lookback_days))).normalize()
     effective_start = (requested_start - pd.Timedelta(days=warmup_days_calc)).normalize()
 
-    md_root = (
-        Path(os.environ.get("MARKETDATA_DATA_ROOT", "").strip())
-        if os.environ.get("MARKETDATA_DATA_ROOT", "").strip()
-        else None
-    )
-    if md_root is None:
+    try:
+        md_root = get_marketdata_data_root()
+    except RuntimeConfigError as exc:
         raise MissingHistoricalDataError(
             f"missing historical bars for {symbol} range={effective_start.date()}..{end_ts.date()}. "
-            "MARKETDATA_DATA_ROOT is not configured. Backfill required (Option B): "
-            "run marketdata_service.backfill_cli and ensure data exists in MARKETDATA_DATA_ROOT."
-        )
+            f"{exc}. Backfill required (Option B): run marketdata_service.backfill_cli and ensure data exists in MARKETDATA_DATA_ROOT."
+        ) from exc
 
     derived_source = md_root / "derived" / f"tf_m{tf_minutes}" / f"{symbol.upper()}.parquet"
     if not derived_source.exists():

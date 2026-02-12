@@ -4,6 +4,7 @@ Automatic Trading Factory Dashboard
 Real-time monitoring for trading signals, orders, and portfolio
 """
 import sys
+import argparse
 from pathlib import Path
 
 # Ensure traderunner local src wins import resolution for axiom_bt.
@@ -54,6 +55,32 @@ from trading_dashboard.callbacks.ssot_backtest_config_callback import register_s
 # Setup logging FIRST
 from trading_dashboard.logging_config import setup_logging
 setup_logging()
+import logging
+
+from core.settings.runtime_config import initialize_runtime_config
+
+logger = logging.getLogger(__name__)
+
+
+def _bootstrap_runtime_config() -> None:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--config", dest="trading_config", default=None)
+    args, _ = parser.parse_known_args(sys.argv[1:])
+    if args.trading_config:
+        import os
+
+        os.environ["TRADING_CONFIG"] = args.trading_config
+    rc = initialize_runtime_config(config_path=args.trading_config)
+    logger.info(
+        "actions: runtime_config_loaded config_path=%s artifacts_root=%s marketdata_root=%s stream_url=%s",
+        rc.config_path,
+        rc.paths.trading_artifacts_root,
+        rc.paths.marketdata_data_root,
+        rc.services.marketdata_stream_url,
+    )
+
+
+_bootstrap_runtime_config()
 
 # Initialize Dash app with dark theme
 app = dash.Dash(

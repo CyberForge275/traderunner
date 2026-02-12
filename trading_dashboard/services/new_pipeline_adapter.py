@@ -26,6 +26,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from core.settings import DEFAULT_INITIAL_CASH, DEFAULT_FEE_BPS, DEFAULT_SLIPPAGE_BPS
+from core.settings.runtime_config import get_marketdata_data_root
 from axiom_bt.pipeline.marketdata_stream_client import (
     MarketdataStreamClient,
     build_ensure_request_for_pipeline,
@@ -216,7 +217,7 @@ class NewPipelineAdapter:
                     session_timezone=str(strategy_params.get("session_timezone", "America/New_York")),
                     session_mode=session_mode,
                     session_filter=strategy_params.get("session_filter"),
-                    data_root=os.getenv("MARKETDATA_DATA_ROOT"),
+                    data_root=str(get_marketdata_data_root()),
                 )
                 logger.info(
                     "actions: ensure_bars_request run=%s symbol=%s range=%s..%s url=%s",

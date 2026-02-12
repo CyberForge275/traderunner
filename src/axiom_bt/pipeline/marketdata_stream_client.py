@@ -6,6 +6,11 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 import requests
+from core.settings.runtime_config import (
+    RuntimeConfigError,
+    get_marketdata_data_root,
+    get_runtime_config,
+)
 
 
 def _to_date(x: Any) -> dt.date:
@@ -64,7 +69,13 @@ class MarketdataStreamClient:
         timeout_sec: Optional[int] = None,
         enabled: Optional[bool] = None,
     ) -> None:
-        self.base_url = (base_url or os.getenv("MARKETDATA_STREAM_URL") or "").rstrip("/")
+        resolved_base_url = base_url
+        if not resolved_base_url:
+            try:
+                resolved_base_url = get_runtime_config().services.marketdata_stream_url
+            except RuntimeConfigError:
+                resolved_base_url = os.getenv("MARKETDATA_STREAM_URL")
+        self.base_url = (resolved_base_url or "").rstrip("/")
         self.timeout_sec = int(timeout_sec or os.getenv("MARKETDATA_STREAM_TIMEOUT_SEC") or "180")
         if enabled is None:
             self.enabled = _env_bool("PIPELINE_AUTO_ENSURE_BARS", False)
@@ -121,5 +132,5 @@ def build_ensure_request_for_pipeline(
         session_timezone=session_timezone,
         session_mode=session_mode,
         session_filter=session_filter,
-        data_root=data_root or os.getenv("MARKETDATA_DATA_ROOT"),
+        data_root=data_root or str(get_marketdata_data_root()),
     )

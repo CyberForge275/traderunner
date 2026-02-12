@@ -28,6 +28,10 @@ def _mk_derived(path: Path) -> None:
 
 
 def test_wrapper_raises_when_derived_missing_and_never_uses_legacy(monkeypatch, tmp_path: Path):
+    from core.settings.runtime_config import reset_runtime_config_for_tests
+
+    reset_runtime_config_for_tests()
+    monkeypatch.delenv("TRADING_CONFIG", raising=False)
     monkeypatch.setenv("MARKETDATA_DATA_ROOT", str(tmp_path))
 
     def _forbidden(*_args, **_kwargs):
@@ -48,6 +52,10 @@ def test_wrapper_raises_when_derived_missing_and_never_uses_legacy(monkeypatch, 
 
 
 def test_wrapper_loads_derived_and_writes_snapshot(monkeypatch, tmp_path: Path):
+    from core.settings.runtime_config import reset_runtime_config_for_tests
+
+    reset_runtime_config_for_tests()
+    monkeypatch.delenv("TRADING_CONFIG", raising=False)
     monkeypatch.setenv("MARKETDATA_DATA_ROOT", str(tmp_path))
     derived = tmp_path / "derived" / "tf_m5" / "HOOD.parquet"
     _mk_derived(derived)
