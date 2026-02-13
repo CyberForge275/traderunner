@@ -95,7 +95,7 @@ class BacktestDetailsService:
 
         # Try manifest first
         if manifest_file.exists():
-            return self._load_from_manifest(run_id, run_dir, manifest_file)
+            return self._load_from_manifest(run_id, run_dir, manifest_file, result_file)
         elif meta_file.exists():
             return self._load_from_meta(run_id, run_dir, meta_file, result_file)
         else:
@@ -113,7 +113,8 @@ class BacktestDetailsService:
         self,
         run_id: str,
         run_dir: Path,
-        manifest_file: Path
+        manifest_file: Path,
+        result_file: Path,
     ) -> RunDetails:
         """Load from run_manifest.json."""
         try:
@@ -129,9 +130,19 @@ class BacktestDetailsService:
             started_at_str = identity.get("timestamp_utc")
             started_at = datetime.fromisoformat(started_at_str) if started_at_str else None
 
-            # Status from result section
-            status = result_section.get("run_status", "unknown").upper()
+            # Status from manifest result section, with fallback to run_result.json.
+            status = result_section.get("run_status")
             failure_reason = result_section.get("failure_reason")
+            if not status and result_file.exists():
+                try:
+                    with open(result_file) as f:
+                        result = json.load(f)
+                    status = result.get("status")
+                    if not failure_reason:
+                        failure_reason = result.get("reason")
+                except Exception as e:
+                    logger.warning(f"Failed to parse run_result.json for {run_id}: {e}")
+            status = str(status or "unknown").upper()
 
             # Extract symbol (singular in manifest)
             symbol = data_section.get("symbol")

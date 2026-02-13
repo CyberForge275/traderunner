@@ -101,6 +101,27 @@ class TestBacktestDetailsService:
         assert details.failure_reason == "coverage_gap"
         assert details.source == "meta+result"
 
+    def test_manifest_without_run_status_falls_back_to_run_result_status(self, tmp_path):
+        run_dir = tmp_path / "manifest_with_result_fallback"
+        run_dir.mkdir()
+
+        manifest = {
+            "run_id": "manifest_with_result_fallback",
+            "params": {"strategy_id": "insidebar_intraday"},
+            "hashes": {},
+        }
+        with open(run_dir / "run_manifest.json", "w") as f:
+            json.dump(manifest, f)
+
+        with open(run_dir / "run_result.json", "w") as f:
+            json.dump({"run_id": "manifest_with_result_fallback", "status": "success"}, f)
+
+        service = BacktestDetailsService(artifacts_root=tmp_path)
+        details = service.load_summary("manifest_with_result_fallback")
+
+        assert details.source == "manifest"
+        assert details.status == "SUCCESS"
+
     def test_load_steps_from_run_steps_jsonl(self, tmp_path):
         """
         RED TEST: Load steps from run_steps.jsonl, sorted by step_index.

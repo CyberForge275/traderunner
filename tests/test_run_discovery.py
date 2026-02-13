@@ -175,6 +175,22 @@ class TestRunDiscovery:
         # Steps should be available (implementation will add steps property)
         # For now, just verify count
 
+    def test_manifest_without_run_status_uses_run_result_status(self, tmp_path):
+        run_dir = tmp_path / "manifest_result_fallback"
+        run_dir.mkdir()
+
+        with open(run_dir / "run_manifest.json", "w") as f:
+            json.dump({"run_id": "manifest_result_fallback", "params": {}}, f)
+
+        with open(run_dir / "run_result.json", "w") as f:
+            json.dump({"status": "error", "reason": "boom"}, f)
+
+        service = RunDiscoveryService(artifacts_root=tmp_path)
+        runs = service.discover()
+
+        assert len(runs) == 1
+        assert runs[0].status == "ERROR"
+
     def test_dropdown_refresh_lists_new_run_after_creation(self, tmp_path):
         """
         RED TEST: After creating a new run, calling discover() again

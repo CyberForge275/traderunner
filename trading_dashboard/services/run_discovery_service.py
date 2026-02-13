@@ -175,9 +175,19 @@ class RunDiscoveryService:
             # Parse finished_at (might not exist in manifest)
             finished_at = None
 
-            # Get status from result section
-            status = outcome.get("run_status", "unknown").upper()
+            # Get status from manifest result section, with fallback to run_result.json.
+            status = outcome.get("run_status")
             failure_reason = outcome.get("failure_reason")
+            if not status and result_file.exists():
+                try:
+                    with open(result_file) as f:
+                        result = json.load(f)
+                    status = result.get("status")
+                    if not failure_reason:
+                        failure_reason = result.get("reason")
+                except Exception as e:
+                    logger.warning(f"Failed to parse run_result.json for {run_id}: {e}")
+            status = str(status or "unknown").upper()
 
             # Get strategy key from strategy section
             strategy_key = strategy_section.get("key", "unknown")
