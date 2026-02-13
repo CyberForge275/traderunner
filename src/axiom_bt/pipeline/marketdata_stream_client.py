@@ -70,15 +70,24 @@ class MarketdataStreamClient:
         enabled: Optional[bool] = None,
     ) -> None:
         resolved_base_url = base_url
+        runtime_flag = None
         if not resolved_base_url:
             try:
-                resolved_base_url = get_runtime_config().services.marketdata_stream_url
+                runtime_cfg = get_runtime_config()
+                resolved_base_url = runtime_cfg.services.marketdata_stream_url
+                runtime_flag = runtime_cfg.runtime.pipeline_auto_ensure_bars
             except RuntimeConfigError:
                 resolved_base_url = os.getenv("MARKETDATA_STREAM_URL")
         self.base_url = (resolved_base_url or "").rstrip("/")
         self.timeout_sec = int(timeout_sec or os.getenv("MARKETDATA_STREAM_TIMEOUT_SEC") or "180")
         if enabled is None:
-            self.enabled = _env_bool("PIPELINE_AUTO_ENSURE_BARS", False)
+            env_enabled = os.getenv("PIPELINE_AUTO_ENSURE_BARS")
+            if env_enabled is not None:
+                self.enabled = _env_bool("PIPELINE_AUTO_ENSURE_BARS", False)
+            elif runtime_flag is not None:
+                self.enabled = bool(runtime_flag)
+            else:
+                self.enabled = False
         else:
             self.enabled = enabled
 

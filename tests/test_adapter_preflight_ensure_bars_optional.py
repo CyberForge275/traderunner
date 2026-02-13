@@ -13,15 +13,28 @@ def _base_params():
     }
 
 
-def test_adapter_preflight_ensure_bars_flag_off_skips_http(monkeypatch):
+def test_adapter_preflight_ensure_bars_flag_off_skips_http(monkeypatch, tmp_path):
     from core.settings.runtime_config import reset_runtime_config_for_tests
 
     calls = {"ensure": 0, "run": 0}
 
+    cfg = tmp_path / "trading.yaml"
+    cfg.write_text(
+        f"""
+paths:
+  marketdata_data_root: {tmp_path / "marketdata"}
+  trading_artifacts_root: {tmp_path / "artifacts"}
+services:
+  marketdata_stream_url: http://127.0.0.1:8090
+runtime:
+  pipeline_auto_ensure_bars: false
+""".strip()
+    )
     reset_runtime_config_for_tests()
+    monkeypatch.setenv("TRADING_CONFIG", str(cfg))
     monkeypatch.setenv("PIPELINE_AUTO_ENSURE_BARS", "0")
     monkeypatch.setenv("MARKETDATA_STREAM_URL", "http://127.0.0.1:8090")
-    monkeypatch.setenv("MARKETDATA_DATA_ROOT", "/tmp/marketdata")
+    monkeypatch.setenv("MARKETDATA_DATA_ROOT", str(tmp_path / "marketdata"))
 
     def _fake_ensure(self, req):
         calls["ensure"] += 1
@@ -57,15 +70,28 @@ def test_adapter_preflight_ensure_bars_flag_off_skips_http(monkeypatch):
     assert "stop_after_run" in result.get("error", "")
 
 
-def test_adapter_preflight_ensure_bars_flag_on_calls_http(monkeypatch):
+def test_adapter_preflight_ensure_bars_flag_on_calls_http(monkeypatch, tmp_path):
     from core.settings.runtime_config import reset_runtime_config_for_tests
 
     calls = {"ensure": 0, "run": 0}
 
+    cfg = tmp_path / "trading.yaml"
+    cfg.write_text(
+        f"""
+paths:
+  marketdata_data_root: {tmp_path / "marketdata"}
+  trading_artifacts_root: {tmp_path / "artifacts"}
+services:
+  marketdata_stream_url: http://127.0.0.1:8090
+runtime:
+  pipeline_auto_ensure_bars: true
+""".strip()
+    )
     reset_runtime_config_for_tests()
+    monkeypatch.setenv("TRADING_CONFIG", str(cfg))
     monkeypatch.setenv("PIPELINE_AUTO_ENSURE_BARS", "1")
     monkeypatch.setenv("MARKETDATA_STREAM_URL", "http://127.0.0.1:8090")
-    monkeypatch.setenv("MARKETDATA_DATA_ROOT", "/tmp/marketdata")
+    monkeypatch.setenv("MARKETDATA_DATA_ROOT", str(tmp_path / "marketdata"))
 
     def _fake_ensure(self, req):
         calls["ensure"] += 1
