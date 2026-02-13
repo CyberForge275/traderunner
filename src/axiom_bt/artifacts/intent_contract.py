@@ -118,7 +118,7 @@ def sanitize_intent(
         removed.append(key)
 
     if removed:
-        logger.error(
+        logger.info(
             "actions: intent_contract_violation run_id=%s template_id=%s removed=%s",
             run_id,
             template_id,
@@ -139,7 +139,7 @@ def sanitize_intent(
             except Exception:
                 continue
             if pd.notna(ts_val) and ts_val > intent_ts:
-                logger.error(
+                logger.info(
                     "actions: intent_contract_future_ts run_id=%s template_id=%s key=%s value=%s intent_ts=%s",
                     run_id,
                     template_id,
