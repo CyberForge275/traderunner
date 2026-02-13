@@ -5,7 +5,7 @@ versions:
     required_warmup_bars: 40
     strategy_finalized: false
     core:
-      inside_bar_definition_mode: mb_body_oc__ib_hl
+      inside_bar_definition_mode: mb_high__ib_high_and_close_in_mb_range
       atr_period: 15
       risk_reward_ratio: 2.0
       min_mother_bar_size: 0.5
