@@ -328,10 +328,10 @@ def register_ssot_config_viewer_callback(app):
             )
             return status, no_update, no_update, no_update, no_update
         
-        # Compute overrides
-        core_overrides, tunable_overrides = _compute_overrides(loaded_defaults, edited_values, edited_ids)
-        
         try:
+            # Compute overrides (must be inside try so validation errors return UI message, not HTTP 500)
+            core_overrides, tunable_overrides = _compute_overrides(loaded_defaults, edited_values, edited_ids)
+
             if not new_version_value:
                 # In-place update (draft only)
                 StrategyConfigStore.update_existing_version(
@@ -503,6 +503,29 @@ def _compute_overrides(loaded_defaults, edited_values, edited_ids):
                     new_value,
                     original_norm,
                 )
+            continue
+
+        if key == "risk_reward_ratio":
+            if value in (None, ""):
+                continue
+            if isinstance(value, list):
+                if not value:
+                    continue
+                value = value[0]
+            if isinstance(value, str):
+                value = value.strip()
+                if value == "":
+                    continue
+                value = value.replace(",", ".")
+            try:
+                new_value = float(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Invalid float value for {key}: {value!r}") from exc
+            if new_value != float(original):
+                if section == "core":
+                    core_overrides[key] = new_value
+                else:
+                    tunable_overrides[key] = new_value
             continue
         
         # Type conversion
