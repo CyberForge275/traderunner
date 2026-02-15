@@ -54,16 +54,16 @@ versions:
     required_warmup_bars: 40
     strategy_finalized: false
     core:
-      inside_bar_definition_mode: mb_body_oc__ib_hl
-      atr_period: 16
-      risk_reward_ratio: 2.5
-      min_mother_bar_size: 0.75
+      inside_bar_definition_mode: mb_high__ib_high_and_close_in_mb_range
+      atr_period: 6
+      risk_reward_ratio: 2.75
+      min_mother_bar_size: 0.55
       breakout_confirmation: true
       inside_bar_mode: inclusive
       session_timezone: America/New_York
       session_mode: rth
       session_filter:
-      - 09:30-11:00
+      - 09:45-12:00
       - 14:00-15:00
       timeframe_minutes: 5
       valid_from_policy: signal_ts

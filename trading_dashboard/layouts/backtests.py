@@ -975,7 +975,7 @@ def create_backtests_layout():
                         type="number",
                         value=4,  # Changed from 30 to 4
                         min=1,
-                        max=365,
+                        max=1460,
                         step=1,
                         style={"width": "100%", "marginBottom": "8px"},
                     ),
