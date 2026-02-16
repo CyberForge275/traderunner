@@ -65,3 +65,48 @@ def test_pipeline_manifest_contains_config_audit_block(tmp_path: Path):
     assert manifest["params"]["commission_bps"] == 2.0
     assert manifest["params"]["fees_bps"] == 2.0
     assert manifest["params"]["slippage_bps"] == 1.0
+
+
+def test_pipeline_manifest_includes_base_config_metadata_when_provided(tmp_path: Path):
+    out = tmp_path / "run_with_base"
+    bars = _make_bars(tmp_path)
+    base_config = tmp_path / "base_config.yaml"
+    base_config.write_text(
+        "\n".join(
+            [
+                "backtest:",
+                "  initial_cash: 7500",
+                "costs:",
+                "  commission_bps: 1.5",
+                "  slippage_bps: 0.5",
+            ]
+        )
+    )
+    argv = [
+        "--run-id",
+        "run_manifest_cfg_base",
+        "--out-dir",
+        str(out),
+        "--bars-path",
+        str(bars),
+        "--strategy-id",
+        "insidebar_intraday",
+        "--strategy-version",
+        "1.0.0",
+        "--symbol",
+        "TEST",
+        "--timeframe",
+        "M5",
+        "--requested-end",
+        "2025-01-05",
+        "--lookback-days",
+        "5",
+        "--base-config",
+        str(base_config),
+    ]
+    pipeline_main(argv)
+
+    manifest = json.loads((out / "run_manifest.json").read_text())
+    config = manifest["config"]
+    assert config["base_config_path"] == str(base_config)
+    assert isinstance(config["base_config_sha256"], str) and len(config["base_config_sha256"]) == 64

@@ -22,6 +22,9 @@ from typing import Dict, List, Optional, Callable
 # Add traderunner src to path
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
+# NOTE: this module lives in trading_dashboard/services/, so repo root is parents[2].
+REPO_ROOT = Path(__file__).resolve().parents[2]
+BASE_CONFIG = REPO_ROOT / "configs" / "runs" / "backtest_pipeline_defaults.yaml"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
@@ -288,6 +291,7 @@ class NewPipelineAdapter:
                         initial_cash=DEFAULT_INITIAL_CASH,
                         fees_bps=DEFAULT_FEE_BPS,
                         slippage_bps=DEFAULT_SLIPPAGE_BPS,
+                        base_config_path=BASE_CONFIG if BASE_CONFIG.exists() else None,
                     )
                     break
                 except PipelineError as run_err:

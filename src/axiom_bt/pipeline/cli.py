@@ -10,6 +10,12 @@ from .runner import run_pipeline
 from .strategy_config_loader import load_strategy_params_from_ssot
 
 
+def _default_base_config_path() -> Path | None:
+    root = Path(__file__).resolve().parents[3]
+    candidate = root / "configs" / "runs" / "backtest_pipeline_defaults.yaml"
+    return candidate if candidate.exists() else None
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Define CLI arguments for the headless pipeline.
 
@@ -20,6 +26,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--run-id", required=True)
     p.add_argument("--out-dir", required=True, type=Path)
     p.add_argument("--bars-path", required=True, type=Path)
+    p.add_argument(
+        "--base-config",
+        required=False,
+        type=Path,
+        default=_default_base_config_path(),
+        help="Optional base YAML/JSON for resolved config audit",
+    )
     p.add_argument("--strategy-id", required=True)
     p.add_argument("--strategy-version", required=True)
     p.add_argument("--symbol", required=True)
@@ -33,8 +46,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--compound-enabled", action="store_true")
     p.add_argument("--compound-equity-basis", default="cash_only")
     p.add_argument("--initial-cash", type=float, default=10000.0)
-    p.add_argument("--fees-bps", type=float, default=1.0)
-    p.add_argument("--slippage-bps", type=float, default=0.25)
+    # Cost defaults come from base config YAML (SSOT). CLI args are optional overrides.
+    p.add_argument("--fees-bps", type=float, default=None)
+    p.add_argument("--slippage-bps", type=float, default=None)
     return p
 
 
@@ -77,6 +91,13 @@ def main(argv=None) -> int:
         params["valid_from_policy"] = args.valid_from_policy
     if args.order_validity_policy:
         params["order_validity_policy"] = args.order_validity_policy
+    cli_backtest_overrides = {"initial_cash": args.initial_cash}
+    cli_costs_overrides = {}
+    if args.fees_bps is not None:
+        cli_costs_overrides["commission_bps"] = args.fees_bps
+    if args.slippage_bps is not None:
+        cli_costs_overrides["slippage_bps"] = args.slippage_bps
+
     run_pipeline(
         run_id=args.run_id,
         out_dir=args.out_dir,
@@ -88,13 +109,14 @@ def main(argv=None) -> int:
         compound_enabled=args.compound_enabled,
         compound_equity_basis=args.compound_equity_basis,
         initial_cash=args.initial_cash,
-        fees_bps=args.fees_bps,
-        slippage_bps=args.slippage_bps,
+        fees_bps=args.fees_bps if args.fees_bps is not None else 0.0,
+        slippage_bps=args.slippage_bps if args.slippage_bps is not None else 0.0,
+        base_config_path=args.base_config,
         config_overrides={
             "ui": {},
             "cli": {
-                "backtest": {"initial_cash": args.initial_cash},
-                "costs": {"commission_bps": args.fees_bps, "slippage_bps": args.slippage_bps},
+                "backtest": cli_backtest_overrides,
+                "costs": cli_costs_overrides,
             },
             "spyder": {},
         },

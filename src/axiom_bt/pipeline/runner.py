@@ -27,6 +27,11 @@ class PipelineError(RuntimeError):
     """Raised when the pipeline fails."""
 
 
+def _default_base_config_path() -> Optional[Path]:
+    candidate = Path(__file__).resolve().parents[3] / "configs" / "runs" / "backtest_pipeline_defaults.yaml"
+    return candidate if candidate.exists() else None
+
+
 def run_pipeline(
     *,
     run_id: str,
@@ -257,26 +262,21 @@ def run_pipeline(
     # [Reporting Layer]: Calculate standardized performance metrics and risk ratios from the finalized trade history and equity curve.
     metrics = compute_and_write_metrics(exec_art.trades, exec_art.equity_curve, initial_cash, out_dir / "metrics.json")
 
-    defaults_cfg = {
-        "backtest": {
-            "initial_cash": 10000.0,
-            "fixed_qty": 0,
-        },
-        "costs": {
-            "commission_bps": 0.0,
-            "slippage_bps": 0.0,
-            "price_semantics": "exec_price_adjustment",
-            "price_source": "last",
-        },
-    }
-    base_cfg = load_base_config(base_config_path) if base_config_path else {}
+    defaults_cfg = {}
+    effective_base_config_path = base_config_path or _default_base_config_path()
+    base_cfg = load_base_config(effective_base_config_path) if effective_base_config_path else {}
     overrides_cfg = config_overrides or {}
     resolved_cfg = resolve_config(base=base_cfg, overrides=overrides_cfg, defaults=defaults_cfg)
-    effective_commission_bps = float(resolved_cfg.resolved.get("costs", {}).get("commission_bps", fees_bps))
-    effective_slippage_bps = float(resolved_cfg.resolved.get("costs", {}).get("slippage_bps", slippage_bps))
+    costs_cfg = resolved_cfg.resolved.get("costs", {})
+    if "commission_bps" not in costs_cfg or "slippage_bps" not in costs_cfg:
+        raise PipelineError(
+            "resolved costs missing commission_bps/slippage_bps; provide base config YAML or explicit overrides"
+        )
+    effective_commission_bps = float(costs_cfg["commission_bps"])
+    effective_slippage_bps = float(costs_cfg["slippage_bps"])
     base_config_sha256 = None
-    if base_config_path:
-        base_config_sha256 = hashlib.sha256(base_config_path.read_bytes()).hexdigest()
+    if effective_base_config_path:
+        base_config_sha256 = hashlib.sha256(effective_base_config_path.read_bytes()).hexdigest()
 
     manifest_fields = {
         "run_id": run_id,
@@ -293,7 +293,7 @@ def run_pipeline(
             "slippage_bps": effective_slippage_bps,
         },
         "config": {
-            "base_config_path": str(base_config_path) if base_config_path else None,
+            "base_config_path": str(effective_base_config_path) if effective_base_config_path else None,
             "base_config_sha256": base_config_sha256,
             "overrides": {
                 "ui": (overrides_cfg.get("ui") if isinstance(overrides_cfg, dict) else None) or {},

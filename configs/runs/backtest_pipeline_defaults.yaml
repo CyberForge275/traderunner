@@ -1,0 +1,9 @@
+backtest:
+  initial_cash: 10000
+  fixed_qty: 0
+
+costs:
+  commission_bps: 2.0
+  slippage_bps: 1.0
+  price_semantics: exec_price_adjustment
+  price_source: last

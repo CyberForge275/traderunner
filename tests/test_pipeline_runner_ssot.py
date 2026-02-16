@@ -199,3 +199,41 @@ def test_cli_valid_from_derives_lookback(monkeypatch):
     params = captured.get("strategy_params", {})
     assert params.get("requested_end") == "2026-01-11"
     assert params.get("lookback_days") == 10
+
+
+def test_cli_uses_yaml_for_cost_defaults_when_not_passed(monkeypatch):
+    from axiom_bt.pipeline import cli
+
+    captured = {}
+
+    def fake_run_pipeline(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(cli, "run_pipeline", fake_run_pipeline)
+
+    cli.main([
+        "--run-id", "demo",
+        "--out-dir", "/tmp/demo",
+        "--bars-path", "/tmp/demo/bars.csv",
+        "--strategy-id", "insidebar_intraday",
+        "--strategy-version", "1.0.0",
+        "--symbol", "TEST",
+        "--timeframe", "M5",
+        "--requested-end", "2026-01-11",
+        "--lookback-days", "10",
+    ])
+
+    base_cfg = captured.get("base_config_path")
+    assert base_cfg is not None
+    assert str(base_cfg).endswith("configs/runs/backtest_pipeline_defaults.yaml")
+    cli_costs = captured["config_overrides"]["cli"].get("costs", {})
+    assert "commission_bps" not in cli_costs
+    assert "slippage_bps" not in cli_costs
+
+
+def test_pipeline_runner_has_default_base_config_yaml():
+    from axiom_bt.pipeline.runner import _default_base_config_path
+
+    path = _default_base_config_path()
+    assert path is not None
+    assert str(path).endswith("configs/runs/backtest_pipeline_defaults.yaml")

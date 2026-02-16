@@ -39,3 +39,5 @@ def test_execute_backtest_passes_ui_lookback_days_to_pipeline(monkeypatch):
     assert "stop_after_capture" in result.get("error", "")
     assert captured["strategy_params"]["lookback_days"] == 30
     assert captured["strategy_params"]["lookback_days"] != 1
+    assert captured.get("base_config_path") is not None
+    assert str(captured["base_config_path"]).endswith("configs/runs/backtest_pipeline_defaults.yaml")

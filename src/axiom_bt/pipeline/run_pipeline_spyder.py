@@ -15,6 +15,7 @@ from datetime import datetime
 # Ensure local source takes precedence (avoid stale installed package)
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
+BASE_CONFIG = ROOT / "configs" / "runs" / "backtest_pipeline_defaults.yaml"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
@@ -83,6 +84,7 @@ if __name__ == "__main__":
             initial_cash=10000.0,
             fees_bps=2.0,
             slippage_bps=1.0,
+            base_config_path=BASE_CONFIG if BASE_CONFIG.exists() else None,
             config_overrides={
                 "ui": {},
                 "cli": {},
