@@ -5,10 +5,10 @@ from __future__ import annotations
 import hashlib
 import logging
 import math
-import os
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, Optional
+from core.settings.runtime_config import RuntimeConfigError, get_runtime_config
 
 from .data_prep import load_bars_snapshot
 from .data_fetcher import ensure_and_snapshot_bars, DataFetcherError
@@ -43,15 +43,12 @@ class _NoopStepTracker:
         return None
 
 
-def _env_bool(name: str, default: bool = False) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
-
-
 def _build_step_tracker(run_dir: Path):
-    if not _env_bool("AXIOM_BT_WRITE_STEPS", False):
+    try:
+        enabled = bool(get_runtime_config().runtime.pipeline_write_run_steps)
+    except RuntimeConfigError:
+        enabled = False
+    if not enabled:
         return _NoopStepTracker()
     try:
         from backtest.services.step_tracker import StepTracker

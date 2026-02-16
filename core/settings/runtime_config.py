@@ -34,6 +34,7 @@ class RuntimeServices:
 class RuntimeFlags:
     pipeline_consumer_only: bool | None
     pipeline_auto_ensure_bars: bool | None
+    pipeline_write_run_steps: bool | None
 
 
 @dataclass(frozen=True)
@@ -131,6 +132,7 @@ def load_runtime_config(
         runtime=RuntimeFlags(
             pipeline_consumer_only=_as_bool(runtime_cfg.get("pipeline_consumer_only")),
             pipeline_auto_ensure_bars=_as_bool(runtime_cfg.get("pipeline_auto_ensure_bars")),
+            pipeline_write_run_steps=_as_bool(runtime_cfg.get("pipeline_write_run_steps")),
         ),
     )
 

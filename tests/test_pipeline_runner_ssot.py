@@ -246,7 +246,19 @@ def test_runner_writes_run_steps_when_enabled(monkeypatch, tmp_path):
     bars_path = run_dir / "bars_exec_M5_rth.parquet"
     _make_bars(bars_path)
 
-    monkeypatch.setenv("AXIOM_BT_WRITE_STEPS", "1")
+    cfg_file = tmp_path / "trading.yaml"
+    cfg_file.write_text(
+        """
+paths:
+  marketdata_data_root: /var/lib/trading/marketdata
+  trading_artifacts_root: /var/lib/trading/artifacts
+runtime:
+  pipeline_write_run_steps: true
+""".strip()
+    )
+    monkeypatch.setenv("TRADING_CONFIG", str(cfg_file))
+    from core.settings.runtime_config import reset_runtime_config_for_tests
+    reset_runtime_config_for_tests()
 
     cfg = load_strategy_params_from_ssot("insidebar_intraday", "1.0.0")
     params = {
@@ -289,7 +301,19 @@ def test_runner_does_not_write_run_steps_when_disabled(monkeypatch, tmp_path):
     bars_path = run_dir / "bars_exec_M5_rth.parquet"
     _make_bars(bars_path)
 
-    monkeypatch.delenv("AXIOM_BT_WRITE_STEPS", raising=False)
+    cfg_file = tmp_path / "trading.yaml"
+    cfg_file.write_text(
+        """
+paths:
+  marketdata_data_root: /var/lib/trading/marketdata
+  trading_artifacts_root: /var/lib/trading/artifacts
+runtime:
+  pipeline_write_run_steps: false
+""".strip()
+    )
+    monkeypatch.setenv("TRADING_CONFIG", str(cfg_file))
+    from core.settings.runtime_config import reset_runtime_config_for_tests
+    reset_runtime_config_for_tests()
 
     cfg = load_strategy_params_from_ssot("insidebar_intraday", "1.0.0")
     params = {
