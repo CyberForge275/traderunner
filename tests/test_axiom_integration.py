@@ -158,3 +158,75 @@ def test_runner_cli(tmp_path, monkeypatch):
     assert orders_csv.exists()
     saved_orders = pd.read_csv(orders_csv)
     assert "filled" in saved_orders.columns
+
+
+def test_runner_cli_uses_base_yaml_costs_when_config_has_no_costs(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data_m5"
+    data_dir_m1 = tmp_path / "data_m1"
+    orders_csv = tmp_path / "orders.csv"
+    _create_sample_data(data_dir, data_dir_m1)
+    _create_orders_csv(orders_csv)
+
+    base_cfg = tmp_path / "base_costs.yaml"
+    base_cfg.write_text(
+        "\n".join(
+            [
+                "costs:",
+                "  commission_bps: 3.0",
+                "  slippage_bps: 1.5",
+            ]
+        )
+    )
+
+    captured = {}
+
+    def _fake_simulate(orders_csv, data_path, data_path_m1=None, tz="UTC", costs=None, initial_cash=0):
+        captured.update(
+            {
+                "orders_csv": orders_csv,
+                "data_path": data_path,
+                "data_path_m1": data_path_m1,
+                "tz": tz,
+                "costs": costs,
+                "initial_cash": initial_cash,
+            }
+        )
+        return {
+            "filled_orders": pd.DataFrame(),
+            "trades": None,
+            "equity": None,
+            "metrics": {},
+            "orders": pd.DataFrame(),
+        }
+
+    monkeypatch.setattr("axiom_bt.runner._default_base_config_path", lambda: base_cfg)
+    monkeypatch.setattr(
+        "axiom_bt.engines.replay_engine.simulate_insidebar_from_orders",
+        _fake_simulate,
+    )
+
+    config_path = tmp_path / "config_no_costs.yml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "name: test_run_no_costs",
+                "engine: replay",
+                "mode: insidebar_intraday",
+                f"orders_source_csv: {orders_csv}",
+                "data:",
+                f"  path: {data_dir}",
+                f"  path_m1: {data_dir_m1}",
+                "  tz: UTC",
+                f"initial_cash: {DEFAULT_INITIAL_CASH}",
+            ]
+        )
+    )
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["prog", "--config", str(config_path)])
+
+    assert runner_main() == 0
+    costs = captured.get("costs")
+    assert costs is not None
+    assert costs.commission_bps == 3.0
+    assert costs.slippage_bps == 1.5

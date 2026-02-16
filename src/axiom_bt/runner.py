@@ -15,6 +15,7 @@ from core.settings import DEFAULT_INITIAL_CASH
 from axiom_bt.fs import ensure_layout, new_run_dir
 from axiom_bt.metrics import compose_metrics
 from axiom_bt.report import save_drawdown_png, save_equity_png
+from axiom_bt.pipeline.config_resolver import load_base_config, resolve_config
 
 
 def load_yaml(path: str | Path):
@@ -42,6 +43,11 @@ def _derive_m1_dir(data_path: Path) -> Path | None:
     if sibling.exists():
         return sibling
     return None
+
+
+def _default_base_config_path() -> Path | None:
+    candidate = Path(__file__).resolve().parents[2] / "configs" / "runs" / "backtest_pipeline_defaults.yaml"
+    return candidate if candidate.exists() else None
 
 
 def main() -> int:
@@ -81,8 +87,23 @@ def main() -> int:
     tz_value = data_cfg.get("tz", "UTC")
 
     costs_cfg = cfg.get("costs", {}) or {}
-    fees_bps = float(costs_cfg.get("fees_bps", 0.0))
-    slippage_bps = float(costs_cfg.get("slippage_bps", 0.0))
+    base_config_path = _default_base_config_path()
+    base_cfg = load_base_config(base_config_path) if base_config_path else {}
+    resolved_cfg = resolve_config(
+        base=base_cfg,
+        overrides={"cli": {"costs": costs_cfg}} if costs_cfg else {},
+        defaults={},
+    )
+    resolved_costs = resolved_cfg.resolved.get("costs", {})
+    if "commission_bps" not in resolved_costs or "slippage_bps" not in resolved_costs:
+        print(
+            "[ERROR] resolved costs missing commission_bps/slippage_bps. "
+            "Provide configs/runs/backtest_pipeline_defaults.yaml or costs in run config.",
+            file=sys.stderr,
+        )
+        return 2
+    commission_bps = float(resolved_costs["commission_bps"])
+    slippage_bps = float(resolved_costs["slippage_bps"])
 
     initial_cash = float(cfg.get("initial_cash", DEFAULT_INITIAL_CASH))
 
@@ -114,11 +135,14 @@ def main() -> int:
 
     if hasattr(replay_engine, "Costs"):
         try:
-            costs_obj = replay_engine.Costs(fees_bps=fees_bps, slippage_bps=slippage_bps)
+            costs_obj = replay_engine.Costs(
+                commission_bps=commission_bps,
+                slippage_bps=slippage_bps,
+            )
         except TypeError:
-            costs_obj = replay_engine.Costs(fees_bps, slippage_bps)
+            costs_obj = replay_engine.Costs(commission_bps, slippage_bps)
     else:
-        costs_obj = {"fees_bps": fees_bps, "slippage_bps": slippage_bps}
+        costs_obj = {"fees_bps": commission_bps, "slippage_bps": slippage_bps}
 
     kwargs = {}
     if "orders_csv" in accepted:

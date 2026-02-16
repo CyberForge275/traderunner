@@ -82,15 +82,14 @@ if __name__ == "__main__":
             compound_enabled=True,
             compound_equity_basis="cash_only",
             initial_cash=10000.0,
-            fees_bps=2.0,
-            slippage_bps=1.0,
+            fees_bps=0.0,
+            slippage_bps=0.0,
             base_config_path=BASE_CONFIG if BASE_CONFIG.exists() else None,
             config_overrides={
                 "ui": {},
                 "cli": {},
                 "spyder": {
                     "backtest": {"initial_cash": 10000.0},
-                    "costs": {"commission_bps": 2.0, "slippage_bps": 1.0},
                 },
             },
         )
