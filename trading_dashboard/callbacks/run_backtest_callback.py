@@ -5,6 +5,7 @@ import logging
 import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
 from ..ui_ids import Nav, BT, RUN
+from trading_dashboard.services.backtest_ui.range_resolver import resolve_ui_backtest_range
 
 
 logger = logging.getLogger(__name__)
@@ -55,25 +56,14 @@ def _resolve_ui_backtest_range(
     explicit_start,
     explicit_end,
 ):
-    """Resolve UI date inputs to start/end dates (parity with existing callback logic)."""
-    if date_mode == "days_back":
-        if isinstance(anchor_date, str):
-            end_date = datetime.fromisoformat(anchor_date).date()
-        else:
-            end_date = anchor_date
-        start_date = end_date - timedelta(days=int(days_back or 30))
-    else:
-        if isinstance(explicit_start, str):
-            start_date = datetime.fromisoformat(explicit_start).date()
-        else:
-            start_date = explicit_start
-
-        if isinstance(explicit_end, str):
-            end_date = datetime.fromisoformat(explicit_end).date()
-        else:
-            end_date = explicit_end
-
-    return start_date, end_date
+    """Compatibility wrapper around the dedicated range resolver service."""
+    return resolve_ui_backtest_range(
+        date_mode=date_mode,
+        anchor_date=anchor_date,
+        days_back=days_back,
+        explicit_start=explicit_start,
+        explicit_end=explicit_end,
+    )
 
 
 def register_run_backtest_callback(app):
