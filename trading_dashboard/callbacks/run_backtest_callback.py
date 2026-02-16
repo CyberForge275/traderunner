@@ -6,6 +6,11 @@ import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
 from ..ui_ids import Nav, BT, RUN
 from trading_dashboard.services.backtest_ui.range_resolver import resolve_ui_backtest_range
+from trading_dashboard.services.backtest_ui.config_snapshot_service import (
+    SnapshotValidationError,
+    build_config_params_from_snapshot,
+    resolve_insidebar_snapshot,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -147,31 +152,18 @@ def register_run_backtest_callback(app):
 
         # SSOT: Logic for migrated strategies (InsideBar)
         if strategy == "insidebar_intraday":
-            if not bt_config_snapshot or bt_config_snapshot.get("strategy_id") != strategy:
-                if selected_version:
-                    try:
-                        from trading_dashboard.config_store.strategy_config_store import StrategyConfigStore
-                        defaults = StrategyConfigStore.get_defaults(strategy, selected_version)
-                        bt_config_snapshot = {
-                            "strategy_id": strategy,
-                            "version": selected_version,
-                            "required_warmup_bars": defaults.get("required_warmup_bars", 0),
-                            "core": defaults.get("core", {}),
-                            "tunable": defaults.get("tunable", {}),
-                            "strategy_finalized": defaults.get("strategy_finalized", False),
-                        }
-                    except Exception:
-                        error_msg = html.Div([
-                            html.Span("❌ Configuration snapshot missing. ", style={"color": "red", "fontWeight": "bold"}),
-                            html.Span("Please select Strategy and Version to load parameters first."),
-                        ])
-                        return error_msg, run_name, {"bt_job_running": False}, "", None, ""
-                else:
-                    error_msg = html.Div([
-                        html.Span("❌ Configuration snapshot missing. ", style={"color": "red", "fontWeight": "bold"}),
-                        html.Span("Please select Strategy and Version to load parameters first."),
-                    ])
-                    return error_msg, run_name, {"bt_job_running": False}, "", None, ""
+            try:
+                bt_config_snapshot = resolve_insidebar_snapshot(
+                    strategy_id=strategy,
+                    selected_version=selected_version,
+                    snapshot=bt_config_snapshot,
+                )
+            except (SnapshotValidationError, Exception):
+                error_msg = html.Div([
+                    html.Span("❌ Configuration snapshot missing. ", style={"color": "red", "fontWeight": "bold"}),
+                    html.Span("Please select Strategy and Version to load parameters first."),
+                ])
+                return error_msg, run_name, {"bt_job_running": False}, "", None, ""
 
             version_to_use = bt_config_snapshot.get("version") or selected_version
             if not version_to_use:
@@ -832,21 +824,10 @@ def register_run_backtest_callback(app):
 
 def build_config_params(strategy, version_to_use, bt_config_snapshot, compound_toggle_val, equity_basis_val):
     """Refactored logic to build config params for testability."""
-    config_params = {}
-    if strategy == "insidebar_intraday":
-        # SSOT Path: Use Snapshot from Store
-        core = bt_config_snapshot.get("core", {})
-        tunable = bt_config_snapshot.get("tunable", {})
-        
-        # Merge all into runner config
-        config_params = {**core, **tunable}
-        config_params["strategy_version"] = version_to_use
-
-        # --- Compound Settings (Opt-in) ---
-        compound_enabled = "enabled" in (compound_toggle_val or [])
-        if compound_enabled:
-            config_params["backtesting"] = {
-                "compound_sizing": True,
-                "compound_equity_basis": equity_basis_val or "cash_only"
-            }
-    return config_params
+    return build_config_params_from_snapshot(
+        strategy=strategy,
+        version_to_use=version_to_use,
+        snapshot=bt_config_snapshot,
+        compound_toggle_val=compound_toggle_val,
+        equity_basis_val=equity_basis_val,
+    )
