@@ -62,5 +62,6 @@ def test_pipeline_manifest_contains_config_audit_block(tmp_path: Path):
     assert config["resolved"]["costs"]["fees_bps"] == 2.0
     assert config["resolved"]["costs"]["slippage_bps"] == 1.0
     assert config["sources"]["costs.commission_bps"] == "cli"
+    assert manifest["params"]["commission_bps"] == 2.0
     assert manifest["params"]["fees_bps"] == 2.0
     assert manifest["params"]["slippage_bps"] == 1.0

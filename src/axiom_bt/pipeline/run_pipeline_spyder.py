@@ -88,7 +88,7 @@ if __name__ == "__main__":
                 "cli": {},
                 "spyder": {
                     "backtest": {"initial_cash": 10000.0},
-                    "costs": {"fees_bps": 2.0, "slippage_bps": 1.0},
+                    "costs": {"commission_bps": 2.0, "slippage_bps": 1.0},
                 },
             },
         )

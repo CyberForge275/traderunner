@@ -94,7 +94,7 @@ def main(argv=None) -> int:
             "ui": {},
             "cli": {
                 "backtest": {"initial_cash": args.initial_cash},
-                "costs": {"fees_bps": args.fees_bps, "slippage_bps": args.slippage_bps},
+                "costs": {"commission_bps": args.fees_bps, "slippage_bps": args.slippage_bps},
             },
             "spyder": {},
         },

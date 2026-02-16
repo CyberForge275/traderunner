@@ -272,6 +272,8 @@ def run_pipeline(
     base_cfg = load_base_config(base_config_path) if base_config_path else {}
     overrides_cfg = config_overrides or {}
     resolved_cfg = resolve_config(base=base_cfg, overrides=overrides_cfg, defaults=defaults_cfg)
+    effective_commission_bps = float(resolved_cfg.resolved.get("costs", {}).get("commission_bps", fees_bps))
+    effective_slippage_bps = float(resolved_cfg.resolved.get("costs", {}).get("slippage_bps", slippage_bps))
     base_config_sha256 = None
     if base_config_path:
         base_config_sha256 = hashlib.sha256(base_config_path.read_bytes()).hexdigest()
@@ -286,8 +288,9 @@ def run_pipeline(
             "compound_enabled": compound_enabled,
             "compound_equity_basis": compound_equity_basis,
             "initial_cash": initial_cash,
-            "fees_bps": fees_bps,
-            "slippage_bps": slippage_bps,
+            "commission_bps": effective_commission_bps,
+            "fees_bps": effective_commission_bps,
+            "slippage_bps": effective_slippage_bps,
         },
         "config": {
             "base_config_path": str(base_config_path) if base_config_path else None,
