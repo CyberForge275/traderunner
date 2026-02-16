@@ -466,9 +466,6 @@ def register_run_backtest_callback(app):
 
         log_state = get_pipeline_log_state(current_job_id, BACKTESTS_DIR)
 
-        # Use utility to parse log
-        log_state = get_pipeline_log_state(current_job_id, BACKTESTS_DIR)
-
         # No log file yet
         if log_state.total_steps == 0 and log_state.overall_status == "pending":
             return html.Div([

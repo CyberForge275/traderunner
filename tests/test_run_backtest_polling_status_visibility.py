@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 
-from trading_dashboard.callbacks.run_backtest_callback import (
-    _collect_jobs_for_polling,
-    _status_text,
+from trading_dashboard.services.backtest_ui.job_status_service import (
+    collect_jobs_for_polling,
+    status_text,
 )
 
 
@@ -19,7 +19,7 @@ def test_collect_jobs_includes_error_and_failed_precondition():
         "job-gate": {"status": "failed_precondition", "ended_at": _iso_now()},
     }
 
-    running, recent = _collect_jobs_for_polling(jobs, datetime.now(timezone.utc).timestamp())
+    running, recent = collect_jobs_for_polling(jobs, datetime.now(timezone.utc).timestamp())
 
     assert "job-running" in running
     assert "job-completed" in recent
@@ -29,7 +29,7 @@ def test_collect_jobs_includes_error_and_failed_precondition():
 
 
 def test_status_text_covers_terminal_statuses():
-    assert _status_text("completed") == "Completed Successfully"
-    assert _status_text("failed") == "Failed"
-    assert _status_text("error") == "Error"
-    assert _status_text("failed_precondition") == "Failed Precondition (Gates Blocked)"
+    assert status_text("completed") == "Completed Successfully"
+    assert status_text("failed") == "Failed"
+    assert status_text("error") == "Error"
+    assert status_text("failed_precondition") == "Failed Precondition (Gates Blocked)"
