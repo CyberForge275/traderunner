@@ -236,6 +236,19 @@ def run_pipeline(
         extra={"rows": len(fills_art.fills), **(fills_art.gap_stats or {})},
     )
     
+    defaults_cfg = {}
+    effective_base_config_path = base_config_path or _default_base_config_path()
+    base_cfg = load_base_config(effective_base_config_path) if effective_base_config_path else {}
+    overrides_cfg = config_overrides or {}
+    resolved_cfg = resolve_config(base=base_cfg, overrides=overrides_cfg, defaults=defaults_cfg)
+    costs_cfg = resolved_cfg.resolved.get("costs", {})
+    if "commission_bps" not in costs_cfg or "slippage_bps" not in costs_cfg:
+        raise PipelineError(
+            "resolved costs missing commission_bps/slippage_bps; provide base config YAML or explicit overrides"
+        )
+    effective_commission_bps = float(costs_cfg["commission_bps"])
+    effective_slippage_bps = float(costs_cfg["slippage_bps"])
+
     # [Engine Layer]: Portfolio Management: Apply position sizing, risk rules, and derive actual trades, equity curve, and the portfolio ledger.
     # Execution: apply sizing (respecting compound_enabled) and derive trades/equity/ledger
     exec_art = execute(
@@ -247,6 +260,8 @@ def run_pipeline(
         order_validity_policy=strategy_params.get("order_validity_policy"),
         session_timezone=strategy_params.get("session_timezone"),
         session_filter=strategy_params.get("session_filter"),
+        commission_bps=effective_commission_bps,
+        slippage_bps=effective_slippage_bps,
     )
     trace_ui(
         step="pipeline_execution_done",
@@ -262,18 +277,6 @@ def run_pipeline(
     # [Reporting Layer]: Calculate standardized performance metrics and risk ratios from the finalized trade history and equity curve.
     metrics = compute_and_write_metrics(exec_art.trades, exec_art.equity_curve, initial_cash, out_dir / "metrics.json")
 
-    defaults_cfg = {}
-    effective_base_config_path = base_config_path or _default_base_config_path()
-    base_cfg = load_base_config(effective_base_config_path) if effective_base_config_path else {}
-    overrides_cfg = config_overrides or {}
-    resolved_cfg = resolve_config(base=base_cfg, overrides=overrides_cfg, defaults=defaults_cfg)
-    costs_cfg = resolved_cfg.resolved.get("costs", {})
-    if "commission_bps" not in costs_cfg or "slippage_bps" not in costs_cfg:
-        raise PipelineError(
-            "resolved costs missing commission_bps/slippage_bps; provide base config YAML or explicit overrides"
-        )
-    effective_commission_bps = float(costs_cfg["commission_bps"])
-    effective_slippage_bps = float(costs_cfg["slippage_bps"])
     base_config_sha256 = None
     if effective_base_config_path:
         base_config_sha256 = hashlib.sha256(effective_base_config_path.read_bytes()).hexdigest()

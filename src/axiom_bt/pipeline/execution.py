@@ -48,6 +48,8 @@ def _build_trades(
     order_validity_policy: str | None,
     session_timezone: str | None,
     session_filter: list[str] | None,
+    commission_bps: float,
+    slippage_bps: float,
 ) -> pd.DataFrame:
     """Build trades from fills with proper compound sizing.
     
@@ -162,13 +164,20 @@ def _build_trades(
             qty = int(max(cash // row["entry_price"], 1))
             qtys.append(qty)
             
-            # Calculate PnL for this trade
-            if row["side"] == "BUY":
-                pnl = (row["exit_price"] - row["entry_price"]) * qty
-            else:  # SELL
-                pnl = (row["entry_price"] - row["exit_price"]) * qty
-            
-            # Update cash: add back PnL (profit or loss)
+            # Calculate net PnL for this trade (includes slippage + commissions)
+            side = str(row["side"]).upper()
+            entry_price = float(row["entry_price"])
+            exit_price = float(row["exit_price"])
+
+            entry_exec = entry_price * (1.0 + slippage_bps / 1e4) if side == "BUY" else entry_price * (1.0 - slippage_bps / 1e4)
+            exit_exec = exit_price * (1.0 - slippage_bps / 1e4) if side == "BUY" else exit_price * (1.0 + slippage_bps / 1e4)
+
+            gross_pnl = (exit_price - entry_price) * qty if side == "BUY" else (entry_price - exit_price) * qty
+            pnl_exec_no_fees = (exit_exec - entry_exec) * qty if side == "BUY" else (entry_exec - exit_exec) * qty
+            commission_total = abs(qty) * (entry_exec + exit_exec) * (commission_bps / 1e4)
+            pnl = pnl_exec_no_fees - commission_total
+
+            # Update cash with net PnL for next position
             # This makes cash available for next position
             cash += pnl
             
@@ -182,9 +191,33 @@ def _build_trades(
         # Fixed sizing: qty=1 for all trades
         merged["qty"] = 1.0
     
-    # Calculate PnL (needed for equity curve even if already calculated above)
-    merged["pnl"] = (merged["exit_price"] - merged["entry_price"]) * merged["qty"]
-    merged.loc[merged["side"] == "SELL", "pnl"] = (merged["entry_price"] - merged["exit_price"]) * merged["qty"]
+    merged["entry_exec_price"] = merged["entry_price"]
+    merged["exit_exec_price"] = merged["exit_price"]
+    buy_mask = merged["side"] == "BUY"
+    sell_mask = merged["side"] == "SELL"
+
+    if slippage_bps > 0:
+        slip = slippage_bps / 1e4
+        merged.loc[buy_mask, "entry_exec_price"] = merged.loc[buy_mask, "entry_price"] * (1.0 + slip)
+        merged.loc[buy_mask, "exit_exec_price"] = merged.loc[buy_mask, "exit_price"] * (1.0 - slip)
+        merged.loc[sell_mask, "entry_exec_price"] = merged.loc[sell_mask, "entry_price"] * (1.0 - slip)
+        merged.loc[sell_mask, "exit_exec_price"] = merged.loc[sell_mask, "exit_price"] * (1.0 + slip)
+
+    merged["gross_pnl"] = (merged["exit_price"] - merged["entry_price"]) * merged["qty"]
+    merged.loc[sell_mask, "gross_pnl"] = (merged["entry_price"] - merged["exit_price"]) * merged["qty"]
+
+    merged["pnl_exec_no_fees"] = (merged["exit_exec_price"] - merged["entry_exec_price"]) * merged["qty"]
+    merged.loc[sell_mask, "pnl_exec_no_fees"] = (
+        merged["entry_exec_price"] - merged["exit_exec_price"]
+    ) * merged["qty"]
+
+    merged["slippage_cost"] = merged["gross_pnl"] - merged["pnl_exec_no_fees"]
+    merged["commission_cost"] = (
+        merged["qty"].abs() * (merged["entry_exec_price"].abs() + merged["exit_exec_price"].abs()) * (commission_bps / 1e4)
+    )
+    merged["total_cost"] = merged["slippage_cost"] + merged["commission_cost"]
+    merged["net_pnl"] = merged["pnl_exec_no_fees"] - merged["commission_cost"]
+    merged["pnl"] = merged["net_pnl"]
     
     merged["reason"] = merged["exit_reason"].fillna("UNKNOWN_EXIT_REASON")
     
@@ -195,8 +228,15 @@ def _build_trades(
         "qty",
         "entry_ts",
         "entry_price",
+        "entry_exec_price",
         "exit_ts",
         "exit_price",
+        "exit_exec_price",
+        "gross_pnl",
+        "commission_cost",
+        "slippage_cost",
+        "total_cost",
+        "net_pnl",
         "pnl",
         "reason",
     ]
@@ -223,6 +263,8 @@ def execute(
     order_validity_policy: str | None = None,
     session_timezone: str | None = None,
     session_filter: list[str] | None = None,
+    commission_bps: float = 0.0,
+    slippage_bps: float = 0.0,
 ) -> ExecutionArtifacts:
     """Apply sizing and produce trades/ledger/equity.
 
@@ -238,8 +280,15 @@ def execute(
                 "qty",
                 "entry_ts",
                 "entry_price",
+                "entry_exec_price",
                 "exit_ts",
                 "exit_price",
+                "exit_exec_price",
+                "gross_pnl",
+                "commission_cost",
+                "slippage_cost",
+                "total_cost",
+                "net_pnl",
                 "pnl",
                 "reason",
             ]
@@ -258,6 +307,8 @@ def execute(
         order_validity_policy=order_validity_policy,
         session_timezone=session_timezone,
         session_filter=session_filter,
+        commission_bps=commission_bps,
+        slippage_bps=slippage_bps,
     )
 
     equity_curve = _equity_from_trades(trades, initial_cash)

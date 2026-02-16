@@ -115,11 +115,21 @@ def trade_stats(trades: pd.DataFrame) -> Dict[str, float]:
         }
 
     pnl = pd.to_numeric(trades["pnl"], errors="coerce").astype(float)
-    gross_pnl = float(pnl.sum())
-    net_pnl = gross_pnl
+    gross_series = (
+        pd.to_numeric(trades["gross_pnl"], errors="coerce").astype(float)
+        if "gross_pnl" in trades.columns
+        else pnl
+    )
+    net_series = (
+        pd.to_numeric(trades["net_pnl"], errors="coerce").astype(float)
+        if "net_pnl" in trades.columns
+        else pnl
+    )
+    gross_pnl = float(gross_series.sum())
+    net_pnl = float(net_series.sum())
 
-    wins = pnl[pnl > 0]
-    losses = pnl[pnl < 0]
+    wins = net_series[net_series > 0]
+    losses = net_series[net_series < 0]
     num_trades = int(len(trades))
     win_rate = float((len(wins) / num_trades) if num_trades > 0 else 0.0)
     avg_win = float(wins.mean()) if len(wins) else 0.0
