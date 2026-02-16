@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import math
+import os
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -25,6 +27,39 @@ logger = logging.getLogger(__name__)
 
 class PipelineError(RuntimeError):
     """Raised when the pipeline fails."""
+
+
+class _NoopStepContext:
+    def add_detail(self, key: str, value) -> None:  # pragma: no cover - intentional no-op
+        return None
+
+
+class _NoopStepTracker:
+    @contextmanager
+    def step(self, step_name: str, details: Optional[Dict] = None):
+        yield _NoopStepContext()
+
+    def skip_step(self, step_name: str, reason: str) -> None:  # pragma: no cover
+        return None
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _build_step_tracker(run_dir: Path):
+    if not _env_bool("AXIOM_BT_WRITE_STEPS", False):
+        return _NoopStepTracker()
+    try:
+        from backtest.services.step_tracker import StepTracker
+
+        return StepTracker(run_dir)
+    except Exception as exc:  # fail-open: step tracking must never block pipeline
+        logger.warning("actions: step_tracker_unavailable run_dir=%s err=%s", run_dir, exc)
+        return _NoopStepTracker()
 
 
 def _default_base_config_path() -> Optional[Path]:
@@ -67,6 +102,8 @@ def run_pipeline(
         file=__file__,
         func="run_pipeline",
     )
+    step_tracker = _build_step_tracker(out_dir)
+
     if compound_equity_basis != "cash_only":
         raise PipelineError("unsupported compound_equity_basis (only cash_only allowed)")
     core = strategy_meta.get("core", {}) if strategy_meta else {}
@@ -138,48 +175,50 @@ def run_pipeline(
     # Bars snapshot: use existing if present, else ensure & snapshot via IntradayStore
     # [Data Layer]: Check if a pre-cached bars file exists; if not, initiate a 'just-in-time' fetch and snapshot process through the DataFetcher.
     snapshot_path = bars_path
-    if not snapshot_path.exists():
-        logger.info(
-            "actions: pipeline_bars_input_missing path=%s", snapshot_path
-        )
-        try:
-            # [Framework Logic]: Orchestrate data fetching, resampling (e.g. M1->M5), and session filtering into a stable, per-run artifact.
-            snap_info = ensure_and_snapshot_bars(
-                run_dir=out_dir,
-                symbol=strategy_params.get("symbol", "UNKNOWN"),
-                timeframe=strategy_params.get("timeframe", "M5"),
-                requested_end=requested_end,
-                lookback_days=int(lookback_days),
-                market_tz=market_tz,
-                session_mode=session_mode,
-                warmup_days=warmup_days,
-                auto_fill_gaps=not bool(strategy_params.get("consumer_only", False)),
-                allow_legacy_http_backfill=bool(
-                    strategy_params.get("allow_legacy_http_backfill", False)
-                ),
-            )
-            snapshot_path = Path(snap_info["exec_path"])
-            bars_hash = snap_info["bars_hash"]
+    with step_tracker.step("load_or_fetch_bars"):
+        if not snapshot_path.exists():
             logger.info(
-                "actions: bars_snapshot_created symbol=%s timeframe=%s exec_path=%s bars_hash=%s",
-                strategy_params.get("symbol", "UNKNOWN"),
-                strategy_params.get("timeframe", "M5"),
-                snapshot_path,
-                bars_hash,
+                "actions: pipeline_bars_input_missing path=%s", snapshot_path
             )
-        except DataFetcherError as exc:
-            raise PipelineError(f"failed to ensure bars: {exc}") from exc
-    # [Data Layer]: Load the validated and snapshotted bars into memory; this marks the 'frozen' state of input data for this specific run.
-    bars, bars_hash = load_bars_snapshot(snapshot_path)
+            try:
+                # [Framework Logic]: Orchestrate data fetching, resampling (e.g. M1->M5), and session filtering into a stable, per-run artifact.
+                snap_info = ensure_and_snapshot_bars(
+                    run_dir=out_dir,
+                    symbol=strategy_params.get("symbol", "UNKNOWN"),
+                    timeframe=strategy_params.get("timeframe", "M5"),
+                    requested_end=requested_end,
+                    lookback_days=int(lookback_days),
+                    market_tz=market_tz,
+                    session_mode=session_mode,
+                    warmup_days=warmup_days,
+                    auto_fill_gaps=not bool(strategy_params.get("consumer_only", False)),
+                    allow_legacy_http_backfill=bool(
+                        strategy_params.get("allow_legacy_http_backfill", False)
+                    ),
+                )
+                snapshot_path = Path(snap_info["exec_path"])
+                bars_hash = snap_info["bars_hash"]
+                logger.info(
+                    "actions: bars_snapshot_created symbol=%s timeframe=%s exec_path=%s bars_hash=%s",
+                    strategy_params.get("symbol", "UNKNOWN"),
+                    strategy_params.get("timeframe", "M5"),
+                    snapshot_path,
+                    bars_hash,
+                )
+            except DataFetcherError as exc:
+                raise PipelineError(f"failed to ensure bars: {exc}") from exc
+        # [Data Layer]: Load the validated and snapshotted bars into memory; this marks the 'frozen' state of input data for this specific run.
+        bars, bars_hash = load_bars_snapshot(snapshot_path)
 
     # 4) Generate intent → fills → execute (sizing, trades, equity/ledger).
     # [Strategy Boundary]: Delegate indicator calculation and signal generation to the decoupled strategy plugin via the abstract registry (SoC).
-    signals_frame, schema = build_signal_frame(
-        bars=bars,
-        strategy_id=strategy_id,
-        strategy_version=strategy_version,
-        strategy_params={**strategy_params, "run_id": run_id},
-    )
+    with step_tracker.step("generate_signal_frame"):
+        signals_frame, schema = build_signal_frame(
+            bars=bars,
+            strategy_id=strategy_id,
+            strategy_version=strategy_version,
+            strategy_params={**strategy_params, "run_id": run_id},
+        )
     trace_ui(
         step="pipeline_signal_frame_built",
         run_id=run_id,
@@ -201,13 +240,14 @@ def run_pipeline(
     )
 
     # [Framework Layer]: Transform the strategy-specific SignalFrame into a normalized, generic intent stream (events_intent) understood by the execution engine.
-    strategy_adapter = get_strategy_adapter(strategy_id)
-    intent_art = strategy_adapter.generate_intent(
-        signals_frame,
-        strategy_id,
-        strategy_version,
-        {**strategy_params, "symbol": strategy_params.get("symbol")},
-    )
+    with step_tracker.step("generate_intent"):
+        strategy_adapter = get_strategy_adapter(strategy_id)
+        intent_art = strategy_adapter.generate_intent(
+            signals_frame,
+            strategy_id,
+            strategy_version,
+            {**strategy_params, "symbol": strategy_params.get("symbol")},
+        )
     trace_ui(
         step="pipeline_intent_generated",
         run_id=run_id,
@@ -219,13 +259,14 @@ def run_pipeline(
     )
     
     # [Engine Layer]: Market Simulation: Match the intent stream against historical bars to generate discrete execution fills (STOP/LIMIT/MARKET).
-    fills_art = generate_fills(
-        intent_art.events_intent,
-        bars,
-        order_validity_policy=strategy_params.get("order_validity_policy"),
-        session_timezone=strategy_params.get("session_timezone"),
-        session_filter=strategy_params.get("session_filter"),
-    )
+    with step_tracker.step("generate_fills"):
+        fills_art = generate_fills(
+            intent_art.events_intent,
+            bars,
+            order_validity_policy=strategy_params.get("order_validity_policy"),
+            session_timezone=strategy_params.get("session_timezone"),
+            session_filter=strategy_params.get("session_filter"),
+        )
     trace_ui(
         step="pipeline_fills_generated",
         run_id=run_id,
@@ -251,18 +292,19 @@ def run_pipeline(
 
     # [Engine Layer]: Portfolio Management: Apply position sizing, risk rules, and derive actual trades, equity curve, and the portfolio ledger.
     # Execution: apply sizing (respecting compound_enabled) and derive trades/equity/ledger
-    exec_art = execute(
-        fills_art.fills,
-        intent_art.events_intent,
-        bars,
-        initial_cash=initial_cash,
-        compound_enabled=compound_enabled,
-        order_validity_policy=strategy_params.get("order_validity_policy"),
-        session_timezone=strategy_params.get("session_timezone"),
-        session_filter=strategy_params.get("session_filter"),
-        commission_bps=effective_commission_bps,
-        slippage_bps=effective_slippage_bps,
-    )
+    with step_tracker.step("execute_portfolio"):
+        exec_art = execute(
+            fills_art.fills,
+            intent_art.events_intent,
+            bars,
+            initial_cash=initial_cash,
+            compound_enabled=compound_enabled,
+            order_validity_policy=strategy_params.get("order_validity_policy"),
+            session_timezone=strategy_params.get("session_timezone"),
+            session_filter=strategy_params.get("session_filter"),
+            commission_bps=effective_commission_bps,
+            slippage_bps=effective_slippage_bps,
+        )
     trace_ui(
         step="pipeline_execution_done",
         run_id=run_id,
@@ -275,7 +317,8 @@ def run_pipeline(
 
     # 5) Compute metrics and write artifacts/manifest hashes.
     # [Reporting Layer]: Calculate standardized performance metrics and risk ratios from the finalized trade history and equity curve.
-    metrics = compute_and_write_metrics(exec_art.trades, exec_art.equity_curve, initial_cash, out_dir / "metrics.json")
+    with step_tracker.step("compute_metrics"):
+        metrics = compute_and_write_metrics(exec_art.trades, exec_art.equity_curve, initial_cash, out_dir / "metrics.json")
 
     base_config_sha256 = None
     if effective_base_config_path:
@@ -322,6 +365,9 @@ def run_pipeline(
             "portfolio_ledger.csv",
         ],
     }
+    steps_file = out_dir / "run_steps.jsonl"
+    if steps_file.exists():
+        manifest_fields["artifacts_index"].append("run_steps.jsonl")
 
     result_fields = {
         "run_id": run_id,
@@ -341,18 +387,19 @@ def run_pipeline(
         file=__file__,
         func="run_pipeline",
     )
-    write_artifacts(
-        out_dir,
-        signals_frame=intent_art.signals_frame,
-        events_intent=intent_art.events_intent,
-        fills=exec_art.fills,
-        trades=exec_art.trades,
-        equity_curve=exec_art.equity_curve,
-        ledger=exec_art.portfolio_ledger,
-        manifest_fields=manifest_fields,
-        result_fields=result_fields,
-        metrics=metrics,
-    )
+    with step_tracker.step("write_artifacts"):
+        write_artifacts(
+            out_dir,
+            signals_frame=intent_art.signals_frame,
+            events_intent=intent_art.events_intent,
+            fills=exec_art.fills,
+            trades=exec_art.trades,
+            equity_curve=exec_art.equity_curve,
+            ledger=exec_art.portfolio_ledger,
+            manifest_fields=manifest_fields,
+            result_fields=result_fields,
+            metrics=metrics,
+        )
 
     logger.info(
         "actions: pipeline_completed run_id=%s intent_hash=%s fills_hash=%s bars_hash=%s",

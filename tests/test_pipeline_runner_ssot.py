@@ -1,3 +1,4 @@
+import json
 import pandas as pd
 import pytest
 from pathlib import Path
@@ -237,3 +238,82 @@ def test_pipeline_runner_has_default_base_config_yaml():
     path = _default_base_config_path()
     assert path is not None
     assert str(path).endswith("configs/runs/backtest_pipeline_defaults.yaml")
+
+
+def test_runner_writes_run_steps_when_enabled(monkeypatch, tmp_path):
+    run_dir = tmp_path / "run_steps_enabled"
+    run_dir.mkdir()
+    bars_path = run_dir / "bars_exec_M5_rth.parquet"
+    _make_bars(bars_path)
+
+    monkeypatch.setenv("AXIOM_BT_WRITE_STEPS", "1")
+
+    cfg = load_strategy_params_from_ssot("insidebar_intraday", "1.0.0")
+    params = {
+        **cfg["core"],
+        **cfg["tunable"],
+        "symbol": "TEST",
+        "timeframe": "M5",
+        "requested_end": "2025-01-10",
+        "lookback_days": 5,
+    }
+
+    run_pipeline(
+        run_id="run_steps_enabled",
+        out_dir=run_dir,
+        bars_path=bars_path,
+        strategy_id="insidebar_intraday",
+        strategy_version="1.0.0",
+        strategy_params=params,
+        strategy_meta=cfg,
+        compound_enabled=False,
+        compound_equity_basis="cash_only",
+        initial_cash=10000,
+        fees_bps=0,
+        slippage_bps=0,
+    )
+
+    steps_file = run_dir / "run_steps.jsonl"
+    assert steps_file.exists()
+    lines = [line.strip() for line in steps_file.read_text().splitlines() if line.strip()]
+    assert lines
+
+    first_event = json.loads(lines[0])
+    assert first_event["status"] == "started"
+    assert first_event["step_name"] == "load_or_fetch_bars"
+
+
+def test_runner_does_not_write_run_steps_when_disabled(monkeypatch, tmp_path):
+    run_dir = tmp_path / "run_steps_disabled"
+    run_dir.mkdir()
+    bars_path = run_dir / "bars_exec_M5_rth.parquet"
+    _make_bars(bars_path)
+
+    monkeypatch.delenv("AXIOM_BT_WRITE_STEPS", raising=False)
+
+    cfg = load_strategy_params_from_ssot("insidebar_intraday", "1.0.0")
+    params = {
+        **cfg["core"],
+        **cfg["tunable"],
+        "symbol": "TEST",
+        "timeframe": "M5",
+        "requested_end": "2025-01-10",
+        "lookback_days": 5,
+    }
+
+    run_pipeline(
+        run_id="run_steps_disabled",
+        out_dir=run_dir,
+        bars_path=bars_path,
+        strategy_id="insidebar_intraday",
+        strategy_version="1.0.0",
+        strategy_params=params,
+        strategy_meta=cfg,
+        compound_enabled=False,
+        compound_equity_basis="cash_only",
+        initial_cash=10000,
+        fees_bps=0,
+        slippage_bps=0,
+    )
+
+    assert not (run_dir / "run_steps.jsonl").exists()
