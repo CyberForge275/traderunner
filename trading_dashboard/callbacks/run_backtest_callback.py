@@ -11,11 +11,14 @@ from trading_dashboard.services.backtest_ui.config_snapshot_service import (
     build_config_params_from_snapshot,
     resolve_insidebar_snapshot,
 )
+from trading_dashboard.services.backtest_ui.job_status_service import (
+    collect_jobs_for_polling,
+    status_icon_payload,
+    status_text,
+)
 
 
 logger = logging.getLogger(__name__)
-TERMINAL_JOB_STATUSES = {"completed", "failed", "error", "failed_precondition"}
-
 try:
     from axiom_bt.utils.trace import trace_ui
 except ModuleNotFoundError:
@@ -26,32 +29,13 @@ except ModuleNotFoundError:
 
 
 def _collect_jobs_for_polling(all_jobs, current_time: float, window_seconds: int = 30):
-    """Select running jobs and recently finished terminal jobs for UI polling."""
-    running_jobs = {jid: j for jid, j in all_jobs.items() if j.get("status") == "running"}
-    recent_jobs = {}
-    for jid, job in all_jobs.items():
-        if job.get("status") not in TERMINAL_JOB_STATUSES:
-            continue
-        ended_at = job.get("ended_at")
-        if not ended_at:
-            continue
-        try:
-            end_time = datetime.fromisoformat(ended_at).timestamp()
-        except Exception:
-            continue
-        if current_time - end_time < window_seconds:
-            recent_jobs[jid] = job
-    return running_jobs, recent_jobs
+    """Compatibility wrapper around job status service."""
+    return collect_jobs_for_polling(all_jobs, current_time, window_seconds)
 
 
 def _status_text(status: str) -> str:
-    mapping = {
-        "completed": "Completed Successfully",
-        "failed": "Failed",
-        "error": "Error",
-        "failed_precondition": "Failed Precondition (Gates Blocked)",
-    }
-    return mapping.get(status, status.replace("_", " ").title() if status else "Unknown")
+    """Compatibility wrapper around job status service."""
+    return status_text(status)
 
 
 def _resolve_ui_backtest_range(
@@ -799,26 +783,12 @@ def register_run_backtest_callback(app):
 
         # Determine status icon based on job states
         status_icon = ""
-        if running_jobs:
+        icon_payload = status_icon_payload(running_jobs, recent_jobs)
+        if icon_payload:
             status_icon = html.Span(
-                "⏳ Running...",
-                style={"color": "#888", "fontSize": "0.9em"}
+                icon_payload["text"],
+                style={"color": icon_payload["color"], "fontSize": "0.9em"}
             )
-        elif recent_jobs:
-            # Check if any completed successfully
-            completed_jobs = [j for j in recent_jobs.values() if j.get("status") == "completed"]
-            failed_jobs = [j for j in recent_jobs.values() if j.get("status") != "completed"]
-
-            if completed_jobs and not failed_jobs:
-                status_icon = html.Span(
-                    "✅ Complete - Click refresh to update results",
-                    style={"color": "green", "fontSize": "0.9em"}
-                )
-            elif failed_jobs:
-                status_icon = html.Span(
-                    "⚠️ Failed - Click refresh to see details",
-                    style={"color": "orange", "fontSize": "0.9em"}
-                )
 
         return html.Div(job_statuses), {"bt_job_running": len(running_jobs) > 0}, status_icon
 
