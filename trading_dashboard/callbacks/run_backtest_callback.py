@@ -32,33 +32,6 @@ except ModuleNotFoundError:
         return None
 
 
-def _collect_jobs_for_polling(all_jobs, current_time: float, window_seconds: int = 30):
-    """Compatibility wrapper around job status service."""
-    return collect_jobs_for_polling(all_jobs, current_time, window_seconds)
-
-
-def _status_text(status: str) -> str:
-    """Compatibility wrapper around job status service."""
-    return status_text(status)
-
-
-def _resolve_ui_backtest_range(
-    date_mode,
-    anchor_date,
-    days_back,
-    explicit_start,
-    explicit_end,
-):
-    """Compatibility wrapper around the dedicated range resolver service."""
-    return resolve_ui_backtest_range(
-        date_mode=date_mode,
-        anchor_date=anchor_date,
-        days_back=days_back,
-        explicit_start=explicit_start,
-        explicit_end=explicit_end,
-    )
-
-
 def register_run_backtest_callback(app):
     """Register callback for running backtests from the UI.
 
@@ -194,7 +167,7 @@ def register_run_backtest_callback(app):
             ])
             return error_msg, run_name, {"bt_job_running": False}, "", None, ""
 
-        start_date, end_date = _resolve_ui_backtest_range(
+        start_date, end_date = resolve_ui_backtest_range(
             date_mode=date_mode,
             anchor_date=anchor_date,
             days_back=days_back,
@@ -639,7 +612,7 @@ def register_run_backtest_callback(app):
 
         import time
         current_time = time.time()
-        running_jobs, recent_jobs = _collect_jobs_for_polling(all_jobs, current_time)
+        running_jobs, recent_jobs = collect_jobs_for_polling(all_jobs, current_time)
 
         if not running_jobs and not recent_jobs:
             # No jobs to display - clear progress and icon
@@ -680,7 +653,7 @@ def register_run_backtest_callback(app):
             if status == "completed":
                 icon = "✅"
                 color = "var(--accent-green)"
-                status_text = _status_text(status)
+                status_text_label = status_text(status)
                 details = []
             else:  # failed/error/failed_precondition
                 # Terminal non-success job: show detailed context where available.
@@ -699,7 +672,7 @@ def register_run_backtest_callback(app):
 
                 progress_display = html.Div([
                     dbc.Alert([
-                        html.H5(_status_text(status), className="alert-heading mb-2"),
+                        html.H5(status_text(status), className="alert-heading mb-2"),
                         html.P(f"Error: {error_msg}", className="mb-2"),
                         html.Small([
                             html.Strong("Job ID: "), job_id, html.Br(),
@@ -736,7 +709,7 @@ def register_run_backtest_callback(app):
                     html.Div(icon, style={"fontSize": "1.2em", "marginRight": "8px", "display": "inline-block"}),
                     html.Div([
                         html.Div(f"{run_name}", style={"fontWeight": "bold", "color": color}),
-                        html.Div(f"{status_text}", style={"fontSize": "0.85em", "marginTop": "2px"}),
+                        html.Div(f"{status_text_label}", style={"fontSize": "0.85em", "marginTop": "2px"}),
                         html.Div(f"Ended: {ended_at[:19] if ended_at else 'N/A'}", style={"fontSize": "0.75em", "color": "var(--text-secondary)", "marginTop": "2px"}),
                         *details,  # Add traceback if present
                     ], style={"display": "inline-block", "verticalAlign": "top"}),
