@@ -338,6 +338,7 @@ _PLUGINS: Dict[str, StrategyPlugin] = {}
 # Minimaler Lazy-Import, nur um InsideBar-Verhalten NICHT zu brechen
 _AUTO_IMPORTS: Dict[str, str] = {
     "insidebar_intraday": "strategies.inside_bar",
+    "confirmed_breakout_intraday": "strategies.confirmed_breakout",
 }
 
 

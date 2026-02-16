@@ -3,6 +3,7 @@
 import logging
 from typing import Dict, Any, Optional
 from src.strategies.config.managers.inside_bar_manager import InsideBarConfigManager
+from src.strategies.config.managers.confirmed_breakout_manager import ConfirmedBreakoutConfigManager
 
 logger = logging.getLogger(__name__)
 
