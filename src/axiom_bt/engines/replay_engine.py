@@ -41,10 +41,26 @@ def _ensure_dtindex_and_ohlcv(df: pd.DataFrame, tz: str) -> pd.DataFrame:
     return df.sort_index()
 
 
-@dataclass
+@dataclass(init=False)
 class Costs:
-    fees_bps: float = 0.0
-    slippage_bps: float = 0.0
+    commission_bps: float
+    slippage_bps: float
+
+    def __init__(
+        self,
+        fees_bps: float | None = None,
+        slippage_bps: float = 0.0,
+        commission_bps: float | None = None,
+    ) -> None:
+        # Canonical field is commission_bps; fees_bps remains input alias.
+        if commission_bps is None:
+            commission_bps = 0.0 if fees_bps is None else float(fees_bps)
+        self.commission_bps = float(commission_bps)
+        self.slippage_bps = float(slippage_bps)
+
+    @property
+    def fees_bps(self) -> float:
+        return self.commission_bps
 
 
 def _apply_slippage(price: float, side: Side, bps: float) -> float:
