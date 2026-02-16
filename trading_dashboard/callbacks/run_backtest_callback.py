@@ -213,9 +213,6 @@ def register_run_backtest_callback(app):
         )
         logger.info(f"🔍 [run_backtest] config_params payload: {config_params}")
 
-        if strategy == "insidebar_intraday_v2":
-            return html.Div("❌ Legacy InsideBar v2 path is not supported in UI", style={"color": "red"}), run_name, {"bt_job_running": False}, "", None, ""
-
         # session_filter is already in config_params from snapshot
 
         job_id = service.start_backtest(
