@@ -41,3 +41,5 @@ def test_execute_backtest_passes_ui_lookback_days_to_pipeline(monkeypatch):
     assert captured["strategy_params"]["lookback_days"] != 1
     assert captured.get("base_config_path") is not None
     assert str(captured["base_config_path"]).endswith("configs/runs/backtest_pipeline_defaults.yaml")
+    assert captured["fees_bps"] == 0.0
+    assert captured["slippage_bps"] == 0.0

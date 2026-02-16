@@ -28,7 +28,7 @@ BASE_CONFIG = REPO_ROOT / "configs" / "runs" / "backtest_pipeline_defaults.yaml"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from core.settings import DEFAULT_INITIAL_CASH, DEFAULT_FEE_BPS, DEFAULT_SLIPPAGE_BPS
+from core.settings import DEFAULT_INITIAL_CASH
 from core.settings.runtime_config import get_marketdata_data_root
 from axiom_bt.pipeline.marketdata_stream_client import (
     MarketdataStreamClient,
@@ -289,8 +289,9 @@ class NewPipelineAdapter:
                         compound_enabled=compound_enabled,
                         compound_equity_basis=compound_equity_basis,
                         initial_cash=DEFAULT_INITIAL_CASH,
-                        fees_bps=DEFAULT_FEE_BPS,
-                        slippage_bps=DEFAULT_SLIPPAGE_BPS,
+                        # Costs are resolved from YAML/overrides in pipeline resolver (SSOT).
+                        fees_bps=0.0,
+                        slippage_bps=0.0,
                         base_config_path=BASE_CONFIG if BASE_CONFIG.exists() else None,
                     )
                     break
