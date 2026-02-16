@@ -16,6 +16,10 @@ from trading_dashboard.services.backtest_ui.job_status_service import (
     status_icon_payload,
     status_text,
 )
+from trading_dashboard.services.backtest_ui.manifest_reader import (
+    parse_run_result,
+    parse_run_steps,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -305,7 +309,6 @@ def register_run_backtest_callback(app):
         """Fetch and display pipeline execution log with progress bar."""
         from pathlib import Path
         from dash import no_update
-        import json
         from ..config import BACKTESTS_DIR
 
         # No active job being tracked
@@ -414,58 +417,19 @@ def register_run_backtest_callback(app):
 
         if steps_file.exists():
             try:
-                # Read all step events
-                step_events = []
-                with open(steps_file) as f:
-                    for line in f:
-                        line = line.strip()
-                        if line:
-                            step_events.append(json.loads(line))
-
-                if step_events:
-                    # Group events by step_index for display
-                    steps_by_index = {}
-                    for event in step_events:
-                        idx = event["step_index"]
-                        if idx not in steps_by_index:
-                            steps_by_index[idx] = []
-                        steps_by_index[idx].append(event)
-
-                    # Build step display elements
+                parsed_steps = parse_run_steps(steps_file)
+                if parsed_steps:
                     step_elements = []
-                    for idx in sorted(steps_by_index.keys()):
-                        events = steps_by_index[idx]
-                        step_name = events[0]["step_name"]
-
-                        # Determine final status
-                        statuses = [e["status"] for e in events]
-                        if "failed" in statuses:
-                            final_status = "failed"
-                            icon = "❌"
-                            color = "#dc3545"
-                        elif "skipped" in statuses:
-                            final_status = "skipped"
-                            icon = "⏭️"
-                            color = "#6c757d"
-                        elif "completed" in statuses:
-                            final_status = "completed"
-                            icon = "✅"
-                            color = "#28a745"
-                        elif "started" in statuses:
-                            final_status = "running"
-                            icon = "⏳"
-                            color = "#ffc107"
-                        else:
-                            final_status = "unknown"
-                            icon = "❔"
-                            color = "#000"
-
+                    for step in parsed_steps:
                         step_elements.append(
                             html.Div([
-                                html.Span(icon, style={"marginRight": "8px", "fontSize": "1.1em"}),
+                                html.Span(step["icon"], style={"marginRight": "8px", "fontSize": "1.1em"}),
                                 html.Span(
-                                    step_name.replace("_", " ").title(),
-                                    style={"fontWeight": "600" if final_status == "running" else "normal", "color": color}
+                                    step["step_name"].replace("_", " ").title(),
+                                    style={
+                                        "fontWeight": "600" if step["final_status"] == "running" else "normal",
+                                        "color": step["color"],
+                                    }
                                 ),
                             ], style={"padding": "6px 0", "display": "flex", "alignItems": "center"})
                         )
@@ -488,13 +452,11 @@ def register_run_backtest_callback(app):
 
         if run_result_file.exists():
             try:
-                with open(run_result_file) as f:
-                    result = json.load(f)
-
-                status = result.get("status", "unknown")
-                reason = result.get("reason")
-                error_id = result.get("error_id")
-                details = result.get("details", {})
+                parsed_result = parse_run_result(run_result_file) or {}
+                status = parsed_result.get("status", "unknown")
+                reason = parsed_result.get("reason")
+                error_id = parsed_result.get("error_id")
+                details = parsed_result.get("details", {})
 
                 if status == "success":
                     return html.Div([
