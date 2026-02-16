@@ -27,7 +27,7 @@ versions:
       max_deviation_atr: 4
   1.0.1:
     required_warmup_bars: 40
-    strategy_finalized: false
+    strategy_finalized: true
     core:
       inside_bar_definition_mode: mb_high__ib_high_and_close_in_mb_range
       atr_period: 8
