@@ -328,7 +328,7 @@ def run_pipeline(
         "status": "success",
         "details": {
             "trades": len(exec_art.trades),
-            "fills": len(fills_art.fills),
+            "fills": len(exec_art.fills),
         },
     }
 
@@ -345,7 +345,7 @@ def run_pipeline(
         out_dir,
         signals_frame=intent_art.signals_frame,
         events_intent=intent_art.events_intent,
-        fills=fills_art.fills,
+        fills=exec_art.fills,
         trades=exec_art.trades,
         equity_curve=exec_art.equity_curve,
         ledger=exec_art.portfolio_ledger,

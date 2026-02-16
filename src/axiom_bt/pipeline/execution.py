@@ -22,6 +22,7 @@ class ExecutionError(ValueError):
 
 @dataclass(frozen=True)
 class ExecutionArtifacts:
+    fills: pd.DataFrame
     trades: pd.DataFrame  # UI contract ready (snake_case)
     equity_curve: pd.DataFrame
     portfolio_ledger: pd.DataFrame
@@ -243,6 +244,111 @@ def _build_trades(
     return merged[cols]
 
 
+def _opposite_side(side: str) -> str:
+    side_up = str(side).upper()
+    return "SELL" if side_up == "BUY" else "BUY"
+
+
+def _build_fill_audit(
+    fills: pd.DataFrame,
+    trades: pd.DataFrame,
+    *,
+    commission_bps: float,
+    slippage_bps: float,
+) -> pd.DataFrame:
+    audited = fills.copy()
+    if audited.empty:
+        for col, default in (
+            ("fill_side", pd.NA),
+            ("fill_qty", 0.0),
+            ("fill_price_ideal", pd.NA),
+            ("fill_price_exec", pd.NA),
+            ("commission_cost", 0.0),
+            ("slippage_cost", 0.0),
+            ("total_cost", 0.0),
+            ("effective_commission_bps", float(commission_bps)),
+            ("effective_slippage_bps", float(slippage_bps)),
+            ("price_semantics", "exec_price_adjustment"),
+        ):
+            audited[col] = default
+        return audited
+
+    trade_by_tpl = trades.set_index("template_id")
+    entry_reasons = {"signal_fill"}
+    exit_reasons = {"stop_loss", "take_profit", "session_end"}
+
+    fill_side: list = []
+    fill_qty: list = []
+    ideal: list = []
+    exec_price: list = []
+    commission_cost: list = []
+    slippage_cost: list = []
+    total_cost: list = []
+    eff_comm_bps: list = []
+    eff_slip_bps: list = []
+
+    for _, row in audited.iterrows():
+        template_id = row.get("template_id")
+        reason = row.get("reason")
+        trade = trade_by_tpl.loc[template_id] if template_id in trade_by_tpl.index else None
+
+        if trade is None or pd.isna(template_id):
+            raw_price = row.get("fill_price")
+            fill_side.append(row.get("side"))
+            fill_qty.append(0.0)
+            ideal.append(raw_price)
+            exec_price.append(raw_price)
+            commission_cost.append(0.0)
+            slippage_cost.append(0.0)
+            total_cost.append(0.0)
+            eff_comm_bps.append(0.0)
+            eff_slip_bps.append(0.0)
+            continue
+
+        qty = float(trade["qty"])
+        trade_side = str(trade["side"]).upper()
+        if reason in entry_reasons:
+            f_side = trade_side
+            p_ideal = float(trade["entry_price"])
+            p_exec = float(trade["entry_exec_price"])
+        elif reason in exit_reasons:
+            f_side = _opposite_side(trade_side)
+            p_ideal = float(trade["exit_price"])
+            p_exec = float(trade["exit_exec_price"])
+        else:
+            raw_price = row.get("fill_price")
+            f_side = row.get("side")
+            p_ideal = float(raw_price) if pd.notna(raw_price) else float("nan")
+            p_exec = p_ideal
+            qty = 0.0
+
+        comm = abs(qty) * abs(p_exec) * (commission_bps / 1e4)
+        slip = abs(qty) * abs(p_exec - p_ideal)
+        total = comm + slip
+
+        fill_side.append(f_side)
+        fill_qty.append(qty)
+        ideal.append(p_ideal)
+        exec_price.append(p_exec)
+        commission_cost.append(comm)
+        slippage_cost.append(slip)
+        total_cost.append(total)
+        eff_comm_bps.append(float(commission_bps))
+        eff_slip_bps.append(float(slippage_bps))
+
+    audited["fill_side"] = fill_side
+    audited["fill_qty"] = fill_qty
+    audited["fill_price_ideal"] = ideal
+    audited["fill_price_exec"] = exec_price
+    audited["commission_cost"] = commission_cost
+    audited["slippage_cost"] = slippage_cost
+    audited["total_cost"] = total_cost
+    audited["effective_commission_bps"] = eff_comm_bps
+    audited["effective_slippage_bps"] = eff_slip_bps
+    audited["price_semantics"] = "exec_price_adjustment"
+    return audited
+
+
 def _equity_from_trades(trades: pd.DataFrame, initial_cash: float) -> pd.DataFrame:
     if trades.empty:
         return pd.DataFrame(columns=["ts", "equity"])
@@ -272,6 +378,12 @@ def execute(
     """
     if fills.empty:
         logger.info("actions: execution_skipped_empty_fills")
+        empty_fills = _build_fill_audit(
+            fills,
+            pd.DataFrame(),
+            commission_bps=commission_bps,
+            slippage_bps=slippage_bps,
+        )
         empty_trades = pd.DataFrame(
             columns=[
                 "template_id",
@@ -295,7 +407,12 @@ def execute(
         )
         empty_equity = pd.DataFrame(columns=["ts", "equity"])
         empty_ledger = pd.DataFrame(columns=["timestamp", "cash", "seq"])
-        return ExecutionArtifacts(trades=empty_trades, equity_curve=empty_equity, portfolio_ledger=empty_ledger)
+        return ExecutionArtifacts(
+            fills=empty_fills,
+            trades=empty_trades,
+            equity_curve=empty_equity,
+            portfolio_ledger=empty_ledger,
+        )
 
     sized_fills = _apply_sizing(fills, initial_cash, compound_enabled)
     trades = _build_trades(
@@ -310,6 +427,12 @@ def execute(
         commission_bps=commission_bps,
         slippage_bps=slippage_bps,
     )
+    audited_fills = _build_fill_audit(
+        sized_fills,
+        trades,
+        commission_bps=commission_bps,
+        slippage_bps=slippage_bps,
+    )
 
     equity_curve = _equity_from_trades(trades, initial_cash)
     ledger = equity_curve.rename(columns={"ts": "timestamp", "equity": "cash"}).reset_index(drop=True)
@@ -317,4 +440,9 @@ def execute(
     logger.info(
         "actions: execution_complete trades=%d compound=%s", len(trades), compound_enabled
     )
-    return ExecutionArtifacts(trades=trades, equity_curve=equity_curve, portfolio_ledger=ledger)
+    return ExecutionArtifacts(
+        fills=audited_fills,
+        trades=trades,
+        equity_curve=equity_curve,
+        portfolio_ledger=ledger,
+    )
