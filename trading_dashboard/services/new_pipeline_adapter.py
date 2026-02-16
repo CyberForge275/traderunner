@@ -29,7 +29,11 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from core.settings import DEFAULT_INITIAL_CASH
-from core.settings.runtime_config import get_marketdata_data_root
+from core.settings.runtime_config import (
+    RuntimeConfigError,
+    get_marketdata_data_root,
+    get_runtime_config,
+)
 from axiom_bt.pipeline.marketdata_stream_client import (
     MarketdataStreamClient,
     build_ensure_request_for_pipeline,
@@ -40,6 +44,13 @@ from axiom_bt.pipeline.data_fetcher import MissingHistoricalDataError as Pipelin
 from trading_dashboard.services.errors import MissingHistoricalDataError
 
 logger = logging.getLogger(__name__)
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in ("1", "true", "yes", "y", "on")
 
 
 class NewPipelineAdapter:
@@ -170,13 +181,15 @@ class NewPipelineAdapter:
             # Prepare bars_path (will be created by data_fetcher)
             bars_snapshot_path = run_dir / "bars_snapshot.parquet"
 
-            consumer_only = os.getenv("PIPELINE_CONSUMER_ONLY", "0").strip().lower() in (
-                "1",
-                "true",
-                "yes",
-                "y",
-                "on",
-            )
+            env_consumer_only = os.getenv("PIPELINE_CONSUMER_ONLY")
+            if env_consumer_only is not None:
+                consumer_only = _env_bool("PIPELINE_CONSUMER_ONLY", False)
+            else:
+                try:
+                    runtime_consumer_only = get_runtime_config().runtime.pipeline_consumer_only
+                except RuntimeConfigError:
+                    runtime_consumer_only = None
+                consumer_only = bool(runtime_consumer_only) if runtime_consumer_only is not None else False
             
             # CRITICAL: Pipeline expects requested_end and lookback_days in strategy_params!
             # Also needs symbol and timeframe for data fetching
@@ -204,9 +217,8 @@ class NewPipelineAdapter:
             self.progress_callback("⚙️ Executing modular pipeline stages...")
 
             # Optional ensure/backfill via marketdata-service before pipeline run.
-            marketdata_stream_url = os.getenv("MARKETDATA_STREAM_URL")
             ensure_req = None
-            md_client = MarketdataStreamClient(base_url=marketdata_stream_url)
+            md_client = MarketdataStreamClient()
             if md_client.is_configured():
                 timeframe_minutes = int(strategy_params.get("timeframe_minutes", 5))
                 lookback_candles = int(strategy_params.get("lookback_candles", 0))
@@ -303,7 +315,7 @@ class NewPipelineAdapter:
                         and ensure_req is not None
                     ):
                         try:
-                            md_client = MarketdataStreamClient(base_url=marketdata_stream_url)
+                            md_client = MarketdataStreamClient()
                             if md_client.is_configured():
                                 logger.info(
                                     "actions: marketdata_stream_ensure_retry run=%s symbol=%s",
