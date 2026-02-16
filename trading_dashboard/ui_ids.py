@@ -99,6 +99,7 @@ class RUN:
     STRATEGY_DROPDOWN = "run:strategy-dropdown"
     VERSION_DROPDOWN = "run:version-dropdown"
     VERSION_LABEL = "run:version-label"
+    CONFIG_PREVIEW = "run:config-preview"
     CONFIG_CONTAINER = "run:config-container"
     RUN_NAME_INPUT = "run:name-input"
     RUN_NAME_PREFIX = "run:name-prefix"

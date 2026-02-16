@@ -7,11 +7,13 @@ metrics, run log, and orders/fills/trades tables.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from dash import dcc, html, dash_table, Input, Output, State
 import dash_bootstrap_components as dbc
 import plotly.express as px
 import pandas as pd
+import yaml
 
 from ..repositories.backtests import list_backtests
 from ..ui_ids import Nav, BT, SSOT, RUN
@@ -20,6 +22,41 @@ from ..components.row_inspector import (
     build_inspector_modal,
 )
 from ..components.time_columns import add_buy_sell_ny_columns
+
+
+def _build_backtest_config_preview() -> html.Div:
+    """Render a small read-only preview of pipeline base config parameters."""
+    cfg_path = Path(__file__).resolve().parents[2] / "configs" / "runs" / "backtest_pipeline_defaults.yaml"
+    rows: list = []
+    if cfg_path.exists():
+        try:
+            data = yaml.safe_load(cfg_path.read_text()) or {}
+            for section in ("backtest", "costs"):
+                section_data = data.get(section, {}) if isinstance(data, dict) else {}
+                if isinstance(section_data, dict):
+                    for key, value in section_data.items():
+                        rows.append(html.Li(f"{section}.{key}: {value}"))
+        except Exception:
+            rows = [html.Li("config preview unavailable (parse error)")]
+    else:
+        rows = [html.Li("config preview unavailable (file missing)")]
+
+    return html.Div(
+        id=RUN.CONFIG_PREVIEW,
+        children=[
+            html.Div("Resolved Base Parameters", style={"fontWeight": "bold", "marginBottom": "6px"}),
+            html.Ul(rows, style={"marginBottom": "10px", "paddingLeft": "20px"}),
+        ],
+        style={
+            "backgroundColor": "rgba(255,255,255,0.04)",
+            "border": "1px solid rgba(255,255,255,0.12)",
+            "borderRadius": "6px",
+            "padding": "8px 10px",
+            "marginBottom": "10px",
+            "fontSize": "0.9em",
+            "color": "var(--text-secondary)",
+        },
+    )
 
 
 def _create_backtests_table(df):
@@ -848,6 +885,7 @@ def create_backtests_layout():
         className="dashboard-card",
         children=[
             html.H6("📊 New Backtest Configuration", style={"marginBottom": "15px"}),
+            _build_backtest_config_preview(),
 
             # Strategy selector
             html.Label("Strategy", style={"fontWeight": "bold", "marginTop": "8px"}),
