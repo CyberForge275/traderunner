@@ -90,6 +90,14 @@ def main(argv=None) -> int:
         initial_cash=args.initial_cash,
         fees_bps=args.fees_bps,
         slippage_bps=args.slippage_bps,
+        config_overrides={
+            "ui": {},
+            "cli": {
+                "backtest": {"initial_cash": args.initial_cash},
+                "costs": {"fees_bps": args.fees_bps, "slippage_bps": args.slippage_bps},
+            },
+            "spyder": {},
+        },
     )
     return 0
 

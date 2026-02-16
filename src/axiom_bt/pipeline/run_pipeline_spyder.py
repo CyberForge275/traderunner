@@ -83,4 +83,12 @@ if __name__ == "__main__":
             initial_cash=10000.0,
             fees_bps=2.0,
             slippage_bps=1.0,
+            config_overrides={
+                "ui": {},
+                "cli": {},
+                "spyder": {
+                    "backtest": {"initial_cash": 10000.0},
+                    "costs": {"fees_bps": 2.0, "slippage_bps": 1.0},
+                },
+            },
         )

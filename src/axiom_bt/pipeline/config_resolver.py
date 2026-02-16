@@ -87,10 +87,13 @@ def resolve_config(
         resolved["costs"] = costs
         sources["costs"] = "default"
 
-    if "commission_bps" not in costs and "fees_bps" in costs:
-        costs["commission_bps"] = costs["fees_bps"]
-        if "costs.fees_bps" in sources:
-            sources["costs.commission_bps"] = sources["costs.fees_bps"]
+    if "fees_bps" in costs:
+        commission_source = sources.get("costs.commission_bps")
+        fees_source = sources.get("costs.fees_bps")
+        if "commission_bps" not in costs or commission_source == "default":
+            costs["commission_bps"] = costs["fees_bps"]
+            if fees_source:
+                sources["costs.commission_bps"] = fees_source
 
     if "commission_bps" in costs:
         costs["fees_bps"] = costs["commission_bps"]

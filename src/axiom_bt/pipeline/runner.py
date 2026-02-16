@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import math
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 from .data_prep import load_bars_snapshot
 from .data_fetcher import ensure_and_snapshot_bars, DataFetcherError
@@ -17,6 +18,7 @@ from axiom_bt.contracts.signal_frame_contract_v1 import compute_schema_fingerpri
 from .execution import execute
 from .metrics import compute_and_write_metrics
 from .artifacts import write_artifacts
+from .config_resolver import load_base_config, resolve_config
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,8 @@ def run_pipeline(
     initial_cash: float,
     fees_bps: float,
     slippage_bps: float,
+    base_config_path: Optional[Path] = None,
+    config_overrides: Optional[Dict] = None,
 ) -> None:
     """End-to-end pipeline orchestrator (headless/CLI).
 
@@ -253,6 +257,25 @@ def run_pipeline(
     # [Reporting Layer]: Calculate standardized performance metrics and risk ratios from the finalized trade history and equity curve.
     metrics = compute_and_write_metrics(exec_art.trades, exec_art.equity_curve, initial_cash, out_dir / "metrics.json")
 
+    defaults_cfg = {
+        "backtest": {
+            "initial_cash": 10000.0,
+            "fixed_qty": 0,
+        },
+        "costs": {
+            "commission_bps": 0.0,
+            "slippage_bps": 0.0,
+            "price_semantics": "exec_price_adjustment",
+            "price_source": "last",
+        },
+    }
+    base_cfg = load_base_config(base_config_path) if base_config_path else {}
+    overrides_cfg = config_overrides or {}
+    resolved_cfg = resolve_config(base=base_cfg, overrides=overrides_cfg, defaults=defaults_cfg)
+    base_config_sha256 = None
+    if base_config_path:
+        base_config_sha256 = hashlib.sha256(base_config_path.read_bytes()).hexdigest()
+
     manifest_fields = {
         "run_id": run_id,
         "params": {
@@ -265,6 +288,18 @@ def run_pipeline(
             "initial_cash": initial_cash,
             "fees_bps": fees_bps,
             "slippage_bps": slippage_bps,
+        },
+        "config": {
+            "base_config_path": str(base_config_path) if base_config_path else None,
+            "base_config_sha256": base_config_sha256,
+            "overrides": {
+                "ui": (overrides_cfg.get("ui") if isinstance(overrides_cfg, dict) else None) or {},
+                "cli": (overrides_cfg.get("cli") if isinstance(overrides_cfg, dict) else None) or {},
+                "spyder": (overrides_cfg.get("spyder") if isinstance(overrides_cfg, dict) else None) or {},
+            },
+            "resolved": resolved_cfg.resolved,
+            "sources": resolved_cfg.sources,
+            "unknown_keys": resolved_cfg.unknown_keys,
         },
         "hashes": {
             "bars_hash": bars_hash,
