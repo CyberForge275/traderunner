@@ -126,3 +126,5 @@ dashboard.pid
 backups/
 # Spyder project files
 .spyproject/
+# Linux nohup output
+nohup.out
