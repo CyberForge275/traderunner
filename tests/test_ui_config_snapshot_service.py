@@ -86,3 +86,20 @@ def test_build_config_params_from_snapshot_compound_on_defaults_basis():
     )
     assert cfg["backtesting"]["compound_sizing"] is True
     assert cfg["backtesting"]["compound_equity_basis"] == "cash_only"
+
+
+def test_build_config_params_from_snapshot_supports_confirmed_breakout():
+    snapshot = {
+        "core": {"atr_period": 8},
+        "tunable": {"lookback_candles": 50},
+    }
+    cfg = build_config_params_from_snapshot(
+        strategy="confirmed_breakout_intraday",
+        version_to_use="1.0.0",
+        snapshot=snapshot,
+        compound_toggle_val=[],
+        equity_basis_val="cash_only",
+    )
+    assert cfg["atr_period"] == 8
+    assert cfg["lookback_candles"] == 50
+    assert cfg["strategy_version"] == "1.0.0"

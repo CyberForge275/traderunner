@@ -110,9 +110,16 @@ def register_run_backtest_callback(app):
         # CRITICAL: Validate version is provided (mandatory for strategy lab progression)
         import re
         version_to_use = None
+        from src.strategies.config.registry import config_manager_registry
+        config_manager = config_manager_registry.get_manager(strategy) if strategy else None
 
-        # SSOT: Logic for migrated strategies (InsideBar)
-        if strategy == "insidebar_intraday":
+        # Legacy v2 path removed (inputs no longer exist)
+        if strategy in ["insidebar_intraday_v2"]:
+            error_msg = html.Div("❌ Legacy InsideBar v2 path is not supported in UI", style={"color": "red"})
+            return error_msg, run_name, {"bt_job_running": False}, "", None, ""
+
+        # SSOT: All registered strategy managers are migrated in runner callback
+        if config_manager:
             try:
                 bt_config_snapshot = resolve_insidebar_snapshot(
                     strategy_id=strategy,
@@ -130,21 +137,15 @@ def register_run_backtest_callback(app):
             if not version_to_use:
                 error_msg = html.Div("❌ Strategy version missing in snapshot", style={"color": "red"})
                 return error_msg, run_name, {"bt_job_running": False}, "", None, ""
-        
-        # Legacy v2 path removed (inputs no longer exist)
-        elif strategy in ["insidebar_intraday_v2"]:
-            error_msg = html.Div("❌ Legacy InsideBar v2 path is not supported in UI", style={"color": "red"})
-            return error_msg, run_name, {"bt_job_running": False}, "", None, ""
-        
-        # New Strategy: check if it's in registry but not migrated
-        else:
-            from src.strategies.config.registry import config_manager_registry
-            if config_manager_registry.get_manager(strategy):
-                error_msg = html.Div([
-                    html.Span("⚠️ Strategy not migrated yet. ", style={"color": "orange", "fontWeight": "bold"}),
-                    html.Span(f"Strategy '{strategy}' is registered but the runner interface is not yet updated for it."),
-                ])
-                return error_msg, run_name, {"bt_job_running": False}, "", None, ""
+        elif strategy:
+            return (
+                html.Div(f"❌ No SSOT config manager found for strategy '{strategy}'", style={"color": "red"}),
+                run_name,
+                {"bt_job_running": False},
+                "",
+                None,
+                "",
+            )
 
         # Validate inputs
         if not strategy or not symbols_str or not timeframe:
@@ -184,7 +185,7 @@ def register_run_backtest_callback(app):
 
         # Build strategy parameters dict from UI inputs
         config_params = {}
-        if strategy == "insidebar_intraday":
+        if config_manager:
             config_params = build_config_params(
                 strategy, 
                 version_to_use, 

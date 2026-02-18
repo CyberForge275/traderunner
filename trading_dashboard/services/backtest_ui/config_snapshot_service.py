@@ -46,18 +46,21 @@ def build_config_params_from_snapshot(
     equity_basis_val,
 ) -> Dict[str, Any]:
     """Build runner config params from SSOT snapshot (parity behavior)."""
-    config_params: Dict[str, Any] = {}
-    if strategy == "insidebar_intraday":
-        snapshot = snapshot or {}
-        core = snapshot.get("core", {})
-        tunable = snapshot.get("tunable", {})
-        config_params = {**core, **tunable}
-        config_params["strategy_version"] = version_to_use
+    snapshot = snapshot or {}
+    core = snapshot.get("core", {}) if isinstance(snapshot, dict) else {}
+    tunable = snapshot.get("tunable", {}) if isinstance(snapshot, dict) else {}
+    if not isinstance(core, dict):
+        core = {}
+    if not isinstance(tunable, dict):
+        tunable = {}
 
-        compound_enabled = "enabled" in (compound_toggle_val or [])
-        if compound_enabled:
-            config_params["backtesting"] = {
-                "compound_sizing": True,
-                "compound_equity_basis": equity_basis_val or "cash_only",
-            }
+    config_params: Dict[str, Any] = {**core, **tunable}
+    config_params["strategy_version"] = version_to_use
+
+    compound_enabled = "enabled" in (compound_toggle_val or [])
+    if compound_enabled:
+        config_params["backtesting"] = {
+            "compound_sizing": True,
+            "compound_equity_basis": equity_basis_val or "cash_only",
+        }
     return config_params

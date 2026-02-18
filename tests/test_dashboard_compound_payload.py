@@ -48,3 +48,20 @@ def test_build_config_params_defaults():
     )
     
     assert params["backtesting"]["compound_equity_basis"] == "cash_only"
+
+
+def test_build_config_params_confirmed_breakout():
+    snapshot = {
+        "core": {"atr_period": 8},
+        "tunable": {"lookback_candles": 50},
+    }
+    params = build_config_params(
+        "confirmed_breakout_intraday",
+        "1.0.0",
+        snapshot,
+        [],
+        "cash_only",
+    )
+    assert params["atr_period"] == 8
+    assert params["lookback_candles"] == 50
+    assert params["strategy_version"] == "1.0.0"
