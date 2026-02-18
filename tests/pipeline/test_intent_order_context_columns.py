@@ -1,6 +1,12 @@
 import pandas as pd
 
-from axiom_bt.pipeline.signals import generate_intent
+from strategies.intent_registry import get_strategy_adapter
+
+
+def generate_intent(signals_frame, strategy_id, strategy_version, params):
+    return get_strategy_adapter(strategy_id).generate_intent(
+        signals_frame, strategy_id, strategy_version, params
+    )
 
 
 def test_generate_intent_adds_sig_context_columns():
@@ -15,6 +21,7 @@ def test_generate_intent_adds_sig_context_columns():
                 "entry_price": 100.0,
                 "stop_price": 99.0,
                 "take_profit_price": 102.0,
+                "oco_group_id": "g1",
                 "exit_ts": pd.NaT,
                 "exit_reason": None,
                 "atr": 0.5,
@@ -25,7 +32,15 @@ def test_generate_intent_adds_sig_context_columns():
         ]
     )
 
-    artifacts = generate_intent(signals_frame, "insidebar_intraday", "1.0.1", params={})
+    artifacts = generate_intent(
+        signals_frame,
+        "insidebar_intraday",
+        "1.0.1",
+        params={
+            "valid_from_policy": "signal_ts",
+            "timeframe_minutes": 5,
+        },
+    )
     events_intent = artifacts.events_intent
 
     assert "sig_atr" in events_intent.columns

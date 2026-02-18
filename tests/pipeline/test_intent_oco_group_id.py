@@ -1,6 +1,12 @@
 import pandas as pd
 
-from axiom_bt.pipeline.signals import generate_intent
+from strategies.intent_registry import get_strategy_adapter
+
+
+def generate_intent(signals_frame, strategy_id, strategy_version, params):
+    return get_strategy_adapter(strategy_id).generate_intent(
+        signals_frame, strategy_id, strategy_version, params
+    )
 
 
 def _signal_row(ts, side, entry, stop, tp, template_id, oco_group_id):

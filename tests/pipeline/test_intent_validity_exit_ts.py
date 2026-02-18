@@ -1,6 +1,12 @@
 import pandas as pd
 
-from axiom_bt.pipeline.signals import generate_intent
+from strategies.intent_registry import get_strategy_adapter
+
+
+def generate_intent(signals_frame, strategy_id, strategy_version, params):
+    return get_strategy_adapter(strategy_id).generate_intent(
+        signals_frame, strategy_id, strategy_version, params
+    )
 
 
 def test_intent_exit_ts_session_end_and_dbg_valid_to():
@@ -15,6 +21,7 @@ def test_intent_exit_ts_session_end_and_dbg_valid_to():
                 "entry_price": 100.0,
                 "stop_price": 99.0,
                 "take_profit_price": 102.0,
+                "oco_group_id": "g1",
             }
         ]
     )

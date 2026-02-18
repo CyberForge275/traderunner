@@ -2,8 +2,14 @@ import pandas as pd
 
 from strategies.inside_bar.session_logic import generate_signals
 from strategies.inside_bar.config import InsideBarConfig, SessionFilter
-from axiom_bt.pipeline.signals import generate_intent
+from strategies.intent_registry import get_strategy_adapter
 from axiom_bt.pipeline.fill_model import generate_fills
+
+
+def generate_intent(signals_frame, strategy_id, strategy_version, params):
+    return get_strategy_adapter(strategy_id).generate_intent(
+        signals_frame, strategy_id, strategy_version, params
+    )
 
 
 def _bars():
