@@ -166,10 +166,11 @@ def extend_insidebar_signal_frame_from_core(
                 mother_color = _candle_color(float(df.at[mother_idx, "open"]), float(df.at[mother_idx, "close"]))
                 inside_color = _candle_color(float(df.at[ib_idx_int, "open"]), float(df.at[ib_idx_int, "close"]))
                 same_color = mother_color != 0 and mother_color == inside_color
-                if same_color:
-                    allowed_side = "BUY" if mother_color > 0 else "SELL"
-                    if sig.side != allowed_side:
-                        continue
+                if not same_color:
+                    continue
+                allowed_side = "BUY" if mother_color > 0 else "SELL"
+                if sig.side != allowed_side:
+                    continue
 
         base_template_id = f"{STRATEGY_TAG}_{df.at[idx, 'symbol']}_{ts.strftime('%Y%m%d_%H%M%S')}"
         oco_group_id = f"{df.at[idx, 'symbol']}_{ts.isoformat()}_{df.at[idx, 'strategy_id']}_{df.at[idx, 'strategy_version']}_{base_template_id}"

@@ -90,7 +90,7 @@ def test_confirmed_breakout_intraday_schema_unchanged(monkeypatch):
     assert out["signal_side"].dtype == object
 
 
-def test_same_color_continuation_filters_one_side_only(monkeypatch):
+def test_same_color_required_and_continuation_filters_one_side_only(monkeypatch):
     bars = _bars()
 
     def _signals(*_args, **_kwargs):
@@ -129,7 +129,7 @@ def test_same_color_continuation_filters_one_side_only(monkeypatch):
                 take_profit=100.5,
                 metadata={"ib_idx": 4, "sig_idx": 5},
             ),
-            # Mixed (GR) -> both sides remain (legacy)
+            # Mixed (GR) -> both sides must be dropped (same_color required)
             RawSignal(
                 timestamp=pd.to_datetime(bars.loc[8, "timestamp"], utc=True),
                 side="BUY",
@@ -159,4 +159,4 @@ def test_same_color_continuation_filters_one_side_only(monkeypatch):
 
     assert set(gg_rows["signal_side"].tolist()) == {"BUY"}
     assert set(rr_rows["signal_side"].tolist()) == {"SELL"}
-    assert set(mixed_rows["signal_side"].tolist()) == {"BUY", "SELL"}
+    assert mixed_rows.empty
