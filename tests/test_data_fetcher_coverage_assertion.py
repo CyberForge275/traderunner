@@ -24,7 +24,7 @@ def _write_derived_m5(path: Path, start: str, end: str) -> None:
     df.to_parquet(path)
 
 
-def test_raises_when_requested_lookback_not_covered(monkeypatch, tmp_path: Path):
+def test_consumer_does_not_fail_when_producer_ok_even_if_local_bounds_short(monkeypatch, tmp_path: Path):
     from core.settings.runtime_config import reset_runtime_config_for_tests
 
     cfg = tmp_path / "trading.yaml"
@@ -38,22 +38,22 @@ paths:
     reset_runtime_config_for_tests()
     monkeypatch.setenv("TRADING_CONFIG", str(cfg))
 
-    # Only about 10 days of bars available.
+    # Local file does not reach requested_end, but consumer must not apply its own gap semantics.
     _write_derived_m5(
         tmp_path / "derived" / "tf_m5" / "HOOD.parquet",
         start="2026-02-01 14:30:00",
-        end="2026-02-10 19:55:00",
+        end="2026-02-13 19:55:00",
     )
 
-    with pytest.raises(MissingHistoricalDataError, match="before_existing_data"):
-        ensure_and_snapshot_bars(
-            run_dir=tmp_path / "run",
-            symbol="HOOD",
-            timeframe="M5",
-            requested_end="2026-02-10",
-            lookback_days=30,
-            market_tz="America/New_York",
-        )
+    out = ensure_and_snapshot_bars(
+        run_dir=tmp_path / "run",
+        symbol="HOOD",
+        timeframe="M5",
+        requested_end="2026-02-17",
+        lookback_days=30,
+        market_tz="America/New_York",
+    )
+    assert Path(out["exec_path"]).exists()
 
 
 def test_passes_when_lookback_is_within_available_coverage(monkeypatch, tmp_path: Path):

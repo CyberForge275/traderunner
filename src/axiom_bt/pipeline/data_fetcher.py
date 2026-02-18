@@ -43,49 +43,6 @@ def _timeframe_minutes(timeframe: str) -> int:
     raise DataFetcherError(f"unsupported timeframe '{timeframe}' (expected M1/M5/M15/H1/D1)")
 
 
-def _coverage_gaps_from_bounds(
-    *,
-    expected_start: pd.Timestamp,
-    expected_end: pd.Timestamp,
-    actual_min: pd.Timestamp,
-    actual_max: pd.Timestamp,
-    slack_start_days: int,
-    slack_end_days: int,
-) -> list[dict[str, object]]:
-    gaps: list[dict[str, object]] = []
-
-    start_threshold = expected_start + pd.Timedelta(days=slack_start_days)
-    end_threshold = expected_end - pd.Timedelta(days=slack_end_days)
-
-    if actual_min > start_threshold:
-        gap_start = expected_start.date()
-        gap_end = (actual_min - pd.Timedelta(days=1)).date()
-        if gap_end >= gap_start:
-            gaps.append(
-                {
-                    "gap_start": gap_start.isoformat(),
-                    "gap_end": gap_end.isoformat(),
-                    "gap_days": (gap_end - gap_start).days + 1,
-                    "reason": "before_existing_data",
-                }
-            )
-
-    if actual_max < end_threshold:
-        gap_start = (actual_max + pd.Timedelta(days=1)).date()
-        gap_end = expected_end.date()
-        if gap_end >= gap_start:
-            gaps.append(
-                {
-                    "gap_start": gap_start.isoformat(),
-                    "gap_end": gap_end.isoformat(),
-                    "gap_days": (gap_end - gap_start).days + 1,
-                    "reason": "after_existing_data",
-                }
-            )
-
-    return gaps
-
-
 def ensure_and_snapshot_bars(
     *,
     run_dir: Path,
@@ -195,35 +152,14 @@ def ensure_and_snapshot_bars(
             "Backfill required (Option B): run marketdata_service.backfill_cli or call producer /ensure_timeframe_bars."
         )
 
-    actual_min = df_filtered.index.min()
-    actual_max = df_filtered.index.max()
-    gaps = _coverage_gaps_from_bounds(
-        expected_start=effective_start,
-        expected_end=end_ts,
-        actual_min=actual_min,
-        actual_max=actual_max,
-        slack_start_days=7,
-        slack_end_days=2,
-    )
-    coverage_ok = not gaps
     logger.info(
-        "actions: derived_timeframe_coverage_check symbol=%s tf_m=%s expected_start=%s expected_end=%s "
-        "actual_min=%s actual_max=%s slack_start_days=%s slack_end_days=%s coverage_ok=%s",
+        "actions: derived_timeframe_loaded symbol=%s tf_m=%s effective_start=%s requested_end=%s rows=%d",
         symbol,
         tf_minutes,
         effective_start.isoformat(),
         end_ts.isoformat(),
-        actual_min.isoformat(),
-        actual_max.isoformat(),
-        7,
-        2,
-        coverage_ok,
+        len(df_filtered),
     )
-    if not coverage_ok:
-        raise MissingHistoricalDataError(
-            f"insufficient_derived_coverage for {symbol} tf={tf_upper} range={effective_start.date()}..{end_ts.date()}; "
-            f"gaps={gaps}. Backfill required (Option B): run marketdata_service.backfill_cli or call producer /ensure_timeframe_bars."
-        )
 
     target_exec = bars_dir / f"bars_exec_{tf_upper}_rth.parquet"
     signal_target = target_exec if tf_upper in {"M1", "H1"} else bars_dir / f"bars_signal_{tf_upper}_rth.parquet"

@@ -133,6 +133,14 @@ def extend_insidebar_signal_frame_from_core(
 
     # Map signals into frame (allow multiple legs per bar via row append)
     appended_rows = []
+
+    def _candle_color(open_v: float, close_v: float) -> int:
+        if close_v > open_v:
+            return 1
+        if close_v < open_v:
+            return -1
+        return 0
+
     for sig in signals:
         ts = pd.to_datetime(sig.timestamp, utc=True)
         meta = sig.metadata or {}
@@ -149,6 +157,19 @@ def extend_insidebar_signal_frame_from_core(
                 )
                 continue
             idx = int(match_idx[0])
+
+        ib_idx = meta.get("ib_idx")
+        if isinstance(ib_idx, (int, float)) and 0 <= int(ib_idx) < len(df):
+            ib_idx_int = int(ib_idx)
+            if ib_idx_int > 0:
+                mother_idx = ib_idx_int - 1
+                mother_color = _candle_color(float(df.at[mother_idx, "open"]), float(df.at[mother_idx, "close"]))
+                inside_color = _candle_color(float(df.at[ib_idx_int, "open"]), float(df.at[ib_idx_int, "close"]))
+                same_color = mother_color != 0 and mother_color == inside_color
+                if same_color:
+                    allowed_side = "BUY" if mother_color > 0 else "SELL"
+                    if sig.side != allowed_side:
+                        continue
 
         base_template_id = f"{STRATEGY_TAG}_{df.at[idx, 'symbol']}_{ts.strftime('%Y%m%d_%H%M%S')}"
         oco_group_id = f"{df.at[idx, 'symbol']}_{ts.isoformat()}_{df.at[idx, 'strategy_id']}_{df.at[idx, 'strategy_version']}_{base_template_id}"
@@ -183,7 +204,6 @@ def extend_insidebar_signal_frame_from_core(
         if "atr" in meta:
             row["atr"] = meta["atr"]
 
-        ib_idx = meta.get("ib_idx")
         if isinstance(ib_idx, (int, float)) and 0 <= int(ib_idx) < len(df):
             ib_idx = int(ib_idx)
             # Mark the IB row itself for indicators

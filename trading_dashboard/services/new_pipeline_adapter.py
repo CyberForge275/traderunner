@@ -264,6 +264,18 @@ class NewPipelineAdapter:
                     len(ensure_res.get("gaps_before", []) or []),
                     len(ensure_res.get("gaps_after", []) or []),
                 )
+                status = str(ensure_res.get("status", "")).lower()
+                gaps_after = ensure_res.get("gaps_after", []) or []
+                if status != "ok" or gaps_after:
+                    raise MissingHistoricalDataError(
+                        symbol=symbol,
+                        requested_range=f"{ensure_req.start_date}..{ensure_req.end_date}",
+                        reason="ensure_bars_failed",
+                        hint=(
+                            "marketdata-service /ensure_timeframe_bars reported unresolved coverage: "
+                            f"status={ensure_res.get('status')} gaps_after={gaps_after}"
+                        ),
+                    )
             
             # Call NEW MODULAR PIPELINE (CORRECT!)
             # This function returns void - writes all artifacts directly
