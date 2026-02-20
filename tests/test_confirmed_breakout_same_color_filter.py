@@ -165,10 +165,17 @@ def test_same_color_required_and_continuation_filters_one_side_only(monkeypatch)
 
 def test_range_ratio_gate_blocks_outside_band_and_zero_mother_range(monkeypatch):
     bars = _bars()
-    # bad ratio for GG candidate at ib_idx=1: mother range=1.0, inside range=0.2 -> 0.2 (blocked)
-    bars.loc[1, ["high", "low"]] = [100.6, 100.4]
-    # zero mother range for RR candidate at ib_idx=4: mother idx=3 high==low (blocked)
-    bars.loc[3, ["high", "low"]] = [101.5, 101.5]
+    # ratio=0.73 for GG candidate at ib_idx=1 -> allowed with lower bound 0.72
+    bars.loc[0, ["high", "low"]] = [101.2, 100.2]  # mother range=1.0
+    bars.loc[1, ["high", "low"]] = [100.93, 100.20]  # inside range=0.73
+
+    # ratio=0.70 for RR candidate at ib_idx=4 -> blocked
+    bars.loc[3, ["high", "low"]] = [102.0, 101.0]  # mother range=1.0
+    bars.loc[4, ["high", "low"]] = [101.75, 101.05]  # inside range=0.70
+
+    # mother_range<=0 for GG candidate at ib_idx=7 -> blocked
+    bars.loc[6, ["high", "low"]] = [102.5, 102.5]
+    bars.loc[7, "close"] = 102.9  # make inside candle green to avoid color filter being the blocker
 
     def _signals(*_args, **_kwargs):
         return [
@@ -188,6 +195,14 @@ def test_range_ratio_gate_blocks_outside_band_and_zero_mother_range(monkeypatch)
                 take_profit=100.5,
                 metadata={"ib_idx": 4, "sig_idx": 5},
             ),
+            RawSignal(
+                timestamp=pd.to_datetime(bars.loc[8, "timestamp"], utc=True),
+                side="BUY",
+                entry_price=102.75,
+                stop_loss=102.5,
+                take_profit=103.2,
+                metadata={"ib_idx": 7, "sig_idx": 8},
+            ),
         ]
 
     monkeypatch.setattr("strategies.confirmed_breakout.InsideBarCore.process_data", _signals)
@@ -195,4 +210,5 @@ def test_range_ratio_gate_blocks_outside_band_and_zero_mother_range(monkeypatch)
     out = extend_insidebar_signal_frame_from_core(bars, _params())
     signal_rows = out[out["signal_side"].notna()].copy()
 
-    assert signal_rows.empty
+    kept_ts = signal_rows["timestamp"].tolist()
+    assert kept_ts == [pd.to_datetime(bars.loc[2, "timestamp"], utc=True)]
