@@ -77,6 +77,22 @@ def _create_input_for_param(key, value, section, spec):
         ])
 
 
+def _normalize_new_version_input(*, is_finalized, current_version, new_version):
+    """Normalize new_version input and return (normalized_value, error_message)."""
+    new_version_value = new_version.strip() if isinstance(new_version, str) else ""
+
+    if is_finalized and not new_version_value:
+        return "", "❌ Finalized versions require new version number"
+
+    if new_version_value == current_version:
+        # Draft versions may be saved in-place repeatedly.
+        if not is_finalized:
+            return "", None
+        return "", f"❌ New version must differ from current ({current_version})"
+
+    return new_version_value, None
+
+
 def register_ssot_config_viewer_callback(app):
     """Register callbacks for editable SSOT config viewer."""
     
@@ -311,19 +327,15 @@ def register_ssot_config_viewer_callback(app):
             return status, no_update, no_update, no_update, no_update
         
         is_finalized = loaded_defaults.get("strategy_finalized", False)
-        new_version_value = new_version.strip() if new_version else ""
-        
-        # Validation
-        if is_finalized and not new_version_value:
+        new_version_value, validation_error = _normalize_new_version_input(
+            is_finalized=is_finalized,
+            current_version=current_version,
+            new_version=new_version,
+        )
+
+        if validation_error:
             status = html.Div(
-                "❌ Finalized versions require new version number",
-                style={"color": "#ff6b6b", "fontSize": "0.85em"}
-            )
-            return status, no_update, no_update, no_update, no_update
-        
-        if new_version_value == current_version:
-            status = html.Div(
-                f"❌ New version must differ from current ({current_version})",
+                validation_error,
                 style={"color": "#ff6b6b", "fontSize": "0.85em"}
             )
             return status, no_update, no_update, no_update, no_update
