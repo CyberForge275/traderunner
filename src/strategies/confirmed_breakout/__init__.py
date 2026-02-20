@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 STRATEGY_ID = "confirmed_breakout_intraday"
 STRATEGY_TAG = "cb"
-_RANGE_RATIO_MIN = 0.751
+_RANGE_RATIO_MIN = 0.72
 _RANGE_RATIO_MAX = 0.912
 
 
