@@ -46,8 +46,9 @@ def _bars() -> pd.DataFrame:
         {
             "timestamp": ts,
             "open": [100.0, 100.5, 100.8, 102.0, 101.6, 101.3, 103.0, 102.8, 102.7],
-            "high": [101.2, 100.9, 101.1, 102.2, 101.8, 101.5, 103.2, 102.9, 102.8],
-            "low": [99.8, 100.1, 100.6, 100.9, 101.1, 101.0, 102.4, 102.3, 102.5],
+            # Keep mother/inside ranges around ratio ~0.8 for accepted fixtures.
+            "high": [101.2, 100.9, 101.1, 102.0, 101.8, 101.5, 103.2, 102.9, 102.8],
+            "low": [100.2, 100.1, 100.6, 101.0, 101.0, 101.0, 102.4, 102.3, 102.5],
             "close": [101.0, 100.7, 100.9, 101.2, 101.2, 101.1, 103.1, 102.6, 102.75],
             "volume": [1000] * 9,
         }
@@ -160,3 +161,38 @@ def test_same_color_required_and_continuation_filters_one_side_only(monkeypatch)
     assert set(gg_rows["signal_side"].tolist()) == {"BUY"}
     assert set(rr_rows["signal_side"].tolist()) == {"SELL"}
     assert mixed_rows.empty
+
+
+def test_range_ratio_gate_blocks_outside_band_and_zero_mother_range(monkeypatch):
+    bars = _bars()
+    # bad ratio for GG candidate at ib_idx=1: mother range=1.0, inside range=0.2 -> 0.2 (blocked)
+    bars.loc[1, ["high", "low"]] = [100.6, 100.4]
+    # zero mother range for RR candidate at ib_idx=4: mother idx=3 high==low (blocked)
+    bars.loc[3, ["high", "low"]] = [101.5, 101.5]
+
+    def _signals(*_args, **_kwargs):
+        return [
+            RawSignal(
+                timestamp=pd.to_datetime(bars.loc[2, "timestamp"], utc=True),
+                side="BUY",
+                entry_price=101.0,
+                stop_loss=100.5,
+                take_profit=102.0,
+                metadata={"ib_idx": 1, "sig_idx": 2},
+            ),
+            RawSignal(
+                timestamp=pd.to_datetime(bars.loc[5, "timestamp"], utc=True),
+                side="SELL",
+                entry_price=101.1,
+                stop_loss=101.4,
+                take_profit=100.5,
+                metadata={"ib_idx": 4, "sig_idx": 5},
+            ),
+        ]
+
+    monkeypatch.setattr("strategies.confirmed_breakout.InsideBarCore.process_data", _signals)
+
+    out = extend_insidebar_signal_frame_from_core(bars, _params())
+    signal_rows = out[out["signal_side"].notna()].copy()
+
+    assert signal_rows.empty

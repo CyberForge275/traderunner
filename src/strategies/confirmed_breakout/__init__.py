@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 STRATEGY_ID = "confirmed_breakout_intraday"
 STRATEGY_TAG = "cb"
+_RANGE_RATIO_MIN = 0.751
+_RANGE_RATIO_MAX = 0.912
 
 
 def _core_config_from_params(params: dict) -> InsideBarConfig:
@@ -163,6 +165,13 @@ def extend_insidebar_signal_frame_from_core(
             ib_idx_int = int(ib_idx)
             if ib_idx_int > 0:
                 mother_idx = ib_idx_int - 1
+                mother_range = float(df.at[mother_idx, "high"]) - float(df.at[mother_idx, "low"])
+                if mother_range <= 0:
+                    continue
+                inside_range = float(df.at[ib_idx_int, "high"]) - float(df.at[ib_idx_int, "low"])
+                range_ratio = inside_range / mother_range
+                if range_ratio < _RANGE_RATIO_MIN or range_ratio > _RANGE_RATIO_MAX:
+                    continue
                 mother_color = _candle_color(float(df.at[mother_idx, "open"]), float(df.at[mother_idx, "close"]))
                 inside_color = _candle_color(float(df.at[ib_idx_int, "open"]), float(df.at[ib_idx_int, "close"]))
                 same_color = mother_color != 0 and mother_color == inside_color
