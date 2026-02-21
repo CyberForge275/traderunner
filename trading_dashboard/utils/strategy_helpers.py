@@ -20,6 +20,12 @@ def get_available_strategies():
     return list_strategies()
 
 
+def get_all_strategies() -> Dict[str, StrategyMetadata]:
+    """Legacy-compatible API: return metadata keyed by strategy_id."""
+    registry = get_registry()
+    return {meta.strategy_id: meta for meta in registry.list_all()}
+
+
 def get_registry() -> StrategyRegistry:
     """Get the central StrategyRegistry instance with profiles loaded.
     
@@ -86,3 +92,10 @@ def get_strategy_default_params(strategy_id: str, version: Optional[str] = None)
         logging.getLogger(__name__).warning(f"Error fetching default params for {strategy_id}: {e}")
         
     return {}
+
+
+def get_strategy_metadata(strategy_id: str) -> Optional[StrategyMetadata]:
+    """Legacy-compatible single strategy metadata lookup."""
+    registry = get_registry()
+    canonical_id = strategy_id.replace("insidebar_intraday", "inside_bar")
+    return registry.get_or_none(strategy_id) or registry.get_or_none(canonical_id)

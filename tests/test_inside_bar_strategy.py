@@ -126,9 +126,11 @@ class TestInsideBarStrategy:
         data = self.create_sample_data(10)
         config = {
             "atr_period": 5,
+            "inside_bar_definition_mode": "mb_high__ib_high_and_close_in_mb_range",
             "risk_reward_ratio": 2.0,
             "inside_bar_mode": "inclusive",
             "breakout_confirmation": True,
+            "min_mother_bar_size": 0.0,
         }
 
         signals = self.strategy.generate_signals(data, "TEST", config)
@@ -175,9 +177,11 @@ class TestInsideBarStrategy:
 
         config = {
             "atr_period": 2,
+            "inside_bar_definition_mode": "mb_high__ib_high_and_close_in_mb_range",
             "risk_reward_ratio": 2.0,
             "inside_bar_mode": "inclusive",
             "breakout_confirmation": True,
+            "min_mother_bar_size": 0.0,
         }
 
         signals = self.strategy.generate_signals(data, "TEST", config)
@@ -228,9 +232,11 @@ class TestInsideBarStrategy:
 
         config = {
             "atr_period": 2,
+            "inside_bar_definition_mode": "mb_high__ib_high_and_close_in_mb_range",
             "risk_reward_ratio": 3.0,  # 3:1 RR
             "inside_bar_mode": "inclusive",
             "breakout_confirmation": True,
+            "min_mother_bar_size": 0.0,
         }
 
         signals = self.strategy.generate_signals(data, "TEST", config)
@@ -272,9 +278,11 @@ class TestInsideBarStrategy:
 
         config = {
             "atr_period": 2,
+            "inside_bar_definition_mode": "mb_high__ib_high_and_close_in_mb_range",
             "risk_reward_ratio": 2.0,
             "inside_bar_mode": "inclusive",
             "breakout_confirmation": True,
+            "min_mother_bar_size": 0.0,
         }
 
         signals = self.strategy.generate_signals(df, "TEST", config)
@@ -327,9 +335,11 @@ class TestInsideBarStrategy:
 
         config = {
             "atr_period": 3,
+            "inside_bar_definition_mode": "mb_high__ib_high_and_close_in_mb_range",
             "risk_reward_ratio": 2.0,
             "inside_bar_mode": "inclusive",
             "breakout_confirmation": True,
+            "min_mother_bar_size": 0.0,
         }
 
         signals = self.strategy.generate_signals(data, "TEST", config)
@@ -358,7 +368,11 @@ class TestInsideBarStrategy:
             ]
         )
 
-        config = {"atr_period": 14, "risk_reward_ratio": 2.0}
+        config = {
+            "atr_period": 14,
+            "inside_bar_definition_mode": "mb_high__ib_high_and_close_in_mb_range",
+            "risk_reward_ratio": 2.0,
+        }
 
         signals = self.strategy.generate_signals(data, "TEST", config)
         assert signals == []  # Should return empty list
@@ -376,7 +390,11 @@ class TestInsideBarStrategy:
             ]
         )
 
-        config = {"atr_period": 14, "risk_reward_ratio": 2.0}
+        config = {
+            "atr_period": 14,
+            "inside_bar_definition_mode": "mb_high__ib_high_and_close_in_mb_range",
+            "risk_reward_ratio": 2.0,
+        }
 
         with pytest.raises(ValueError, match="Missing required columns"):
             self.strategy.generate_signals(data, "TEST", config)
@@ -386,8 +404,10 @@ class TestInsideBarStrategy:
         data = self.create_sample_data(10)
         config = {
             "atr_period": 5,
+            "inside_bar_definition_mode": "mb_high__ib_high_and_close_in_mb_range",
             "risk_reward_ratio": 2.0,
             "inside_bar_mode": "inclusive",
+            "min_mother_bar_size": 0.0,
         }
 
         signals = self.strategy.generate_signals(data, "TEST", config)
