@@ -160,7 +160,9 @@ def generate_signals(
                     'mother_low': float(prev['low']),
                     'ib_high': float(current['high']),
                     'ib_low': float(current['low']),
-                    'atr': float(atr_val)
+                    'atr': float(atr_val),
+                    'mother_body_fraction': float(current.get('mother_body_fraction', 0.0)),
+                    'inside_body_fraction': float(current.get('inside_body_fraction', 0.0)),
                 }
 
                 emit({
@@ -261,6 +263,8 @@ def generate_signals(
                             'effective_risk': effective_risk_long,
                             'mother_high': levels['mother_high'],
                             'mother_low': levels['mother_low'],
+                            'mother_body_fraction': levels['mother_body_fraction'],
+                            'inside_body_fraction': levels['inside_body_fraction'],
                             'atr': levels['atr'],
                             'symbol': symbol
                         }
@@ -283,6 +287,8 @@ def generate_signals(
                             'effective_risk': effective_risk_short,
                             'mother_high': levels['mother_high'],
                             'mother_low': levels['mother_low'],
+                            'mother_body_fraction': levels['mother_body_fraction'],
+                            'inside_body_fraction': levels['inside_body_fraction'],
                             'atr': levels['atr'],
                             'symbol': symbol
                         }

@@ -27,6 +27,16 @@ def detect_inside_bars(df: pd.DataFrame, config: InsideBarConfig) -> pd.DataFram
     df['prev_open'] = df['open'].shift(1)
     df['prev_close'] = df['close'].shift(1)
     df['prev_range'] = df['prev_high'] - df['prev_low']
+    df['prev_body'] = (df['prev_close'] - df['prev_open']).abs()
+    df['inside_range'] = df['high'] - df['low']
+    df['inside_body'] = (df['close'] - df['open']).abs()
+    df['mother_body_fraction'] = (
+        (df['prev_body'] / df['prev_range']).where(df['prev_range'] > 0, 0.0).fillna(0.0)
+    )
+    df['inside_body_fraction'] = (
+        (df['inside_body'] / df['inside_range']).where(df['inside_range'] > 0, 0.0).fillna(0.0)
+    )
+    df['inside_bar_reject_reason'] = pd.NA
 
     strict = config.inside_bar_mode == "strict"
     inside_mask = eval_vectorized(df, config.inside_bar_definition_mode, strict)
@@ -40,6 +50,18 @@ def detect_inside_bars(df: pd.DataFrame, config: InsideBarConfig) -> pd.DataFram
             df['prev_range'] >= (config.min_mother_bar_size * atr_ref)
         )
         inside_mask = inside_mask & size_ok.fillna(False)
+
+    # Quality gate: reject wick/doji-heavy mother bars.
+    mb_ok = df['mother_body_fraction'] >= config.min_mother_body_fraction
+    mb_reject = inside_mask & (~mb_ok.fillna(False))
+    df.loc[mb_reject, 'inside_bar_reject_reason'] = 'MB_BODY_FRACTION'
+    inside_mask = inside_mask & mb_ok.fillna(False)
+
+    # Quality gate: reject tiny-body inside bars.
+    ib_ok = df['inside_body_fraction'] >= config.min_inside_body_fraction
+    ib_reject = inside_mask & (~ib_ok.fillna(False))
+    df.loc[ib_reject, 'inside_bar_reject_reason'] = 'IB_BODY_FRACTION'
+    inside_mask = inside_mask & ib_ok.fillna(False)
 
     df['is_inside_bar'] = inside_mask
     df['mother_bar_high'] = df['prev_high'].where(inside_mask)

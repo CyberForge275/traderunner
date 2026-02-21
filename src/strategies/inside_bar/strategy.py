@@ -163,6 +163,8 @@ class InsideBarStrategy(BaseStrategy):
             'trailing_apply_mode': config.get('trailing_apply_mode', 'next_bar'),
 
             'max_position_pct': config.get('max_position_pct', 100.0),
+            'min_mother_body_fraction': config.get('min_mother_body_fraction', 0.55),
+            'min_inside_body_fraction': config.get('min_inside_body_fraction', 0.40),
         }
 
         strategy_config = InsideBarConfig(**core_params)

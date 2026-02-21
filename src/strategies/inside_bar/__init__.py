@@ -48,6 +48,8 @@ def _core_config_from_params(params: dict) -> InsideBarConfig:
         "stop_distance_cap_ticks": params.get("stop_distance_cap_ticks", 40),
         "tick_size": params.get("tick_size", 0.01),
         "timeframe_minutes": params["timeframe_minutes"],
+        "min_mother_body_fraction": params.get("min_mother_body_fraction", 0.55),
+        "min_inside_body_fraction": params.get("min_inside_body_fraction", 0.40),
         # MVP: Trigger and Netting
         "trigger_must_be_within_session": params.get("trigger_must_be_within_session", True),
         "netting_mode": params.get("netting_mode", "one_position_per_symbol"),
@@ -181,6 +183,10 @@ def extend_insidebar_signal_frame_from_core(
             row["mother_low"] = meta["mother_low"]
         if "atr" in meta:
             row["atr"] = meta["atr"]
+        if "mother_body_fraction" in meta:
+            row["mother_body_fraction"] = meta["mother_body_fraction"]
+        if "inside_body_fraction" in meta:
+            row["inside_body_fraction"] = meta["inside_body_fraction"]
 
         ib_idx = meta.get("ib_idx")
         if isinstance(ib_idx, (int, float)) and 0 <= int(ib_idx) < len(df):

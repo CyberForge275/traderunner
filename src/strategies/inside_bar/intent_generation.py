@@ -18,6 +18,8 @@ ORDER_CONTEXT_COLUMNS_DEFAULT = [
     "inside_bar",
     "mother_high",
     "mother_low",
+    "mother_body_fraction",
+    "inside_body_fraction",
     "entry_price",
     "stop_price",
     "take_profit_price",

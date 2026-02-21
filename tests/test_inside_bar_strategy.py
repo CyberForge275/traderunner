@@ -182,6 +182,8 @@ class TestInsideBarStrategy:
             "inside_bar_mode": "inclusive",
             "breakout_confirmation": True,
             "min_mother_bar_size": 0.0,
+            "min_mother_body_fraction": 0.0,
+            "min_inside_body_fraction": 0.0,
         }
 
         signals = self.strategy.generate_signals(data, "TEST", config)
@@ -237,6 +239,8 @@ class TestInsideBarStrategy:
             "inside_bar_mode": "inclusive",
             "breakout_confirmation": True,
             "min_mother_bar_size": 0.0,
+            "min_mother_body_fraction": 0.0,
+            "min_inside_body_fraction": 0.0,
         }
 
         signals = self.strategy.generate_signals(data, "TEST", config)
@@ -340,6 +344,8 @@ class TestInsideBarStrategy:
             "inside_bar_mode": "inclusive",
             "breakout_confirmation": True,
             "min_mother_bar_size": 0.0,
+            "min_mother_body_fraction": 0.0,
+            "min_inside_body_fraction": 0.0,
         }
 
         signals = self.strategy.generate_signals(data, "TEST", config)
@@ -455,8 +461,11 @@ class TestInsideBarStrategy:
         # Test with confirmation disabled
         config_no_confirm = {
             "atr_period": 2,
+            "inside_bar_definition_mode": "mb_high__ib_high_and_close_in_mb_range",
             "risk_reward_ratio": 2.0,
             "breakout_confirmation": False,
+            "min_mother_body_fraction": 0.0,
+            "min_inside_body_fraction": 0.0,
         }
 
         signals_no_confirm = self.strategy.generate_signals(
@@ -466,8 +475,11 @@ class TestInsideBarStrategy:
         # Test with confirmation enabled
         config_confirm = {
             "atr_period": 2,
+            "inside_bar_definition_mode": "mb_high__ib_high_and_close_in_mb_range",
             "risk_reward_ratio": 2.0,
             "breakout_confirmation": True,
+            "min_mother_body_fraction": 0.0,
+            "min_inside_body_fraction": 0.0,
         }
 
         signals_confirm = self.strategy.generate_signals(data, "TEST", config_confirm)

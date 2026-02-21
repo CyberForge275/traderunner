@@ -28,8 +28,12 @@ def test_insidebar_signal_frame_builds():
     params = {
         "symbol": "TEST",
         "timeframe": "M5",
+        "timeframe_minutes": 5,
+        "inside_bar_definition_mode": "mb_high__ib_high_and_close_in_mb_range",
         "atr_period": 3,
         "min_mother_bar_size": 0.0,
+        "min_mother_body_fraction": 0.0,
+        "min_inside_body_fraction": 0.0,
         "breakout_confirmation": True,
         "inside_bar_mode": "inclusive",
         "session_timezone": "Europe/Berlin",

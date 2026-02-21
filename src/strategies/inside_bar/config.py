@@ -263,6 +263,8 @@ class InsideBarConfig:
     max_pattern_age_candles: int = 12
     max_deviation_atr: float = 3.0
     max_position_pct: float = 100.0  # Default to 100 for Legacy parity
+    min_mother_body_fraction: float = 0.55
+    min_inside_body_fraction: float = 0.40
 
     @property
     def session_filter(self) -> SessionFilter:
@@ -283,6 +285,10 @@ class InsideBarConfig:
         assert self.atr_period > 0, "ATR period must be positive"
         assert self.risk_reward_ratio > 0, "Risk/reward ratio must be positive"
         assert self.min_mother_bar_size >= 0, "Min mother size must be non-negative"
+        assert 0.0 <= self.min_mother_body_fraction <= 1.0, \
+            "min_mother_body_fraction must be in [0, 1]"
+        assert 0.0 <= self.min_inside_body_fraction <= 1.0, \
+            "min_inside_body_fraction must be in [0, 1]"
         assert self.inside_bar_mode in ["inclusive", "strict"], \
             f"Invalid mode: {self.inside_bar_mode}"
 

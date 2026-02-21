@@ -14,7 +14,12 @@ from ..models import RawSignal
 
 
 def _cfg(**overrides):
-    base = {"inside_bar_definition_mode": "mb_body_oc__ib_hl"}
+    base = {
+        "inside_bar_definition_mode": "mb_body_oc__ib_hl",
+        # Keep legacy test fixtures permissive unless a test targets the new gate.
+        "min_mother_body_fraction": 0.0,
+        "min_inside_body_fraction": 0.0,
+    }
     base.update(overrides)
     return InsideBarConfig(**base)
 
@@ -281,6 +286,76 @@ class TestInsideBarDetection:
         result = core.detect_inside_bars(df)
         assert result.iloc[2]['is_inside_bar'] == False
 
+    def test_rejects_tiny_mother_body_fraction(self):
+        """MB with tiny body should be rejected by mother body-fraction gate."""
+        dates = pd.date_range('2025-01-05', periods=3, freq='5min')
+        data = pd.DataFrame({
+            "timestamp": dates,
+            "open": [100.0, 100.00, 100.06],
+            "high": [101.0, 103.00, 100.08],
+            "low": [99.0, 97.00, 100.02],
+            "close": [100.5, 100.10, 100.05],
+        })
+        core = InsideBarCore(
+            _cfg(
+                inside_bar_mode="inclusive",
+                min_mother_bar_size=0,
+                min_mother_body_fraction=0.55,
+                min_inside_body_fraction=0.0,
+            )
+        )
+        df = core.calculate_atr(data)
+        result = core.detect_inside_bars(df)
+        assert result.iloc[2]["is_inside_bar"] == False
+        assert result.iloc[2]["inside_bar_reject_reason"] == "MB_BODY_FRACTION"
+
+    def test_rejects_tiny_inside_body_fraction(self):
+        """IB with tiny body should be rejected by inside body-fraction gate."""
+        dates = pd.date_range('2025-01-06', periods=3, freq='5min')
+        data = pd.DataFrame({
+            "timestamp": dates,
+            "open": [100.0, 100.0, 100.50],
+            "high": [101.0, 104.0, 100.80],
+            "low": [99.0, 99.0, 100.20],
+            "close": [100.5, 103.0, 100.51],
+        })
+        core = InsideBarCore(
+            _cfg(
+                inside_bar_mode="inclusive",
+                min_mother_bar_size=0,
+                min_mother_body_fraction=0.0,
+                min_inside_body_fraction=0.40,
+            )
+        )
+        df = core.calculate_atr(data)
+        result = core.detect_inside_bars(df)
+        assert result.iloc[2]["is_inside_bar"] == False
+        assert result.iloc[2]["inside_bar_reject_reason"] == "IB_BODY_FRACTION"
+
+    def test_zero_range_inside_bar_rejected_without_exception(self):
+        """Zero-range inside bar must produce body_fraction=0 and reject safely."""
+        dates = pd.date_range('2025-01-07', periods=3, freq='5min')
+        data = pd.DataFrame({
+            "timestamp": dates,
+            "open": [100.0, 100.0, 100.6],
+            "high": [101.0, 103.0, 100.6],
+            "low": [99.0, 99.0, 100.6],
+            "close": [100.5, 102.0, 100.6],
+        })
+        core = InsideBarCore(
+            _cfg(
+                inside_bar_mode="inclusive",
+                min_mother_bar_size=0,
+                min_mother_body_fraction=0.0,
+                min_inside_body_fraction=0.40,
+            )
+        )
+        df = core.calculate_atr(data)
+        result = core.detect_inside_bars(df)
+        assert result.iloc[2]["is_inside_bar"] == False
+        assert result.iloc[2]["inside_body_fraction"] == 0.0
+        assert result.iloc[2]["inside_bar_reject_reason"] == "IB_BODY_FRACTION"
+
 
 class TestSignalGeneration:
     """Test trading signal generation."""
@@ -377,6 +452,36 @@ class TestSignalGeneration:
 
         assert len(signals) > 0
         assert signals[0].side == 'BUY'
+
+    def test_pass_case_contains_body_fraction_metadata(self):
+        """Accepted setup should carry MB/IB body fraction metadata."""
+        dates = pd.date_range("2025-01-08 14:00", periods=4, freq="5min", tz="UTC")
+        data = pd.DataFrame({
+            "timestamp": dates,
+            "open": [100.0, 100.0, 101.2, 102.6],
+            "high": [102.0, 104.0, 101.8, 103.3],
+            "low": [99.0, 99.0, 101.0, 101.8],
+            "close": [101.0, 103.0, 101.6, 102.9],
+        })
+        core = InsideBarCore(
+            _cfg(
+                breakout_confirmation=True,
+                min_mother_bar_size=0,
+                min_mother_body_fraction=0.55,
+                min_inside_body_fraction=0.40,
+                session_timezone="UTC",
+                session_windows=["00:00-23:59"],
+                trigger_must_be_within_session=False,
+            )
+        )
+
+        signals = core.process_data(data, "TEST")
+
+        assert len(signals) > 0
+        assert "mother_body_fraction" in signals[0].metadata
+        assert "inside_body_fraction" in signals[0].metadata
+        assert signals[0].metadata["mother_body_fraction"] >= 0.55
+        assert signals[0].metadata["inside_body_fraction"] >= 0.40
 
 
 class TestRawSignalValidation:

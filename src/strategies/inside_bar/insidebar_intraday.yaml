@@ -25,6 +25,8 @@ versions:
       lookback_candles: 50
       max_pattern_age_candles: 12
       max_deviation_atr: 4
+      min_mother_body_fraction: 0.55
+      min_inside_body_fraction: 0.40
   1.0.1:
     required_warmup_bars: 40
     strategy_finalized: true
@@ -50,6 +52,8 @@ versions:
       max_pattern_age_candles: 12
       max_deviation_atr: 3.0
       max_position_loss_pct_equity: 0.03
+      min_mother_body_fraction: 0.55
+      min_inside_body_fraction: 0.40
   1.0.2:
     required_warmup_bars: 40
     strategy_finalized: false
@@ -75,6 +79,8 @@ versions:
       max_pattern_age_candles: 12
       max_deviation_atr: 3.0
       max_position_loss_pct_equity: 0.04
+      min_mother_body_fraction: 0.55
+      min_inside_body_fraction: 0.40
   2.0.0:
     required_warmup_bars: 40
     strategy_finalized: false
@@ -98,6 +104,8 @@ versions:
       lookback_candles: 50
       max_pattern_age_candles: 12
       max_deviation_atr: 3.0
+      min_mother_body_fraction: 0.55
+      min_inside_body_fraction: 0.40
   1.0.3:
     required_warmup_bars: 40
     strategy_finalized: false
@@ -122,3 +130,5 @@ versions:
       max_pattern_age_candles: 12
       max_deviation_atr: 3.0
       max_position_loss_pct_equity: 0.025
+      min_mother_body_fraction: 0.55
+      min_inside_body_fraction: 0.40
