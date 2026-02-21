@@ -118,9 +118,19 @@ def extend_insidebar_signal_frame_from_core(
     df["breakout_level"] = np.nan
     df["order_expired"] = False
     df["order_expire_reason"] = pd.NA
+    df["mother_body_fraction"] = np.nan
+    df["inside_body_fraction"] = np.nan
+    df["inside_bar_reject_reason"] = pd.NA
+
+    core = InsideBarCore(_core_config_from_params(params))
+    # Mirror pattern-level diagnostics into the frame for audit artifacts.
+    analysis_df = core.calculate_atr(df.copy())
+    analysis_df = core.detect_inside_bars(analysis_df)
+    for col in ("mother_body_fraction", "inside_body_fraction", "inside_bar_reject_reason"):
+        if col in analysis_df.columns:
+            df[col] = analysis_df[col].values
 
     # Core SSOT: generate signals only via process_data()
-    core = InsideBarCore(_core_config_from_params(params))
     signals = core.process_data(df, params.get("symbol", "UNKNOWN"))
     trace_ui(
         step="insidebar_core_done",

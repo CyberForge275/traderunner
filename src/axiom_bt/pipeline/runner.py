@@ -461,6 +461,7 @@ def run_pipeline(
         },
         "signal_schema": schema_fp,
         "artifacts_index": [
+            "signals_frame.csv",
             "events_intent.csv",
             "fills.csv",
             "trades.csv",

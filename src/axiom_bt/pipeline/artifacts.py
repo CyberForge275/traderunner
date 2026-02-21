@@ -40,7 +40,7 @@ def write_artifacts(
 ) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # signals_frame is used for computation but not persisted to disk (Proof of runtime validation only)
+    write_frame(signals_frame, out_dir / "signals_frame.csv")
     write_frame(events_intent, out_dir / "events_intent.csv")
     write_frame(fills, out_dir / "fills.csv")
     write_frame(trades, out_dir / "trades.csv")
@@ -53,6 +53,9 @@ def write_artifacts(
     result_path = out_dir / "run_result.json"
     meta_path = out_dir / "run_meta.json"
 
+    artifacts_index = manifest_fields.setdefault("artifacts_index", [])
+    if "signals_frame.csv" not in artifacts_index:
+        artifacts_index.append("signals_frame.csv")
     manifest_path.write_text(json.dumps(manifest_fields, indent=2))
     result_path.write_text(json.dumps(result_fields, indent=2))
     meta_path.write_text(json.dumps({"run_id": manifest_fields.get("run_id"), "params": manifest_fields.get("params")}, indent=2))
