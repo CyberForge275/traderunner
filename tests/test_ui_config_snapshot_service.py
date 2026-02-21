@@ -7,7 +7,7 @@ from trading_dashboard.services.backtest_ui.config_snapshot_service import (
 )
 
 
-def test_resolve_insidebar_snapshot_uses_existing_snapshot():
+def test_snapshot_is_never_reused_even_same_strategy_version(monkeypatch):
     snapshot = {
         "strategy_id": "insidebar_intraday",
         "version": "1.0.1",
@@ -16,14 +16,75 @@ def test_resolve_insidebar_snapshot_uses_existing_snapshot():
         "tunable": {"lookback_candles": 50},
         "strategy_finalized": True,
     }
+    calls = {"n": 0}
+
+    def _fake_defaults(strategy_id, version):
+        calls["n"] += 1
+        assert strategy_id == "insidebar_intraday"
+        assert version == "1.0.1"
+        return {
+            "required_warmup_bars": 40,
+            "core": {"session_filter": ["09:30-11:00", "14:00-15:00"]},
+            "tunable": {"lookback_candles": 50},
+            "strategy_finalized": False,
+        }
+
+    monkeypatch.setattr(
+        "trading_dashboard.config_store.strategy_config_store.StrategyConfigStore.get_defaults",
+        _fake_defaults,
+    )
 
     resolved = resolve_insidebar_snapshot(
         strategy_id="insidebar_intraday",
         selected_version="1.0.1",
         snapshot=snapshot,
     )
+    resolved["core"]["session_filter"] = ["CHANGED"]
+    reloaded = resolve_insidebar_snapshot(
+        strategy_id="insidebar_intraday",
+        selected_version="1.0.1",
+        snapshot=resolved,
+    )
     assert resolved["version"] == "1.0.1"
-    assert resolved["core"]["atr_period"] == 8
+    assert reloaded["version"] == "1.0.1"
+    assert reloaded["core"]["session_filter"] == ["09:30-11:00", "14:00-15:00"]
+    assert reloaded is not resolved
+    assert calls["n"] == 2
+
+
+def test_resolve_insidebar_snapshot_reloads_when_version_changed(monkeypatch):
+    snapshot = {
+        "strategy_id": "insidebar_intraday",
+        "version": "1.0.1",
+        "required_warmup_bars": 40,
+        "core": {"session_filter": ["09:30-11:00", "14:00-15:00"]},
+        "tunable": {"lookback_candles": 50},
+        "strategy_finalized": False,
+    }
+
+    def _fake_defaults(strategy_id, version):
+        assert strategy_id == "insidebar_intraday"
+        assert version == "1.0.3"
+        return {
+            "required_warmup_bars": 40,
+            "core": {"session_filter": ["09:30-14:00"], "timeframe_minutes": 15},
+            "tunable": {"lookback_candles": 50},
+            "strategy_finalized": False,
+        }
+
+    monkeypatch.setattr(
+        "trading_dashboard.config_store.strategy_config_store.StrategyConfigStore.get_defaults",
+        _fake_defaults,
+    )
+
+    resolved = resolve_insidebar_snapshot(
+        strategy_id="insidebar_intraday",
+        selected_version="1.0.3",
+        snapshot=snapshot,
+    )
+    assert resolved["version"] == "1.0.3"
+    assert resolved["core"]["session_filter"] == ["09:30-14:00"]
+    assert resolved["core"]["timeframe_minutes"] == 15
 
 
 def test_resolve_insidebar_snapshot_loads_defaults_when_snapshot_missing(monkeypatch):

@@ -33,6 +33,7 @@ from ..components.signal_chart import (
     infer_mother_ts,
     infer_exit_ts,
     infer_signal_ts,
+    infer_level_anchor_ts,
     log_chart_window,
     load_bars_for_run,
 )
@@ -314,6 +315,7 @@ def register_backtests_callbacks(app):
                 if mother_ts is None:
                     mother_ts = pd.to_datetime(row.get("signal_ts"), utc=True, errors="coerce")
                 signal_ts = infer_signal_ts(row)
+                level_anchor_ts = infer_level_anchor_ts(row)
                 if signal_ts is None:
                     logger.warning(
                         "actions: inspector_marker_missing_signal_ts template_id=%s oco_group_id=%s dbg_inside_ts=%s",
@@ -321,7 +323,7 @@ def register_backtests_callbacks(app):
                         row.get("oco_group_id"),
                         row.get("dbg_inside_ts"),
                     )
-                timestamps = [mother_ts, inside_ts, signal_ts, exit_ts]
+                timestamps = [mother_ts, inside_ts, signal_ts, level_anchor_ts, exit_ts]
                 window, meta = compute_bars_window_union(bars_df, timestamps, pre_bars=5, post_bars=5)
                 markers = []
                 if not window.empty:
@@ -333,25 +335,26 @@ def register_backtests_callbacks(app):
                         markers.append(ib)
                     levels = derive_long_short_levels(group_rows or [row])
                     logger.info(
-                        "actions: inspector_marker_ts template_id=%s oco_group_id=%s signal_ts=%s dbg_inside_ts=%s chosen_ts=%s",
+                        "actions: inspector_marker_ts template_id=%s oco_group_id=%s signal_ts=%s level_anchor_ts=%s dbg_inside_ts=%s chosen_ts=%s",
                         row.get("template_id"),
                         row.get("oco_group_id"),
                         signal_ts,
+                        level_anchor_ts,
                         row.get("dbg_inside_ts"),
-                        signal_ts,
+                        level_anchor_ts,
                     )
-                    if signal_ts is not None and pd.notna(signal_ts):
-                        markers.extend(build_level_markers_at_ts(signal_ts, levels["long"], levels["short"]))
-                        v = build_vertical_marker(signal_ts, label="signal_ts", color="#888888")
+                    if level_anchor_ts is not None and pd.notna(level_anchor_ts):
+                        markers.extend(build_level_markers_at_ts(level_anchor_ts, levels["long"], levels["short"]))
+                        v = build_vertical_marker(level_anchor_ts, label="valid_from_ts", color="#888888")
                         if v:
                             markers.append(v)
                 x_range = None
-                if signal_ts is not None and pd.notna(signal_ts) and not window.empty:
+                if level_anchor_ts is not None and pd.notna(level_anchor_ts) and not window.empty:
                     start_ts = pd.to_datetime(meta.get("start_ts"), utc=True, errors="coerce")
                     end_ts = pd.to_datetime(meta.get("end_ts"), utc=True, errors="coerce")
                     if pd.notna(start_ts) and pd.notna(end_ts):
-                        x_min = min(start_ts, signal_ts)
-                        x_max = max(end_ts, signal_ts)
+                        x_min = min(start_ts, level_anchor_ts)
+                        x_max = max(end_ts, level_anchor_ts)
                         x_range = (x_min, x_max)
                 fig = build_candlestick_figure(window, markers=markers, x_range=x_range)
                 start_ts = meta.get("start_ts")
@@ -399,6 +402,7 @@ def register_backtests_callbacks(app):
         row = rows[row_index]
         oco = resolve_trade_oco_levels(row, orders_rows or [])
         signal_ts = oco.get("signal_ts")
+        level_anchor_ts = signal_ts
         levels = oco.get("levels") or {"long": {}, "short": {}}
         oco_group_id = oco.get("oco_group_id")
 
@@ -455,6 +459,9 @@ def register_backtests_callbacks(app):
                     for order_row in orders_rows:
                         if order_row.get("template_id") == row.get("template_id"):
                             mother_ts, inside_ts, _ = resolve_inspector_timestamps(order_row)
+                            order_level_anchor_ts = infer_level_anchor_ts(order_row)
+                            if order_level_anchor_ts is not None and not pd.isna(order_level_anchor_ts):
+                                level_anchor_ts = order_level_anchor_ts
                             break
                 if mother_ts is None:
                     mother_ts = pd.to_datetime(row.get("entry_ts"), utc=True, errors="coerce")
@@ -470,8 +477,8 @@ def register_backtests_callbacks(app):
                     ib = build_marker(window, "inside", inside_ts, "high", "#000000", "triangle-down", "IB")
                     if ib:
                         markers.append(ib)
-                    if signal_ts is not None and pd.notna(signal_ts):
-                        markers.extend(build_level_markers_at_ts(signal_ts, levels["long"], levels["short"]))
+                    if level_anchor_ts is not None and pd.notna(level_anchor_ts):
+                        markers.extend(build_level_markers_at_ts(level_anchor_ts, levels["long"], levels["short"]))
                     entry_price = pd.to_numeric(row.get("entry_price"), errors="coerce")
                     exit_price = pd.to_numeric(row.get("exit_price"), errors="coerce")
                     en = build_price_marker(entry_ts, entry_price, "E", "#2ca02c", "triangle-up")

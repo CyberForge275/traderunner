@@ -55,26 +55,26 @@ versions:
     strategy_finalized: false
     core:
       inside_bar_definition_mode: mb_high__ib_high_and_close_in_mb_range
-      atr_period: 6
-      risk_reward_ratio: 2.75
-      min_mother_bar_size: 0.55
-      breakout_confirmation: true
+      atr_period: 12
+      risk_reward_ratio: 1.5
+      min_mother_bar_size: 0.9
+      breakout_confirmation: false
       inside_bar_mode: inclusive
       session_timezone: America/New_York
       session_mode: rth
       session_filter:
-      - 09:45-12:00
+      - 09:30-12:00
       - 14:00-15:00
       timeframe_minutes: 5
       valid_from_policy: signal_ts
       order_validity_policy: session_end
-      stop_distance_cap_ticks: 40
+      stop_distance_cap_ticks: 90
       max_position_pct: 100.0
     tunable:
-      lookback_candles: 50
+      lookback_candles: 20
       max_pattern_age_candles: 12
       max_deviation_atr: 3.0
-      max_position_loss_pct_equity: 0.03
+      max_position_loss_pct_equity: 0.04
   2.0.0:
     required_warmup_bars: 40
     strategy_finalized: false
@@ -98,3 +98,27 @@ versions:
       lookback_candles: 50
       max_pattern_age_candles: 12
       max_deviation_atr: 3.0
+  1.0.3:
+    required_warmup_bars: 40
+    strategy_finalized: false
+    core:
+      inside_bar_definition_mode: mb_range_hl__ib_hl
+      atr_period: 8
+      risk_reward_ratio: 2.0
+      min_mother_bar_size: 0.55
+      breakout_confirmation: true
+      inside_bar_mode: inclusive
+      session_timezone: America/New_York
+      session_mode: rth
+      session_filter:
+      - 09:30-13:00
+      timeframe_minutes: 15
+      valid_from_policy: signal_ts
+      order_validity_policy: session_end
+      stop_distance_cap_ticks: 20
+      max_position_pct: 100.0
+    tunable:
+      lookback_candles: 10
+      max_pattern_age_candles: 12
+      max_deviation_atr: 3.0
+      max_position_loss_pct_equity: 0.025

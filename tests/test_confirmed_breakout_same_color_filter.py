@@ -55,13 +55,16 @@ def _bars() -> pd.DataFrame:
     )
 
 
-def _params() -> dict:
-    return {
+def _params(**overrides) -> dict:
+    base = {
         "symbol": "TEST",
-        "timeframe": "5m",
+        "timeframe": "M5",
+        "timeframe_minutes": 5,
         "strategy_version": "1.0.0",
         "inside_bar_definition_mode": "mb_high__ib_high_and_close_in_mb_range",
     }
+    base.update(overrides)
+    return base
 
 
 def test_confirmed_breakout_intraday_schema_unchanged(monkeypatch):
@@ -165,7 +168,7 @@ def test_same_color_required_and_continuation_filters_one_side_only(monkeypatch)
 
 def test_range_ratio_gate_blocks_outside_band_and_zero_mother_range(monkeypatch):
     bars = _bars()
-    # ratio=0.73 for GG candidate at ib_idx=1 -> allowed with lower bound 0.72
+    # ratio=0.73 for GG candidate at ib_idx=1 -> allowed with tunable min=0.72
     bars.loc[0, ["high", "low"]] = [101.2, 100.2]  # mother range=1.0
     bars.loc[1, ["high", "low"]] = [100.93, 100.20]  # inside range=0.73
 
@@ -207,8 +210,45 @@ def test_range_ratio_gate_blocks_outside_band_and_zero_mother_range(monkeypatch)
 
     monkeypatch.setattr("strategies.confirmed_breakout.InsideBarCore.process_data", _signals)
 
-    out = extend_insidebar_signal_frame_from_core(bars, _params())
+    out = extend_insidebar_signal_frame_from_core(
+        bars,
+        _params(mother_range_ratio_min=0.72, mother_range_ratio_max=0.912),
+    )
     signal_rows = out[out["signal_side"].notna()].copy()
 
     kept_ts = signal_rows["timestamp"].tolist()
     assert kept_ts == [pd.to_datetime(bars.loc[2, "timestamp"], utc=True)]
+
+
+def test_range_ratio_tunable_overrides_and_invalid_values_fallback(monkeypatch):
+    bars = _bars()
+    bars.loc[0, ["high", "low"]] = [101.2, 100.2]  # mother range=1.0
+    bars.loc[1, ["high", "low"]] = [100.93, 100.20]  # inside range=0.73
+
+    def _signals(*_args, **_kwargs):
+        return [
+            RawSignal(
+                timestamp=pd.to_datetime(bars.loc[2, "timestamp"], utc=True),
+                side="BUY",
+                entry_price=101.0,
+                stop_loss=100.5,
+                take_profit=102.0,
+                metadata={"ib_idx": 1, "sig_idx": 2},
+            ),
+        ]
+
+    monkeypatch.setattr("strategies.confirmed_breakout.InsideBarCore.process_data", _signals)
+
+    # Tight tunables should block ratio 0.73
+    out_tight = extend_insidebar_signal_frame_from_core(
+        bars,
+        _params(mother_range_ratio_min=0.8, mother_range_ratio_max=0.9),
+    )
+    assert out_tight[out_tight["signal_side"].notna()].empty
+
+    # Invalid tunables should fall back to defaults (0.751..0.912), so 0.73 is blocked.
+    out_invalid = extend_insidebar_signal_frame_from_core(
+        bars,
+        _params(mother_range_ratio_min=-1, mother_range_ratio_max=2),
+    )
+    assert out_invalid[out_invalid["signal_side"].notna()].empty

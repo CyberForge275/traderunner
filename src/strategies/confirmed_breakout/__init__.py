@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 STRATEGY_ID = "confirmed_breakout_intraday"
 STRATEGY_TAG = "cb"
-_RANGE_RATIO_MIN = 0.72
+_DEFAULT_RANGE_RATIO_MIN = 0.751
 _RANGE_RATIO_MAX = 0.912
 
 
@@ -29,6 +29,8 @@ def _core_config_from_params(params: dict) -> InsideBarConfig:
         raise ValueError(
             "inside_bar_definition_mode is required in params (no code default)"
         )
+    if "timeframe_minutes" not in params:
+        raise ValueError("timeframe_minutes is required in params (SSOT, no code default)")
     core_params = {
         # Core
         "inside_bar_definition_mode": params["inside_bar_definition_mode"],
@@ -51,6 +53,7 @@ def _core_config_from_params(params: dict) -> InsideBarConfig:
         "entry_level_mode": params.get("entry_level_mode", "mother_bar"),
         "stop_distance_cap_ticks": params.get("stop_distance_cap_ticks", 40),
         "tick_size": params.get("tick_size", 0.01),
+        "timeframe_minutes": params["timeframe_minutes"],
         # MVP: Trigger and Netting
         "trigger_must_be_within_session": params.get("trigger_must_be_within_session", True),
         "netting_mode": params.get("netting_mode", "one_position_per_symbol"),
@@ -136,6 +139,12 @@ def extend_insidebar_signal_frame_from_core(
     # Map signals into frame (allow multiple legs per bar via row append)
     appended_rows = []
 
+    min_rr = float(params.get("mother_range_ratio_min", _DEFAULT_RANGE_RATIO_MIN))
+    max_rr = float(params.get("mother_range_ratio_max", _RANGE_RATIO_MAX))
+    if not (0 < min_rr < max_rr <= 1.5):
+        min_rr = _DEFAULT_RANGE_RATIO_MIN
+        max_rr = _RANGE_RATIO_MAX
+
     def _candle_color(open_v: float, close_v: float) -> int:
         if close_v > open_v:
             return 1
@@ -170,7 +179,7 @@ def extend_insidebar_signal_frame_from_core(
                     continue
                 inside_range = float(df.at[ib_idx_int, "high"]) - float(df.at[ib_idx_int, "low"])
                 range_ratio = inside_range / mother_range
-                if range_ratio < _RANGE_RATIO_MIN or range_ratio > _RANGE_RATIO_MAX:
+                if range_ratio < min_rr or range_ratio > max_rr:
                     continue
                 mother_color = _candle_color(float(df.at[mother_idx, "open"]), float(df.at[mother_idx, "close"]))
                 inside_color = _candle_color(float(df.at[ib_idx_int, "open"]), float(df.at[ib_idx_int, "close"]))

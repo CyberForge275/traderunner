@@ -206,6 +206,7 @@ class InsideBarConfig:
     entry_level_mode: str = "mother_bar"  # or "inside_bar"
     stop_distance_cap_ticks: int = 4000
     tick_size: float = 0.01
+    timeframe_minutes: int = 5
 
     # === Order Validity (Critical for Replay Fills) ===
     order_validity_policy: str = "session_end"
@@ -309,6 +310,8 @@ class InsideBarConfig:
         assert self.max_trades_per_session > 0, "Max trades per session must be positive"
         assert self.stop_distance_cap_ticks > 0, "SL cap ticks must be positive"
         assert self.tick_size > 0, "Tick size must be positive"
+        assert self.timeframe_minutes in {1, 5, 15, 30, 60}, \
+            f"Invalid timeframe_minutes: {self.timeframe_minutes} (allowed: 1, 5, 15, 30, 60)"
         assert 0.0 < self.max_position_pct <= 100.0, "max_position_pct must be in (0, 100]"
 
         # Order validity

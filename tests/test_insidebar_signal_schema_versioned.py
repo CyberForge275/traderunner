@@ -17,6 +17,12 @@ def test_schema_fingerprint_stable():
     assert fp1 == fp2
 
 
+def test_schema_1_0_3_registered():
+    schema_103 = get_signal_frame_schema("1.0.3")
+    schema_102 = get_signal_frame_schema("1.0.2")
+    assert schema_fingerprint(schema_103) == schema_fingerprint(schema_102)
+
+
 def test_unknown_version_fails():
     with pytest.raises(ValueError):
         get_signal_frame_schema("9.9.9")

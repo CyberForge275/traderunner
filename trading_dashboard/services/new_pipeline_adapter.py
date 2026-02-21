@@ -266,7 +266,7 @@ class NewPipelineAdapter:
                 )
                 status = str(ensure_res.get("status", "")).lower()
                 gaps_after = ensure_res.get("gaps_after", []) or []
-                if status != "ok" or gaps_after:
+                if status not in {"ok", "backfilled"} or gaps_after:
                     raise MissingHistoricalDataError(
                         symbol=symbol,
                         requested_range=f"{ensure_req.start_date}..{ensure_req.end_date}",

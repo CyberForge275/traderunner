@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from strategies.inside_bar.session_logic import generate_signals
 from strategies.inside_bar.config import InsideBarConfig, SessionFilter
@@ -35,7 +36,7 @@ def _bars():
     )
 
 
-def _config():
+def _config(timeframe_minutes: int | None = 5):
     cfg = InsideBarConfig(
         inside_bar_definition_mode="mb_body_oc__ib_hl",
         atr_period=8,
@@ -54,9 +55,10 @@ def _config():
         valid_from_policy="signal_ts",
         trigger_must_be_within_session=True,
         netting_mode="one_position_per_symbol",
+        timeframe_minutes=5 if timeframe_minutes is None else timeframe_minutes,
     )
-    # attach timeframe_minutes dynamically (config does not declare it)
-    setattr(cfg, "timeframe_minutes", 5)
+    if timeframe_minutes is None:
+        cfg.timeframe_minutes = None
     return cfg
 
 
@@ -68,6 +70,23 @@ def test_signal_ts_is_next_bar_start():
     ib_ts = pd.to_datetime("2025-01-01 15:25:00+00:00", utc=True)
     expected = ib_ts + pd.Timedelta(minutes=5)
     assert signals[0].timestamp == expected
+
+
+def test_signal_ts_m15_is_next_15min_grid():
+    df = _bars()
+    cfg = _config(timeframe_minutes=15)
+    signals = generate_signals(df, "TEST", cfg)
+    assert signals, "signals should be generated"
+    ib_ts = pd.to_datetime("2025-01-01 15:25:00+00:00", utc=True)
+    expected = ib_ts + pd.Timedelta(minutes=15)
+    assert signals[0].timestamp == expected
+
+
+def test_generate_signals_requires_timeframe_minutes():
+    df = _bars()
+    cfg = _config(timeframe_minutes=None)
+    with pytest.raises(ValueError, match="timeframe_minutes missing"):
+        generate_signals(df, "TEST", cfg)
 
 
 def test_events_intent_signal_ts_next_bar():

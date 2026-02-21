@@ -8,7 +8,10 @@ import math
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, Optional
-from core.settings.runtime_config import RuntimeConfigError, get_runtime_config
+import datetime as dt
+
+import pandas as pd
+from core.settings.runtime_config import RuntimeConfigError, get_marketdata_data_root, get_runtime_config
 
 from .data_prep import load_bars_snapshot
 from .data_fetcher import ensure_and_snapshot_bars, DataFetcherError
@@ -21,6 +24,7 @@ from .execution import execute
 from .metrics import compute_and_write_metrics
 from .artifacts import write_artifacts
 from .config_resolver import load_base_config, resolve_config
+from .marketdata_stream_client import EnsureBarsRequest, MarketdataStreamClient
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +66,78 @@ def _build_step_tracker(run_dir: Path):
 def _default_base_config_path() -> Optional[Path]:
     candidate = Path(__file__).resolve().parents[3] / "configs" / "runs" / "backtest_pipeline_defaults.yaml"
     return candidate if candidate.exists() else None
+
+
+def _load_intrabar_probe_bars_m1(
+    *,
+    symbol: str,
+    bars: pd.DataFrame,
+    session_timezone: str,
+    session_mode: str,
+    session_filter: list[str] | None,
+) -> Optional[pd.DataFrame]:
+    if bars.empty or "timestamp" not in bars.columns:
+        return None
+    ts = pd.to_datetime(bars["timestamp"], utc=True, errors="coerce").dropna()
+    if ts.empty:
+        return None
+    start_date = ts.min().date()
+    end_date = ts.max().date()
+
+    try:
+        runtime_cfg = get_runtime_config()
+        client = MarketdataStreamClient(
+            base_url=runtime_cfg.services.marketdata_stream_url,
+            enabled=True,
+        )
+        data_root = get_marketdata_data_root()
+    except RuntimeConfigError as exc:
+        logger.warning("actions: intrabar_probe_m1_skipped reason=runtime_config_error err=%s", exc)
+        return None
+
+    try:
+        req = EnsureBarsRequest(
+            symbol=symbol,
+            timeframe_minutes=1,
+            start_date=dt.date.fromisoformat(str(start_date)),
+            end_date=dt.date.fromisoformat(str(end_date)),
+            session_timezone=session_timezone,
+            session_mode=session_mode,
+            session_filter=session_filter,
+            data_root=str(data_root),
+        )
+        client.ensure_bars(req)
+    except Exception as exc:
+        logger.warning(
+            "actions: intrabar_probe_m1_ensure_failed symbol=%s start=%s end=%s err=%s",
+            symbol,
+            start_date,
+            end_date,
+            exc,
+        )
+        return None
+
+    m1_path = data_root / "derived" / "tf_m1" / f"{symbol.upper()}.parquet"
+    if not m1_path.exists():
+        logger.warning(
+            "actions: intrabar_probe_m1_missing symbol=%s path=%s",
+            symbol,
+            m1_path,
+        )
+        return None
+
+    df = pd.read_parquet(m1_path)
+    if "ts" in df.columns:
+        df["timestamp"] = pd.to_datetime(df["ts"], unit="s", utc=True, errors="coerce")
+    elif "timestamp" in df.columns:
+        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+    elif isinstance(df.index, pd.DatetimeIndex):
+        idx = df.index
+        df["timestamp"] = pd.to_datetime(idx, utc=True, errors="coerce") if idx.tz is None else idx.tz_convert("UTC")
+    else:
+        return None
+    df = df.dropna(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
+    return df[(df["timestamp"] >= ts.min()) & (df["timestamp"] <= ts.max() + pd.Timedelta(days=1))].copy()
 
 
 def run_pipeline(
@@ -255,6 +331,44 @@ def run_pipeline(
         extra={"rows": len(intent_art.events_intent)},
     )
     
+    defaults_cfg = {}
+    effective_base_config_path = base_config_path or _default_base_config_path()
+    base_cfg = load_base_config(effective_base_config_path) if effective_base_config_path else {}
+    overrides_cfg = config_overrides or {}
+    resolved_cfg = resolve_config(base=base_cfg, overrides=overrides_cfg, defaults=defaults_cfg)
+    costs_cfg = resolved_cfg.resolved.get("costs", {})
+    if "commission_bps" not in costs_cfg or "slippage_bps" not in costs_cfg:
+        raise PipelineError(
+            "resolved costs missing commission_bps/slippage_bps; provide base config YAML or explicit overrides"
+        )
+    execution_cfg = resolved_cfg.resolved.get("execution", {}) or {}
+    raw_allow_same_bar_exit = execution_cfg.get("allow_same_bar_exit", False)
+    if isinstance(raw_allow_same_bar_exit, str):
+        allow_same_bar_exit = raw_allow_same_bar_exit.strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+    else:
+        allow_same_bar_exit = bool(raw_allow_same_bar_exit)
+    same_bar_resolution_mode = str(
+        execution_cfg.get("same_bar_resolution_mode", "no_fill")
+    )
+    intrabar_probe_timeframe = str(
+        execution_cfg.get("intrabar_probe_timeframe", "M1")
+    ).upper()
+    probe_enabled = same_bar_resolution_mode == "m1_probe_then_no_fill" and intrabar_probe_timeframe == "M1"
+    intrabar_probe_bars_m1 = None
+    if probe_enabled and str(strategy_params.get("timeframe", "")).upper() != "M1":
+        intrabar_probe_bars_m1 = _load_intrabar_probe_bars_m1(
+            symbol=strategy_params.get("symbol", "UNKNOWN"),
+            bars=bars,
+            session_timezone=strategy_params.get("session_timezone"),
+            session_mode=strategy_params.get("session_mode", "rth"),
+            session_filter=strategy_params.get("session_filter"),
+        )
+
     # [Engine Layer]: Market Simulation: Match the intent stream against historical bars to generate discrete execution fills (STOP/LIMIT/MARKET).
     with step_tracker.step("generate_fills"):
         fills_art = generate_fills(
@@ -263,6 +377,9 @@ def run_pipeline(
             order_validity_policy=strategy_params.get("order_validity_policy"),
             session_timezone=strategy_params.get("session_timezone"),
             session_filter=strategy_params.get("session_filter"),
+            allow_same_bar_exit=allow_same_bar_exit,
+            same_bar_resolution_mode=same_bar_resolution_mode,
+            intrabar_probe_bars_m1=intrabar_probe_bars_m1,
         )
     trace_ui(
         step="pipeline_fills_generated",
@@ -274,16 +391,6 @@ def run_pipeline(
         extra={"rows": len(fills_art.fills), **(fills_art.gap_stats or {})},
     )
     
-    defaults_cfg = {}
-    effective_base_config_path = base_config_path or _default_base_config_path()
-    base_cfg = load_base_config(effective_base_config_path) if effective_base_config_path else {}
-    overrides_cfg = config_overrides or {}
-    resolved_cfg = resolve_config(base=base_cfg, overrides=overrides_cfg, defaults=defaults_cfg)
-    costs_cfg = resolved_cfg.resolved.get("costs", {})
-    if "commission_bps" not in costs_cfg or "slippage_bps" not in costs_cfg:
-        raise PipelineError(
-            "resolved costs missing commission_bps/slippage_bps; provide base config YAML or explicit overrides"
-        )
     effective_commission_bps = float(costs_cfg["commission_bps"])
     effective_slippage_bps = float(costs_cfg["slippage_bps"])
 

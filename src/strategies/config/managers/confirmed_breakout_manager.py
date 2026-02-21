@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 from ..manager_base import StrategyConfigManagerBase
 from ..repository import StrategyConfigRepository
-from ..specs.inside_bar_spec import InsideBarSpec
+from ..specs.confirmed_breakout_spec import ConfirmedBreakoutSpec
 
 
 class ConfirmedBreakoutConfigManager(StrategyConfigManagerBase):
@@ -18,7 +18,7 @@ class ConfirmedBreakoutConfigManager(StrategyConfigManagerBase):
             strategy_root = Path(__file__).resolve().parents[2] / "confirmed_breakout"
             repository = StrategyConfigRepository(base_path=strategy_root)
         super().__init__(repository=repository)
-        self.spec = InsideBarSpec()
+        self.spec = ConfirmedBreakoutSpec()
 
     def get(self, version: str) -> Dict[str, Any]:
         return self.get_version(version)

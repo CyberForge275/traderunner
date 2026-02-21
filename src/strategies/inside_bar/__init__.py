@@ -23,6 +23,8 @@ def _core_config_from_params(params: dict) -> InsideBarConfig:
         raise ValueError(
             "inside_bar_definition_mode is required in params (no code default)"
         )
+    if "timeframe_minutes" not in params:
+        raise ValueError("timeframe_minutes is required in params (SSOT, no code default)")
     core_params = {
         # Core
         "inside_bar_definition_mode": params["inside_bar_definition_mode"],
@@ -45,6 +47,7 @@ def _core_config_from_params(params: dict) -> InsideBarConfig:
         "entry_level_mode": params.get("entry_level_mode", "mother_bar"),
         "stop_distance_cap_ticks": params.get("stop_distance_cap_ticks", 40),
         "tick_size": params.get("tick_size", 0.01),
+        "timeframe_minutes": params["timeframe_minutes"],
         # MVP: Trigger and Netting
         "trigger_must_be_within_session": params.get("trigger_must_be_within_session", True),
         "netting_mode": params.get("netting_mode", "one_position_per_symbol"),

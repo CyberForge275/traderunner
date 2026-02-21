@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, Optional
 
 from trading_dashboard.config_store.strategy_config_store import StrategyConfigStore
+
+logger = logging.getLogger(__name__)
 
 
 class SnapshotValidationError(ValueError):
@@ -18,15 +21,18 @@ def resolve_insidebar_snapshot(
     snapshot: Optional[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """Return a valid insidebar snapshot, loading defaults when needed."""
-    if snapshot and snapshot.get("strategy_id") == strategy_id:
-        return snapshot
-
     if not selected_version:
         raise SnapshotValidationError(
             "Configuration snapshot missing. Please select Strategy and Version to load parameters first."
         )
 
+    # Policy A: always load defaults fresh for the selected strategy version.
     defaults = StrategyConfigStore.get_defaults(strategy_id, selected_version)
+    logger.info(
+        "actions: ui_snapshot_defaults_loaded strategy_id=%s version=%s",
+        strategy_id,
+        selected_version,
+    )
     return {
         "strategy_id": strategy_id,
         "version": selected_version,

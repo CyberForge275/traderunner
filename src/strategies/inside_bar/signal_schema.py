@@ -92,6 +92,7 @@ SCHEMAS: Dict[str, SignalFrameSchemaV1] = {
     "1.0.0": _schema_v1_0_0(),
     "1.0.1": _schema_v1_0_0(),  # Same schema, only tunable params differ
     "1.0.2": _schema_v1_0_2(),  # OCO two-leg support (oco_group_id)
+    "1.0.3": _schema_v1_0_2(),  # Same signal-frame contract as v1.0.2
 }
 
 

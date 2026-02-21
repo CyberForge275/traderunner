@@ -172,7 +172,12 @@ def generate_signals(
                 })
                 # NEW: Two-leg OCO signals created at IB detection (no breakout gating here)
                 levels = state['levels']
-                timeframe_minutes = int(getattr(config, 'timeframe_minutes', 5))
+                timeframe_minutes = getattr(config, "timeframe_minutes", None)
+                if timeframe_minutes is None:
+                    raise ValueError(
+                        "timeframe_minutes missing in strategy config (SSOT required, no fallback)"
+                    )
+                timeframe_minutes = int(timeframe_minutes)
                 signal_ts = ts + pd.Timedelta(minutes=timeframe_minutes)
                 if entry_mode == "mother_bar":
                     entry_long = levels['mother_high']

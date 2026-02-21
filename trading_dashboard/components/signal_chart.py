@@ -14,6 +14,7 @@ _MOTHER_KEYS = ["dbg_mother_ts", "sig_mother_ts", "mother_ts"]
 _INSIDE_KEYS = ["dbg_inside_ts", "sig_inside_ts", "inside_ts"]
 _EXIT_KEYS = ["order_valid_to_ts", "exit_ts", "dbg_valid_to_ts_utc", "dbg_exit_ts_utc", "dbg_valid_to_ts"]
 _SIGNAL_KEYS = ["signal_ts", "dbg_trigger_ts"]
+_LEVEL_ANCHOR_KEYS = ["dbg_valid_from_ts_utc", "order_valid_from_ts", "valid_from_ts", "signal_ts", "dbg_trigger_ts"]
 
 
 def _coerce_ts(value: object) -> Optional[pd.Timestamp]:
@@ -43,6 +44,15 @@ def infer_inside_ts(row: Mapping[str, object]) -> Optional[pd.Timestamp]:
 
 def infer_signal_ts(row: Mapping[str, object]) -> Optional[pd.Timestamp]:
     for key in _SIGNAL_KEYS:
+        if key in row and row.get(key):
+            ts = _coerce_ts(row.get(key))
+            if ts is not None:
+                return ts
+    return None
+
+
+def infer_level_anchor_ts(row: Mapping[str, object]) -> Optional[pd.Timestamp]:
+    for key in _LEVEL_ANCHOR_KEYS:
         if key in row and row.get(key):
             ts = _coerce_ts(row.get(key))
             if ts is not None:
@@ -314,7 +324,7 @@ def build_level_markers_at_ts(
         return markers
 
     ts_long = signal_ts + pd.Timedelta(seconds=15)
-    ts_short = signal_ts - pd.Timedelta(seconds=15)
+    ts_short = signal_ts + pd.Timedelta(seconds=30)
 
     def _add(ts: pd.Timestamp, price: object, label: str, color: str, symbol: str) -> None:
         if price is None or (isinstance(price, float) and pd.isna(price)):
@@ -410,10 +420,12 @@ def build_candlestick_figure(
 
     ts = pd.to_datetime(bars_window_df["timestamp"], utc=True, errors="coerce")
     ts_local = ts.dt.tz_convert(tz)
+    x_vals = ts_local.dt.strftime("%Y-%m-%d %H:%M").tolist()
+    x_set = set(x_vals)
 
     fig.add_trace(
         go.Candlestick(
-            x=ts_local,
+            x=x_vals,
             open=bars_window_df["open"],
             high=bars_window_df["high"],
             low=bars_window_df["low"],
@@ -421,12 +433,45 @@ def build_candlestick_figure(
             name="price",
         )
     )
+    deltas = ts_local.diff()
+    positive_deltas = deltas[deltas > pd.Timedelta(0)]
+    expected_delta = (
+        positive_deltas.mode().iloc[0]
+        if not positive_deltas.empty
+        else pd.Timedelta(minutes=1)
+    )
+    gap_threshold = expected_delta * 1.5
+    y_low = bars_window_df["low"].min()
+    y_high = bars_window_df["high"].max()
+    for i in range(1, len(ts_local)):
+        prev_ts = ts_local.iloc[i - 1]
+        curr_ts = ts_local.iloc[i]
+        if pd.isna(prev_ts) or pd.isna(curr_ts):
+            continue
+        gap = curr_ts - prev_ts
+        if gap <= gap_threshold:
+            continue
+        label = "day_break" if prev_ts.date() != curr_ts.date() else "session_break"
+        marker_x = x_vals[i]
+        fig.add_trace(
+            go.Scatter(
+                x=[marker_x, marker_x],
+                y=[y_low, y_high],
+                mode="lines",
+                line=dict(color="#777777", width=1, dash="dot"),
+                name=label,
+                showlegend=True,
+            )
+        )
     if markers:
         for marker in markers:
             marker_ts = _coerce_ts(marker.get("ts"))
             if marker_ts is None:
                 continue
-            marker_ts_local = marker_ts.tz_convert(tz)
+            aligned_ts = align_marker_ts(bars_window_df, marker_ts) or marker_ts
+            marker_ts_local = aligned_ts.tz_convert(tz).strftime("%Y-%m-%d %H:%M")
+            if marker_ts_local not in x_set:
+                continue
             if marker.get("mode") == "vertical":
                 fig.add_trace(
                     go.Scatter(
@@ -458,9 +503,25 @@ def build_candlestick_figure(
         yaxis_title="Price",
         height=420,
     )
+    step = max(1, len(x_vals) // 8)
+    fig.update_xaxes(
+        type="category",
+        categoryorder="array",
+        categoryarray=x_vals,
+        rangeslider=dict(visible=False),
+        tickmode="array",
+        tickvals=x_vals[::step],
+    )
     if x_range and all(x_range):
         x0, x1 = x_range
-        fig.update_xaxes(range=[x0.tz_convert(tz), x1.tz_convert(tz)])
+        x0_local = x0.tz_convert(tz)
+        x1_local = x1.tz_convert(tz)
+        bounded = [
+            x for x, ts_l in zip(x_vals, ts_local.tolist())
+            if pd.notna(ts_l) and x0_local <= ts_l <= x1_local
+        ]
+        if bounded:
+            fig.update_xaxes(range=[bounded[0], bounded[-1]])
     return fig
 
 

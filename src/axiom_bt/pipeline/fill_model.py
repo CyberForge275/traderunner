@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 import pandas as pd
 
@@ -63,6 +63,86 @@ def _entry_fill_stop_cross(
     return float(bar["close"]), "no_cross"
 
 
+def _coerce_bars_with_timestamp(df: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
+    if df is None or df.empty:
+        return None
+    bars = df.copy()
+    if "timestamp" in bars.columns:
+        bars["timestamp"] = pd.to_datetime(bars["timestamp"], utc=True, errors="coerce")
+    elif "ts" in bars.columns:
+        bars["timestamp"] = pd.to_datetime(bars["ts"], utc=True, errors="coerce")
+    elif isinstance(bars.index, pd.DatetimeIndex):
+        idx = bars.index
+        if idx.tz is None:
+            bars["timestamp"] = pd.to_datetime(idx, utc=True, errors="coerce")
+        else:
+            bars["timestamp"] = idx.tz_convert("UTC")
+    else:
+        return None
+    bars = bars.dropna(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
+    for col in ("open", "high", "low", "close"):
+        if col not in bars.columns:
+            return None
+    return bars
+
+
+def _resolve_same_bar_with_m1(
+    *,
+    m1_bars: pd.DataFrame,
+    trigger_bar_ts: pd.Timestamp,
+    trigger_bar_end_ts: pd.Timestamp,
+    side: str,
+    entry_price: float,
+    stop_price: float,
+    tp_price: float,
+) -> str:
+    probe = m1_bars[
+        (m1_bars["timestamp"] >= trigger_bar_ts)
+        & (m1_bars["timestamp"] < trigger_bar_end_ts)
+    ]
+    if probe.empty:
+        return "missing_m1"
+
+    in_position = False
+    for _, row in probe.iterrows():
+        high = float(row["high"])
+        low = float(row["low"])
+        if not in_position:
+            if side == "BUY":
+                entry_hit = high >= entry_price
+            else:
+                entry_hit = low <= entry_price
+            if not entry_hit:
+                continue
+            in_position = True
+
+            # Entry minute is sequence-ambiguous if entry and any exit level are reachable
+            # inside the same 1m bar.
+            if side == "BUY":
+                sl_hit = low <= stop_price
+                tp_hit = high >= tp_price
+            else:
+                sl_hit = high >= stop_price
+                tp_hit = low <= tp_price
+            if sl_hit or tp_hit:
+                return "entry_minute_ambiguous"
+            continue
+
+        if side == "BUY":
+            sl_hit = low <= stop_price
+            tp_hit = high >= tp_price
+        else:
+            sl_hit = high >= stop_price
+            tp_hit = low <= tp_price
+        if sl_hit and tp_hit:
+            return "ambiguous"
+        if sl_hit:
+            return "sl_first"
+        if tp_hit:
+            return "tp_first"
+    return "ambiguous"
+
+
 def generate_fills(
     events_intent: pd.DataFrame,
     bars: pd.DataFrame,
@@ -70,6 +150,9 @@ def generate_fills(
     order_validity_policy: str | None = None,
     session_timezone: str | None = None,
     session_filter: list[str] | None = None,
+    allow_same_bar_exit: bool = False,
+    same_bar_resolution_mode: str = "no_fill",
+    intrabar_probe_bars_m1: Optional[pd.DataFrame] = None,
 ) -> FillArtifacts:
     """Generate deterministic fills by trigger-scanning bars from signal_ts.
 
@@ -91,9 +174,11 @@ def generate_fills(
     bars = bars.copy()
     bars["timestamp"] = pd.to_datetime(bars["timestamp"], utc=True)
     bars = bars.sort_values("timestamp").reset_index(drop=True)
+    m1_probe = _coerce_bars_with_timestamp(intrabar_probe_bars_m1)
     bar_idx = bars.set_index("timestamp")
     rows: List[Dict] = []
     session_end_snap_count = 0
+    same_bar_entry_minute_ambiguous_count = 0
     diffs = bars["timestamp"].diff().dt.total_seconds().dropna()
     median_step_s = float(diffs.median()) if len(diffs) else None
     gap_max_s = float(diffs.max()) if len(diffs) else 0.0
@@ -252,23 +337,147 @@ def generate_fills(
         tp_price = intent.get("take_profit_price")
         if pd.isna(stop_price) or pd.isna(tp_price):
             raise FillModelError("intent missing stop_price or take_profit_price")
+        stop_price_f = float(stop_price)
+        tp_price_f = float(tp_price)
+
+        same_bar_candidate = False
+        same_bar_result = "not_applicable"
+        same_bar_exit_row = None
+        if allow_same_bar_exit:
+            if side == "BUY":
+                same_stop_hit = float(trigger_bar["low"]) <= stop_price_f
+                same_tp_hit = float(trigger_bar["high"]) >= tp_price_f
+            else:
+                same_stop_hit = float(trigger_bar["high"]) >= stop_price_f
+                same_tp_hit = float(trigger_bar["low"]) <= tp_price_f
+            same_bar_candidate = bool(same_stop_hit and same_tp_hit)
+            if same_bar_candidate:
+                if same_bar_resolution_mode == "legacy":
+                    same_bar_result = "sl_first"
+                    same_bar_exit_row = {
+                        "template_id": intent["template_id"],
+                        "symbol": intent.get("symbol", "UNKNOWN"),
+                        "fill_ts": trigger_bar["timestamp"],
+                        "fill_price": stop_price_f,
+                        "reason": "stop_loss",
+                    }
+                elif same_bar_resolution_mode == "m1_probe_then_no_fill":
+                    next_rows = bars[bars["timestamp"] > trigger_bar["timestamp"]]["timestamp"]
+                    trigger_end = next_rows.iloc[0] if not next_rows.empty else trigger_bar["timestamp"] + pd.Timedelta(minutes=1)
+                    if m1_probe is None:
+                        same_bar_result = "missing_m1"
+                    else:
+                        same_bar_result = _resolve_same_bar_with_m1(
+                            m1_bars=m1_probe,
+                            trigger_bar_ts=trigger_bar["timestamp"],
+                            trigger_bar_end_ts=trigger_end,
+                            side=side,
+                            entry_price=float(trigger_level),
+                            stop_price=stop_price_f,
+                            tp_price=tp_price_f,
+                        )
+                    if same_bar_result == "entry_minute_ambiguous":
+                        same_bar_entry_minute_ambiguous_count += 1
+                    if same_bar_result == "tp_first":
+                        same_bar_exit_row = {
+                            "template_id": intent["template_id"],
+                            "symbol": intent.get("symbol", "UNKNOWN"),
+                            "fill_ts": trigger_bar["timestamp"],
+                            "fill_price": tp_price_f,
+                            "reason": "take_profit",
+                        }
+                    elif same_bar_result == "sl_first":
+                        same_bar_exit_row = {
+                            "template_id": intent["template_id"],
+                            "symbol": intent.get("symbol", "UNKNOWN"),
+                            "fill_ts": trigger_bar["timestamp"],
+                            "fill_price": stop_price_f,
+                            "reason": "stop_loss",
+                        }
+                else:
+                    same_bar_result = "ambiguous"
+
+                if same_bar_exit_row is None:
+                    # Remove pre-added entry/cancel rows for this group: ambiguous same-bar means no entry fill.
+                    rows = [
+                        r
+                        for r in rows
+                        if not (
+                            r.get("oco_group_id") == oco_group_id
+                            and r.get("template_id") == intent.get("template_id")
+                            and r.get("reason") == "signal_fill"
+                        )
+                    ]
+                    rows = [
+                        r
+                        for r in rows
+                        if not (
+                            r.get("oco_group_id") == oco_group_id
+                            and r.get("reason") == "order_cancelled_oco"
+                        )
+                    ]
+                    logger.info(
+                        "actions: same_bar_resolution template_id=%s symbol=%s same_bar_candidate=%s resolution_mode=%s m1_probe_result=%s final_decision=%s",
+                        intent.get("template_id"),
+                        symbol,
+                        same_bar_candidate,
+                        same_bar_resolution_mode,
+                        same_bar_result,
+                        "order_ambiguous_no_fill",
+                    )
+                    rows.append(
+                        {
+                            "template_id": intent["template_id"],
+                            "symbol": symbol,
+                            "fill_ts": trigger_bar["timestamp"],
+                            "fill_price": float("nan"),
+                            "reason": "order_ambiguous_no_fill",
+                            "side": side,
+                            "oco_group_id": oco_group_id,
+                            "cancel_reason": "entry_minute_ambiguous"
+                            if same_bar_result == "entry_minute_ambiguous"
+                            else "same_bar_ambiguous",
+                        }
+                    )
+                    continue
+
+        logger.info(
+            "actions: same_bar_resolution template_id=%s symbol=%s same_bar_candidate=%s resolution_mode=%s m1_probe_result=%s final_decision=%s",
+            intent.get("template_id"),
+            symbol,
+            same_bar_candidate,
+            same_bar_resolution_mode,
+            same_bar_result,
+            same_bar_exit_row["reason"] if same_bar_exit_row else "next_bar_scan",
+        )
         valid_to = _valid_to_for(intent, signal_ts)
-        scan = bars[(bars["timestamp"] > trigger_bar["timestamp"]) & (bars["timestamp"] <= valid_to)]
-        exit_row = None
+        if allow_same_bar_exit:
+            scan = bars[
+                (bars["timestamp"] >= trigger_bar["timestamp"])
+                & (bars["timestamp"] <= valid_to)
+            ]
+        else:
+            scan = bars[
+                (bars["timestamp"] > trigger_bar["timestamp"])
+                & (bars["timestamp"] <= valid_to)
+            ]
+        exit_row = same_bar_exit_row
         for _, bar_row in scan.iterrows():
+            if exit_row is not None:
+                break
             bar_ts = bar_row["timestamp"]
             if side == "BUY":
-                stop_hit = float(bar_row["low"]) <= float(stop_price)
-                tp_hit = float(bar_row["high"]) >= float(tp_price)
+                stop_hit = float(bar_row["low"]) <= stop_price_f
+                tp_hit = float(bar_row["high"]) >= tp_price_f
             else:  # SELL
-                stop_hit = float(bar_row["high"]) >= float(stop_price)
-                tp_hit = float(bar_row["low"]) <= float(tp_price)
+                stop_hit = float(bar_row["high"]) >= stop_price_f
+                tp_hit = float(bar_row["low"]) <= tp_price_f
             if stop_hit and tp_hit:
                 exit_row = {
                     "template_id": intent["template_id"],
                     "symbol": intent.get("symbol", "UNKNOWN"),
                     "fill_ts": bar_ts,
-                    "fill_price": float(stop_price),
+                    "fill_price": stop_price_f,
                     "reason": "stop_loss",
                 }
                 break
@@ -277,7 +486,7 @@ def generate_fills(
                     "template_id": intent["template_id"],
                     "symbol": intent.get("symbol", "UNKNOWN"),
                     "fill_ts": bar_ts,
-                    "fill_price": float(stop_price),
+                    "fill_price": stop_price_f,
                     "reason": "stop_loss",
                 }
                 break
@@ -286,7 +495,7 @@ def generate_fills(
                     "template_id": intent["template_id"],
                     "symbol": intent.get("symbol", "UNKNOWN"),
                     "fill_ts": bar_ts,
-                    "fill_price": float(tp_price),
+                    "fill_price": tp_price_f,
                     "reason": "take_profit",
                 }
                 break
@@ -344,6 +553,11 @@ def generate_fills(
 
     fills_hash = _hash_dataframe(fills)
     logger.info("actions: fills_generated fills_hash=%s fills=%d", fills_hash, len(fills))
+    if same_bar_entry_minute_ambiguous_count:
+        logger.info(
+            "actions: same_bar_entry_minute_ambiguous_count count=%d",
+            same_bar_entry_minute_ambiguous_count,
+        )
     gap_stats = {
         "bars_gap_median_seconds": median_step_s if median_step_s is not None else 0.0,
         "bars_gap_max_seconds": gap_max_s,

@@ -2,6 +2,7 @@ import json
 import pandas as pd
 import pytest
 from pathlib import Path
+from types import SimpleNamespace
 
 from axiom_bt.pipeline.runner import run_pipeline, PipelineError
 from axiom_bt.pipeline.strategy_config_loader import load_strategy_params_from_ssot
@@ -238,6 +239,133 @@ def test_pipeline_runner_has_default_base_config_yaml():
     path = _default_base_config_path()
     assert path is not None
     assert str(path).endswith("configs/runs/backtest_pipeline_defaults.yaml")
+
+
+def test_runner_single_generate_fills_call_with_probe_enabled(monkeypatch, tmp_path):
+    run_dir = tmp_path / "run_probe_single_call"
+    run_dir.mkdir()
+    bars_path = run_dir / "bars_exec_M15_rth.parquet"
+    bars_df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2025-01-01 14:30:00+00:00", periods=4, freq="15min", tz="UTC"),
+            "open": [100.0, 100.2, 100.1, 100.3],
+            "high": [100.5, 100.7, 100.6, 100.8],
+            "low": [99.8, 99.9, 99.7, 99.9],
+            "close": [100.2, 100.1, 100.3, 100.4],
+            "volume": [1, 1, 1, 1],
+        }
+    )
+    bars_df.to_parquet(bars_path)
+
+    base_cfg = tmp_path / "base.yaml"
+    base_cfg.write_text(
+        """
+costs:
+  commission_bps: 2.0
+  slippage_bps: 1.0
+execution:
+  allow_same_bar_exit: true
+  same_bar_resolution_mode: m1_probe_then_no_fill
+  intrabar_probe_timeframe: M1
+""".strip()
+    )
+
+    monkeypatch.setattr(
+        "axiom_bt.pipeline.runner.build_signal_frame",
+        lambda **kwargs: (
+            pd.DataFrame({"signal_ts": [pd.Timestamp("2025-01-01 14:30:00+00:00")]}),
+            [{"name": "signal_ts", "dtype": "datetime64[ns, UTC]"}],
+        ),
+    )
+    monkeypatch.setattr(
+        "axiom_bt.pipeline.runner.compute_schema_fingerprint",
+        lambda schema: {
+            "schema_version": "1.0.0",
+            "schema_hash": "abc",
+            "column_count": 1,
+        },
+    )
+
+    class _FakeAdapter:
+        def generate_intent(self, *_args, **_kwargs):
+            events_intent = pd.DataFrame(
+                [
+                    {
+                        "template_id": "t1",
+                        "signal_ts": pd.Timestamp("2025-01-01 14:30:00+00:00"),
+                        "symbol": "TEST",
+                        "side": "BUY",
+                        "entry_price": 100.0,
+                        "stop_price": 99.5,
+                        "take_profit_price": 100.8,
+                        "order_valid_to_ts": pd.Timestamp("2025-01-01 14:45:00+00:00"),
+                    }
+                ]
+            )
+            return SimpleNamespace(
+                events_intent=events_intent,
+                intent_hash="intent_hash",
+                signals_frame=events_intent.copy(),
+            )
+
+    monkeypatch.setattr("axiom_bt.pipeline.runner.get_strategy_adapter", lambda _sid: _FakeAdapter())
+    monkeypatch.setattr(
+        "axiom_bt.pipeline.runner._load_intrabar_probe_bars_m1",
+        lambda **kwargs: pd.DataFrame(
+            {
+                "timestamp": pd.date_range("2025-01-01 14:30:00+00:00", periods=2, freq="1min", tz="UTC"),
+                "open": [100.0, 100.1],
+                "high": [100.2, 100.3],
+                "low": [99.9, 100.0],
+                "close": [100.1, 100.2],
+            }
+        ),
+    )
+
+    calls = {"count": 0}
+
+    def _fake_generate_fills(*args, **kwargs):
+        calls["count"] += 1
+        raise RuntimeError("stop_after_generate_fills")
+
+    monkeypatch.setattr("axiom_bt.pipeline.runner.generate_fills", _fake_generate_fills)
+
+    with pytest.raises(RuntimeError, match="stop_after_generate_fills"):
+        run_pipeline(
+            run_id="run_probe_single_call",
+            out_dir=run_dir,
+            bars_path=bars_path,
+            strategy_id="insidebar_intraday",
+            strategy_version="1.0.3",
+            strategy_params={
+                "symbol": "TEST",
+                "timeframe": "M15",
+                "requested_end": "2025-01-03",
+                "lookback_days": 3,
+                "session_timezone": "America/New_York",
+                "session_mode": "rth",
+                "session_filter": ["09:30-11:00", "14:00-15:00"],
+                "order_validity_policy": "session_end",
+            },
+            strategy_meta={
+                "core": {
+                    "timeframe_minutes": 15,
+                    "session_timezone": "America/New_York",
+                    "session_mode": "rth",
+                },
+                "tunable": {},
+                "required_warmup_bars": 0,
+            },
+            compound_enabled=False,
+            compound_equity_basis="cash_only",
+            initial_cash=10000,
+            fees_bps=2.0,
+            slippage_bps=1.0,
+            base_config_path=base_cfg,
+            config_overrides={},
+        )
+
+    assert calls["count"] == 1
 
 
 def test_runner_writes_run_steps_when_enabled(monkeypatch, tmp_path):

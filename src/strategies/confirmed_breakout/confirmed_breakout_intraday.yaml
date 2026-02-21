@@ -22,6 +22,34 @@ versions:
       stop_distance_cap_ticks: 40
       max_position_pct: 100.0
     tunable:
+      mother_range_ratio_min: 0.751
+      mother_range_ratio_max: 0.912
+      lookback_candles: 50
+      max_pattern_age_candles: 12
+      max_deviation_atr: 3.0
+      max_position_loss_pct_equity: 0.03
+  1.0.1:
+    required_warmup_bars: 40
+    strategy_finalized: false
+    core:
+      inside_bar_definition_mode: mb_high__ib_high_and_close_in_mb_range
+      atr_period: 8
+      risk_reward_ratio: 2.0
+      min_mother_bar_size: 0.5
+      breakout_confirmation: true
+      inside_bar_mode: strict
+      session_timezone: America/New_York
+      session_mode: rth
+      session_filter:
+      - 09:30-11:30
+      timeframe_minutes: 5
+      valid_from_policy: signal_ts
+      order_validity_policy: session_end
+      stop_distance_cap_ticks: 40
+      max_position_pct: 100.0
+    tunable:
+      mother_range_ratio_min: 0.751
+      mother_range_ratio_max: 0.912
       lookback_candles: 50
       max_pattern_age_candles: 12
       max_deviation_atr: 3.0

@@ -7,3 +7,8 @@ costs:
   slippage_bps: 1.0
   price_semantics: exec_price_adjustment
   price_source: last
+
+execution:
+  allow_same_bar_exit: true
+  same_bar_resolution_mode: m1_probe_then_no_fill
+  intrabar_probe_timeframe: M1

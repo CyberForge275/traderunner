@@ -118,8 +118,6 @@ def generate_intent(
             intent["dbg_signal_ts_ny"] = signal_ts.tz_convert("America/New_York")
             intent["dbg_signal_ts_berlin"] = signal_ts.tz_convert("Europe/Berlin")
             effective_valid_from_policy = valid_from_policy
-            if strategy_id == "confirmed_breakout_intraday":
-                effective_valid_from_policy = "next_bar"
             if effective_valid_from_policy:
                 intent["dbg_effective_valid_from_policy"] = effective_valid_from_policy
 

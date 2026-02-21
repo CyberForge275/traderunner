@@ -120,4 +120,40 @@ def resolve_config(
         if key not in allowed_costs:
             unknown_keys.append(f"costs.{key}")
 
+    execution = resolved.get("execution")
+    if execution is None:
+        execution = {}
+        resolved["execution"] = execution
+        sources["execution"] = "default"
+    if not isinstance(execution, dict):
+        raise ValueError("execution must be a mapping")
+
+    mode = execution.get("same_bar_resolution_mode")
+    if mode is not None:
+        allowed_modes = {"legacy", "no_fill", "m1_probe_then_no_fill"}
+        if str(mode) not in allowed_modes:
+            raise ValueError(
+                f"invalid execution.same_bar_resolution_mode: {mode!r} "
+                f"(allowed: {sorted(allowed_modes)})"
+            )
+        execution["same_bar_resolution_mode"] = str(mode)
+
+    probe_tf = execution.get("intrabar_probe_timeframe")
+    if probe_tf is not None:
+        if str(probe_tf).upper() != "M1":
+            raise ValueError(
+                f"invalid execution.intrabar_probe_timeframe: {probe_tf!r} (allowed: 'M1')"
+            )
+        execution["intrabar_probe_timeframe"] = "M1"
+
+    allowed_execution = {
+        "allow_same_bar_exit",
+        "same_bar_resolution_mode",
+        "intrabar_probe_timeframe",
+        "intrabar_probe_enabled",
+    }
+    for key in execution.keys():
+        if key not in allowed_execution:
+            unknown_keys.append(f"execution.{key}")
+
     return ResolveResult(resolved=resolved, sources=sources, unknown_keys=sorted(set(unknown_keys)))

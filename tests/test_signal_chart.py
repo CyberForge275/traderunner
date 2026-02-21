@@ -6,6 +6,7 @@ from trading_dashboard.components.signal_chart import (
     compute_bars_window_union,
     resolve_inspector_timestamps,
     build_marker,
+    infer_level_anchor_ts,
 )
 
 
@@ -68,6 +69,15 @@ def test_resolve_inspector_timestamps_priority():
     assert exit_ts is not None
 
 
+def test_infer_level_anchor_prefers_valid_from_over_signal():
+    row = {
+        "signal_ts": "2025-05-09 14:15:00+00:00",
+        "dbg_valid_from_ts_utc": "2025-05-09 14:30:00+00:00",
+    }
+    anchor_ts = infer_level_anchor_ts(row)
+    assert anchor_ts == pd.Timestamp("2025-05-09 14:30:00+00:00", tz="UTC")
+
+
 def test_marker_alignment_non_exact_timestamp_floor_to_previous_bar():
     bars = _make_bars()
     ts_between = bars["timestamp"].iloc[10] + pd.Timedelta(seconds=30)
@@ -98,3 +108,30 @@ def test_build_candlestick_figure_empty():
     fig = build_candlestick_figure(pd.DataFrame())
     assert fig.layout.title.text == "No bars available"
     assert fig.layout.annotations
+
+
+def test_build_candlestick_figure_uses_category_xaxis_without_time_gaps():
+    bars = _make_bars(count=4, start="2025-01-01 14:30:00+00:00", freq="15min")
+    bars.loc[2:, "timestamp"] = pd.to_datetime(
+        ["2025-01-02 14:30:00+00:00", "2025-01-02 14:45:00+00:00"], utc=True
+    )
+    fig = build_candlestick_figure(bars, tz="America/New_York")
+    assert fig.layout.xaxis.type == "category"
+    assert len(fig.layout.xaxis.categoryarray) == 4
+
+
+def test_build_candlestick_figure_adds_day_and_session_break_markers():
+    bars = _make_bars(count=4, start="2025-01-01 14:30:00+00:00", freq="15min")
+    bars.loc[:, "timestamp"] = pd.to_datetime(
+        [
+            "2025-01-01 14:30:00+00:00",
+            "2025-01-01 14:45:00+00:00",
+            "2025-01-01 17:00:00+00:00",  # session break
+            "2025-01-02 14:30:00+00:00",  # day break
+        ],
+        utc=True,
+    )
+    fig = build_candlestick_figure(bars, tz="America/New_York")
+    names = [trace.name for trace in fig.data]
+    assert "session_break" in names
+    assert "day_break" in names

@@ -129,3 +129,259 @@ def test_order_valid_to_ts_present_requires_no_session_params():
     )
     fills = generate_fills(intent, bars).fills
     assert len(fills) == 2
+
+
+def test_same_bar_tp_is_ignored_by_default():
+    t0 = pd.Timestamp("2025-04-03 14:35:00", tz="UTC")
+    t1 = pd.Timestamp("2025-04-03 14:40:00", tz="UTC")
+    bars = _bars([t0, t1], [100.0, 101.0], [105.0, 101.5], [99.5, 100.5])
+    intent = pd.DataFrame(
+        [
+            {
+                "template_id": "t1",
+                "signal_ts": t0,
+                "symbol": "HOOD",
+                "side": "BUY",
+                "entry_price": 100.0,
+                "stop_price": 98.0,
+                "take_profit_price": 104.0,
+                "order_valid_to_ts": t1,
+            }
+        ]
+    )
+    fills = generate_fills(intent, bars).fills
+    exit_row = fills[fills["reason"] != "signal_fill"].iloc[0]
+    assert exit_row["reason"] == "session_end"
+    assert pd.to_datetime(exit_row["fill_ts"], utc=True) == t1
+
+
+def test_same_bar_tp_triggers_when_enabled():
+    t0 = pd.Timestamp("2025-04-03 14:35:00", tz="UTC")
+    t1 = pd.Timestamp("2025-04-03 14:40:00", tz="UTC")
+    bars = _bars([t0, t1], [100.0, 101.0], [105.0, 101.5], [99.5, 100.5])
+    intent = pd.DataFrame(
+        [
+            {
+                "template_id": "t1",
+                "signal_ts": t0,
+                "symbol": "HOOD",
+                "side": "BUY",
+                "entry_price": 100.0,
+                "stop_price": 98.0,
+                "take_profit_price": 104.0,
+                "order_valid_to_ts": t1,
+            }
+        ]
+    )
+    fills = generate_fills(intent, bars, allow_same_bar_exit=True).fills
+    exit_row = fills[fills["reason"] != "signal_fill"].iloc[0]
+    assert exit_row["reason"] == "take_profit"
+    assert pd.to_datetime(exit_row["fill_ts"], utc=True) == t0
+
+
+def test_same_bar_no_fill_default():
+    t0 = pd.Timestamp("2025-04-03 14:35:00", tz="UTC")
+    t1 = pd.Timestamp("2025-04-03 14:40:00", tz="UTC")
+    bars = _bars([t0, t1], [100.0, 101.0], [105.0, 101.5], [97.0, 100.5])
+    intent = pd.DataFrame(
+        [
+            {
+                "template_id": "t1",
+                "signal_ts": t0,
+                "symbol": "HOOD",
+                "side": "BUY",
+                "entry_price": 100.0,
+                "stop_price": 98.0,
+                "take_profit_price": 104.0,
+                "order_valid_to_ts": t1,
+            }
+        ]
+    )
+    fills = generate_fills(
+        intent,
+        bars,
+        allow_same_bar_exit=True,
+        same_bar_resolution_mode="no_fill",
+    ).fills
+    assert len(fills) == 1
+    assert fills.iloc[0]["reason"] == "order_ambiguous_no_fill"
+
+
+def test_same_bar_m1_probe_tp_first():
+    t0 = pd.Timestamp("2025-04-03 14:35:00", tz="UTC")
+    t1 = pd.Timestamp("2025-04-03 14:40:00", tz="UTC")
+    bars = _bars([t0, t1], [100.0, 101.0], [105.0, 101.5], [97.0, 100.5])
+    m1 = _bars(
+        [
+            pd.Timestamp("2025-04-03 14:35:00", tz="UTC"),
+            pd.Timestamp("2025-04-03 14:36:00", tz="UTC"),
+        ],
+        [100.0, 101.0],
+        [100.2, 104.2],
+        [99.9, 99.1],
+    )
+    intent = pd.DataFrame(
+        [
+            {
+                "template_id": "t1",
+                "signal_ts": t0,
+                "symbol": "HOOD",
+                "side": "BUY",
+                "entry_price": 100.0,
+                "stop_price": 98.0,
+                "take_profit_price": 104.0,
+                "order_valid_to_ts": t1,
+            }
+        ]
+    )
+    fills = generate_fills(
+        intent,
+        bars,
+        allow_same_bar_exit=True,
+        same_bar_resolution_mode="m1_probe_then_no_fill",
+        intrabar_probe_bars_m1=m1,
+    ).fills
+    exit_row = fills[fills["reason"] != "signal_fill"].iloc[0]
+    assert exit_row["reason"] == "take_profit"
+    assert pd.to_datetime(exit_row["fill_ts"], utc=True) == t0
+
+
+def test_same_bar_m1_probe_sl_first():
+    t0 = pd.Timestamp("2025-04-03 14:35:00", tz="UTC")
+    t1 = pd.Timestamp("2025-04-03 14:40:00", tz="UTC")
+    bars = _bars([t0, t1], [100.0, 101.0], [105.0, 101.5], [97.0, 100.5])
+    m1 = _bars(
+        [
+            pd.Timestamp("2025-04-03 14:35:00", tz="UTC"),
+            pd.Timestamp("2025-04-03 14:36:00", tz="UTC"),
+        ],
+        [100.0, 99.0],
+        [100.2, 103.5],
+        [99.8, 97.9],
+    )
+    intent = pd.DataFrame(
+        [
+            {
+                "template_id": "t1",
+                "signal_ts": t0,
+                "symbol": "HOOD",
+                "side": "BUY",
+                "entry_price": 100.0,
+                "stop_price": 98.0,
+                "take_profit_price": 104.0,
+                "order_valid_to_ts": t1,
+            }
+        ]
+    )
+    fills = generate_fills(
+        intent,
+        bars,
+        allow_same_bar_exit=True,
+        same_bar_resolution_mode="m1_probe_then_no_fill",
+        intrabar_probe_bars_m1=m1,
+    ).fills
+    exit_row = fills[fills["reason"] != "signal_fill"].iloc[0]
+    assert exit_row["reason"] == "stop_loss"
+    assert pd.to_datetime(exit_row["fill_ts"], utc=True) == t0
+
+
+def test_same_bar_m1_probe_ambiguous_then_no_fill():
+    t0 = pd.Timestamp("2025-04-03 14:35:00", tz="UTC")
+    t1 = pd.Timestamp("2025-04-03 14:40:00", tz="UTC")
+    bars = _bars([t0, t1], [100.0, 101.0], [105.0, 101.5], [97.0, 100.5])
+    m1 = _bars(
+        [pd.Timestamp("2025-04-03 14:35:00", tz="UTC")],
+        [100.0],
+        [104.5],
+        [97.5],
+    )
+    intent = pd.DataFrame(
+        [
+            {
+                "template_id": "t1",
+                "signal_ts": t0,
+                "symbol": "HOOD",
+                "side": "BUY",
+                "entry_price": 100.0,
+                "stop_price": 98.0,
+                "take_profit_price": 104.0,
+                "order_valid_to_ts": t1,
+            }
+        ]
+    )
+    fills = generate_fills(
+        intent,
+        bars,
+        allow_same_bar_exit=True,
+        same_bar_resolution_mode="m1_probe_then_no_fill",
+        intrabar_probe_bars_m1=m1,
+    ).fills
+    assert len(fills) == 1
+    assert fills.iloc[0]["reason"] == "order_ambiguous_no_fill"
+
+
+def test_same_bar_m1_missing_then_no_fill():
+    t0 = pd.Timestamp("2025-04-03 14:35:00", tz="UTC")
+    t1 = pd.Timestamp("2025-04-03 14:40:00", tz="UTC")
+    bars = _bars([t0, t1], [100.0, 101.0], [105.0, 101.5], [97.0, 100.5])
+    intent = pd.DataFrame(
+        [
+            {
+                "template_id": "t1",
+                "signal_ts": t0,
+                "symbol": "HOOD",
+                "side": "BUY",
+                "entry_price": 100.0,
+                "stop_price": 98.0,
+                "take_profit_price": 104.0,
+                "order_valid_to_ts": t1,
+            }
+        ]
+    )
+    fills = generate_fills(
+        intent,
+        bars,
+        allow_same_bar_exit=True,
+        same_bar_resolution_mode="m1_probe_then_no_fill",
+        intrabar_probe_bars_m1=None,
+    ).fills
+    assert len(fills) == 1
+    assert fills.iloc[0]["reason"] == "order_ambiguous_no_fill"
+
+
+def test_same_bar_m1_probe_entry_minute_sl_possible_then_no_fill():
+    t0 = pd.Timestamp("2025-04-03 14:35:00", tz="UTC")
+    t1 = pd.Timestamp("2025-04-03 14:40:00", tz="UTC")
+    bars = _bars([t0, t1], [100.0, 101.0], [105.0, 101.5], [97.0, 100.5])
+    m1 = _bars(
+        [
+            pd.Timestamp("2025-04-03 14:35:00", tz="UTC"),
+            pd.Timestamp("2025-04-03 14:36:00", tz="UTC"),
+        ],
+        [100.0, 101.0],
+        [100.2, 104.5],
+        [97.9, 100.8],  # entry minute also allows SL hit -> ambiguous entry minute
+    )
+    intent = pd.DataFrame(
+        [
+            {
+                "template_id": "t1",
+                "signal_ts": t0,
+                "symbol": "HOOD",
+                "side": "BUY",
+                "entry_price": 100.0,
+                "stop_price": 98.0,
+                "take_profit_price": 104.0,
+                "order_valid_to_ts": t1,
+            }
+        ]
+    )
+    fills = generate_fills(
+        intent,
+        bars,
+        allow_same_bar_exit=True,
+        same_bar_resolution_mode="m1_probe_then_no_fill",
+        intrabar_probe_bars_m1=m1,
+    ).fills
+    assert len(fills) == 1
+    assert fills.iloc[0]["reason"] == "order_ambiguous_no_fill"
