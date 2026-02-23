@@ -55,6 +55,9 @@ def _config(timeframe_minutes: int | None = 5):
         trigger_must_be_within_session=True,
         netting_mode="one_position_per_symbol",
         timeframe_minutes=5 if timeframe_minutes is None else timeframe_minutes,
+        max_position_pct=100.0,
+        min_mother_body_fraction=0.0,
+        min_inside_body_fraction=0.0,
     )
     if timeframe_minutes is None:
         cfg.timeframe_minutes = None
