@@ -16,6 +16,21 @@ from ..models import RawSignal
 def _cfg(**overrides):
     base = {
         "inside_bar_definition_mode": "mb_body_oc__ib_hl",
+        "atr_period": 14,
+        "risk_reward_ratio": 2.0,
+        "min_mother_bar_size": 0.0,
+        "breakout_confirmation": True,
+        "inside_bar_mode": "inclusive",
+        "session_timezone": "UTC",
+        "session_windows": ["00:00-23:59"],
+        "timeframe_minutes": 5,
+        "order_validity_policy": "session_end",
+        "valid_from_policy": "signal_ts",
+        "stop_distance_cap_ticks": 4000,
+        "max_position_pct": 100.0,
+        "max_pattern_age_candles": 12,
+        "max_deviation_atr": 3.0,
+        "max_position_loss_pct_equity": None,
         # Keep legacy test fixtures permissive unless a test targets the new gate.
         "min_mother_body_fraction": 0.0,
         "min_inside_body_fraction": 0.0,

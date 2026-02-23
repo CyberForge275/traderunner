@@ -200,100 +200,160 @@ def generate_signals(
                     continue
 
             # Netting decision handled in fill_model; do not suppress here.
+                reference_price = float(current["close"])
+                atr_for_deviation = float(levels["atr"])
+                max_dev_atr = config.max_deviation_atr
+                allow_long = True
+                allow_short = True
+                long_dev_abs = abs(entry_long - reference_price)
+                short_dev_abs = abs(entry_short - reference_price)
+                long_dev_atr = float("inf")
+                short_dev_atr = float("inf")
+                if atr_for_deviation <= 0:
+                    allow_long = False
+                    allow_short = False
+                    emit({
+                        "event": "signal_rejected",
+                        "reason": "MAX_DEVIATION_ATR",
+                        "detail": "atr_non_positive",
+                        "idx": int(idx),
+                        "atr": atr_for_deviation,
+                    })
+                elif max_dev_atr is not None:
+                    max_dev_abs = float(max_dev_atr) * atr_for_deviation
+                    long_dev_atr = long_dev_abs / atr_for_deviation
+                    short_dev_atr = short_dev_abs / atr_for_deviation
+                    if long_dev_abs > max_dev_abs:
+                        allow_long = False
+                        emit({
+                            "event": "signal_rejected",
+                            "reason": "MAX_DEVIATION_ATR",
+                            "side": "BUY",
+                            "idx": int(idx),
+                            "deviation_abs": long_dev_abs,
+                            "deviation_atr": long_dev_atr,
+                            "max_allowed_atr": float(max_dev_atr),
+                        })
+                    if short_dev_abs > max_dev_abs:
+                        allow_short = False
+                        emit({
+                            "event": "signal_rejected",
+                            "reason": "MAX_DEVIATION_ATR",
+                            "side": "SELL",
+                            "idx": int(idx),
+                            "deviation_abs": short_dev_abs,
+                            "deviation_atr": short_dev_atr,
+                            "max_allowed_atr": float(max_dev_atr),
+                        })
+                if not allow_long and not allow_short:
+                    state["done"] = True
+                    continue
 
                 # Long leg SL/TP with cap
-                sl_long = levels['mother_low']
-                initial_risk_long = entry_long - sl_long
-                if initial_risk_long <= 0:
-                    emit({
-                        'event': 'signal_rejected',
-                        'reason': 'non_positive_risk',
-                        'idx': int(idx),
-                        'entry': entry_long,
-                        'sl': sl_long,
-                        'side': 'BUY'
-                    })
-                    state['done'] = True
-                    continue
-                effective_risk_long = initial_risk_long
-                stop_cap_applied_long = False
-                if initial_risk_long > max_risk:
-                    sl_long = entry_long - max_risk
-                    effective_risk_long = max_risk
-                    stop_cap_applied_long = True
-                tp_long = entry_long + (effective_risk_long * config.risk_reward_ratio)
+                if allow_long:
+                    sl_long = levels['mother_low']
+                    initial_risk_long = entry_long - sl_long
+                    if initial_risk_long <= 0:
+                        emit({
+                            'event': 'signal_rejected',
+                            'reason': 'non_positive_risk',
+                            'idx': int(idx),
+                            'entry': entry_long,
+                            'sl': sl_long,
+                            'side': 'BUY'
+                        })
+                        allow_long = False
+                    else:
+                        effective_risk_long = initial_risk_long
+                        stop_cap_applied_long = False
+                        if initial_risk_long > max_risk:
+                            sl_long = entry_long - max_risk
+                            effective_risk_long = max_risk
+                            stop_cap_applied_long = True
+                        tp_long = entry_long + (effective_risk_long * config.risk_reward_ratio)
 
                 # Short leg SL/TP with cap
-                sl_short = levels['mother_high']
-                initial_risk_short = sl_short - entry_short
-                if initial_risk_short <= 0:
-                    emit({
-                        'event': 'signal_rejected',
-                        'reason': 'non_positive_risk',
-                        'idx': int(idx),
-                        'entry': entry_short,
-                        'sl': sl_short,
-                        'side': 'SELL'
-                    })
-                    state['done'] = True
+                if allow_short:
+                    sl_short = levels['mother_high']
+                    initial_risk_short = sl_short - entry_short
+                    if initial_risk_short <= 0:
+                        emit({
+                            'event': 'signal_rejected',
+                            'reason': 'non_positive_risk',
+                            'idx': int(idx),
+                            'entry': entry_short,
+                            'sl': sl_short,
+                            'side': 'SELL'
+                        })
+                        allow_short = False
+                    else:
+                        effective_risk_short = initial_risk_short
+                        stop_cap_applied_short = False
+                        if initial_risk_short > max_risk:
+                            sl_short = entry_short + max_risk
+                            effective_risk_short = max_risk
+                            stop_cap_applied_short = True
+                        tp_short = entry_short - (effective_risk_short * config.risk_reward_ratio)
+
+                if not allow_long and not allow_short:
+                    state["done"] = True
                     continue
-                effective_risk_short = initial_risk_short
-                stop_cap_applied_short = False
-                if initial_risk_short > max_risk:
-                    sl_short = entry_short + max_risk
-                    effective_risk_short = max_risk
-                    stop_cap_applied_short = True
-                tp_short = entry_short - (effective_risk_short * config.risk_reward_ratio)
 
                 # Emit two legs (BUY + SELL) for OCO
-                signals.append(
-                    RawSignal(
-                        timestamp=signal_ts,
-                        side='BUY',
-                        entry_price=entry_long,
-                        stop_loss=sl_long,
-                        take_profit=tp_long,
-                        metadata={
-                            'pattern': 'inside_bar_breakout',
-                            'session_key': str(session_key),
-                            'ib_idx': state['ib_idx'],
-                            'entry_mode': entry_mode,
-                            'stop_cap_applied': stop_cap_applied_long,
-                            'initial_risk': initial_risk_long,
-                            'effective_risk': effective_risk_long,
-                            'mother_high': levels['mother_high'],
-                            'mother_low': levels['mother_low'],
-                            'mother_body_fraction': levels['mother_body_fraction'],
-                            'inside_body_fraction': levels['inside_body_fraction'],
-                            'atr': levels['atr'],
-                            'symbol': symbol
-                        }
+                if allow_long:
+                    signals.append(
+                        RawSignal(
+                            timestamp=signal_ts,
+                            side='BUY',
+                            entry_price=entry_long,
+                            stop_loss=sl_long,
+                            take_profit=tp_long,
+                            metadata={
+                                'pattern': 'inside_bar_breakout',
+                                'session_key': str(session_key),
+                                'ib_idx': state['ib_idx'],
+                                'entry_mode': entry_mode,
+                                'stop_cap_applied': stop_cap_applied_long,
+                                'initial_risk': initial_risk_long,
+                                'effective_risk': effective_risk_long,
+                                'mother_high': levels['mother_high'],
+                                'mother_low': levels['mother_low'],
+                                'mother_body_fraction': levels['mother_body_fraction'],
+                                'inside_body_fraction': levels['inside_body_fraction'],
+                                'atr': levels['atr'],
+                                'deviation_abs': long_dev_abs,
+                                'deviation_atr': long_dev_atr,
+                                'symbol': symbol
+                            }
+                        )
                     )
-                )
-                signals.append(
-                    RawSignal(
-                        timestamp=signal_ts,
-                        side='SELL',
-                        entry_price=entry_short,
-                        stop_loss=sl_short,
-                        take_profit=tp_short,
-                        metadata={
-                            'pattern': 'inside_bar_breakout',
-                            'session_key': str(session_key),
-                            'ib_idx': state['ib_idx'],
-                            'entry_mode': entry_mode,
-                            'stop_cap_applied': stop_cap_applied_short,
-                            'initial_risk': initial_risk_short,
-                            'effective_risk': effective_risk_short,
-                            'mother_high': levels['mother_high'],
-                            'mother_low': levels['mother_low'],
-                            'mother_body_fraction': levels['mother_body_fraction'],
-                            'inside_body_fraction': levels['inside_body_fraction'],
-                            'atr': levels['atr'],
-                            'symbol': symbol
-                        }
+                if allow_short:
+                    signals.append(
+                        RawSignal(
+                            timestamp=signal_ts,
+                            side='SELL',
+                            entry_price=entry_short,
+                            stop_loss=sl_short,
+                            take_profit=tp_short,
+                            metadata={
+                                'pattern': 'inside_bar_breakout',
+                                'session_key': str(session_key),
+                                'ib_idx': state['ib_idx'],
+                                'entry_mode': entry_mode,
+                                'stop_cap_applied': stop_cap_applied_short,
+                                'initial_risk': initial_risk_short,
+                                'effective_risk': effective_risk_short,
+                                'mother_high': levels['mother_high'],
+                                'mother_low': levels['mother_low'],
+                                'mother_body_fraction': levels['mother_body_fraction'],
+                                'inside_body_fraction': levels['inside_body_fraction'],
+                                'atr': levels['atr'],
+                                'deviation_abs': short_dev_abs,
+                                'deviation_atr': short_dev_atr,
+                                'symbol': symbol
+                            }
+                        )
                     )
-                )
                 state['done'] = True
                 signals_per_session[session_key] = signals_per_session.get(session_key, 0) + 1
 

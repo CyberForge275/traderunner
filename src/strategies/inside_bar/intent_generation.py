@@ -99,6 +99,7 @@ def generate_intent(
         session_filter = params.get("session_filter")
         valid_from_policy = params.get("valid_from_policy")
         timeframe_minutes = params.get("timeframe_minutes")
+        max_pattern_age_candles = params.get("max_pattern_age_candles")
         intents = []
         for _, sig in active_signals.iterrows():
             signal_ts = pd.to_datetime(sig["timestamp"], utc=True)
@@ -134,6 +135,25 @@ def generate_intent(
                 intent["dbg_valid_to_ts_utc"] = exit_ts
                 intent["dbg_valid_to_ts_ny"] = exit_ts.tz_convert("America/New_York")
                 intent["dbg_valid_to_ts"] = exit_ts.tz_convert(session_timezone)
+
+            if max_pattern_age_candles is not None:
+                if timeframe_minutes is None:
+                    raise IntentGenerationError(
+                        "max_pattern_age_candles requires timeframe_minutes in params"
+                    )
+                age_valid_to = signal_ts + pd.Timedelta(
+                    minutes=int(max_pattern_age_candles) * int(timeframe_minutes)
+                )
+                current_valid_to = intent.get("order_valid_to_ts")
+                if current_valid_to is None or pd.isna(current_valid_to):
+                    intent["order_valid_to_ts"] = age_valid_to
+                else:
+                    intent["order_valid_to_ts"] = min(
+                        pd.to_datetime(current_valid_to, utc=True),
+                        age_valid_to,
+                    )
+                intent["order_valid_to_reason"] = "pattern_age_cap"
+                intent["dbg_pattern_age_valid_to_ts_utc"] = age_valid_to
 
             if effective_valid_from_policy in {"signal_ts", "next_bar"}:
                 if effective_valid_from_policy == "signal_ts":

@@ -189,27 +189,29 @@ class InsideBarConfig:
     inside_bar_definition_mode: str
 
     # === Core Parameters ===
-    atr_period: int = 14
-    risk_reward_ratio: float = 2.0
-    min_mother_bar_size: float = 0.5
-    breakout_confirmation: bool = True
-    inside_bar_mode: str = "inclusive"  # or "strict"
+    atr_period: int
+    risk_reward_ratio: float
+    min_mother_bar_size: float
+    breakout_confirmation: bool
+    inside_bar_mode: str  # or "strict"
 
     # === Session & Timezone (ALWAYS ON) ===
-    session_timezone: str = "Europe/Berlin"
-    session_windows: List[str] = field(
-        default_factory=lambda: ["15:00-16:00", "16:00-17:00"]
-    )
+    session_timezone: str
+    session_windows: List[str]
+    timeframe_minutes: int
+    order_validity_policy: str
+    valid_from_policy: str
+    stop_distance_cap_ticks: int
+    max_position_pct: float
+
+    # === Optional controls (legacy-compatible) ===
     max_trades_per_session: int = 1
 
     # === Entry & Exit ===
     entry_level_mode: str = "mother_bar"  # or "inside_bar"
-    stop_distance_cap_ticks: int = 4000
     tick_size: float = 0.01
-    timeframe_minutes: int = 5
 
     # === Order Validity (Critical for Replay Fills) ===
-    order_validity_policy: str = "session_end"
     """Order validity policy. Determines when orders expire.
     
     Options:
@@ -231,8 +233,6 @@ class InsideBarConfig:
         policy="fixed_minutes" + validity_minutes=60 → order expires after 60 min
     """
     
-    valid_from_policy: str = "signal_ts"  # or "next_bar"
-
     # === MVP: Trigger and Netting Rules ===
     trigger_must_be_within_session: bool = True
     """Enforce trigger (breakout) must occur within session windows.
@@ -260,10 +260,9 @@ class InsideBarConfig:
 
     # === Live-specific Parameters ===
     lookback_candles: int = 50
-    max_pattern_age_candles: int = 12
-    max_deviation_atr: float = 3.0
-    max_position_pct: float = 100.0  # Default to 100 for Legacy parity
-
+    max_pattern_age_candles: Optional[int] = None
+    max_deviation_atr: Optional[float] = None
+    max_position_loss_pct_equity: Optional[float] = None
     @property
     def session_filter(self) -> SessionFilter:
         """Build SessionFilter from config (always instantiated)."""
@@ -342,6 +341,13 @@ class InsideBarConfig:
             f"Invalid trailing_apply_mode: {self.trailing_apply_mode} (only 'next_bar' supported)"
         assert 0.0 <= self.trailing_trigger_tp_pct <= 1.0, "Trailing trigger must be in [0, 1]"
         assert 0.0 <= self.trailing_risk_remaining_pct <= 1.0, "Trailing risk pct must be in [0, 1]"
+        if self.max_pattern_age_candles is not None:
+            assert int(self.max_pattern_age_candles) >= 1, "max_pattern_age_candles must be int >= 1 or null"
+        if self.max_deviation_atr is not None:
+            assert float(self.max_deviation_atr) >= 0.0, "max_deviation_atr must be float >= 0 or null"
+        if self.max_position_loss_pct_equity is not None:
+            value = float(self.max_position_loss_pct_equity)
+            assert 0.0 <= value <= 1.0, "max_position_loss_pct_equity must be in [0,1] or null"
 
     def __post_init__(self):
         """Auto-validate after initialization."""
@@ -440,3 +446,69 @@ def load_default_config() -> dict:
     """
     config_path = get_default_config_path()
     return load_config(config_path)
+
+
+def _require_param(params: dict, key: str):
+    if key not in params:
+        raise ValueError(f"{key} is required (SSOT: set in YAML)")
+    return params[key]
+
+
+def build_inside_bar_config(params: dict) -> InsideBarConfig:
+    """Single SSOT mapper for confirmed_breakout core params."""
+    if "inside_bar_definition_mode" not in params:
+        raise ValueError("inside_bar_definition_mode is required (no code default)")
+    if "timeframe_minutes" not in params:
+        raise ValueError("timeframe_minutes is required in params (SSOT, no code default)")
+
+    session_windows = params.get("session_filter")
+    if session_windows is None:
+        session_windows = params.get("session_windows")
+    if session_windows is None:
+        raise ValueError("session_filter is required (SSOT: set in YAML)")
+
+    core_params = {
+        "inside_bar_definition_mode": params["inside_bar_definition_mode"],
+        "atr_period": _require_param(params, "atr_period"),
+        "risk_reward_ratio": _require_param(params, "risk_reward_ratio"),
+        "min_mother_bar_size": _require_param(params, "min_mother_bar_size"),
+        "breakout_confirmation": _require_param(params, "breakout_confirmation"),
+        "inside_bar_mode": _require_param(params, "inside_bar_mode"),
+        "session_timezone": _require_param(params, "session_timezone"),
+        "session_windows": session_windows,
+        "order_validity_policy": _require_param(params, "order_validity_policy"),
+        "valid_from_policy": _require_param(params, "valid_from_policy"),
+        "stop_distance_cap_ticks": _require_param(params, "stop_distance_cap_ticks"),
+        "timeframe_minutes": params["timeframe_minutes"],
+        "max_position_pct": _require_param(params, "max_position_pct"),
+        "max_pattern_age_candles": _require_param(params, "max_pattern_age_candles"),
+        "max_deviation_atr": _require_param(params, "max_deviation_atr"),
+        "max_position_loss_pct_equity": _require_param(params, "max_position_loss_pct_equity"),
+    }
+
+    if core_params["order_validity_policy"] == "fixed_minutes":
+        if "validity_minutes" in params:
+            core_params["order_validity_minutes"] = params["validity_minutes"]
+        else:
+            core_params["order_validity_minutes"] = _require_param(params, "order_validity_minutes")
+    elif "validity_minutes" in params:
+        core_params["order_validity_minutes"] = params["validity_minutes"]
+    elif "order_validity_minutes" in params:
+        core_params["order_validity_minutes"] = params["order_validity_minutes"]
+
+    optional_passthrough = (
+        "entry_level_mode",
+        "tick_size",
+        "max_trades_per_session",
+        "trigger_must_be_within_session",
+        "netting_mode",
+        "trailing_enabled",
+        "trailing_trigger_tp_pct",
+        "trailing_risk_remaining_pct",
+        "trailing_apply_mode",
+    )
+    for key in optional_passthrough:
+        if key in params:
+            core_params[key] = params[key]
+
+    return InsideBarConfig(**core_params)
