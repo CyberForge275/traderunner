@@ -18,7 +18,7 @@ def _cfg(**overrides) -> InsideBarConfig:
         "timeframe_minutes": 5,
         "order_validity_policy": "session_end",
         "valid_from_policy": "signal_ts",
-        "stop_distance_cap_ticks": 4000,
+        "stop_cap_atr": 4000,
         "max_position_pct": 100.0,
         "min_mother_body_fraction": 0.0,
         "min_inside_body_fraction": 0.0,

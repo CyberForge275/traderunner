@@ -26,7 +26,7 @@ def test_all_critical_params_materialize():
     critical_params = [
         'order_validity_policy',
         'max_position_pct',
-        'stop_distance_cap_ticks',
+        'stop_cap_atr',
         'risk_reward_ratio',
         'atr_period'
     ]

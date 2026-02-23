@@ -67,8 +67,16 @@ class TestBacktestCoreParity:
             'inside_bar_mode': 'inclusive',
             'session_timezone': 'UTC',
             'session_windows': ['00:00-23:59'],
-            'stop_distance_cap_ticks': 40,
-            'tick_size': 0.01
+            'timeframe_minutes': 5,
+            'order_validity_policy': 'session_end',
+            'valid_from_policy': 'signal_ts',
+            'stop_cap_atr': 40,
+            'max_position_pct': 100.0,
+            'min_mother_body_fraction': 0.0,
+            'min_inside_body_fraction': 0.0,
+            'max_pattern_age_candles': None,
+            'max_deviation_atr': None,
+            'max_position_loss_pct_equity': None,
         }
 
     def test_backtest_adapter_matches_core(self, test_data, config):
@@ -120,8 +128,16 @@ class TestBacktestCoreParity:
             'inside_bar_mode': 'inclusive',
             'session_timezone': 'UTC',
             'session_windows': ['00:00-23:59'],
-            'stop_distance_cap_ticks': 40,
-            'tick_size': 0.01
+            'timeframe_minutes': 5,
+            'order_validity_policy': 'session_end',
+            'valid_from_policy': 'signal_ts',
+            'stop_cap_atr': 40,
+            'max_position_pct': 100.0,
+            'min_mother_body_fraction': 0.0,
+            'min_inside_body_fraction': 0.0,
+            'max_pattern_age_candles': None,
+            'max_deviation_atr': None,
+            'max_position_loss_pct_equity': None,
         }
 
         backtest = InsideBarStrategy()
@@ -152,8 +168,16 @@ class TestBacktestCoreParity:
             'inside_bar_mode': mode,
             'session_timezone': 'UTC',
             'session_windows': ['00:00-23:59'],
-            'stop_distance_cap_ticks': 40,
-            'tick_size': 0.01
+            'timeframe_minutes': 5,
+            'order_validity_policy': 'session_end',
+            'valid_from_policy': 'signal_ts',
+            'stop_cap_atr': 40,
+            'max_position_pct': 100.0,
+            'min_mother_body_fraction': 0.0,
+            'min_inside_body_fraction': 0.0,
+            'max_pattern_age_candles': None,
+            'max_deviation_atr': None,
+            'max_position_loss_pct_equity': None,
         }
 
         backtest = InsideBarStrategy()

@@ -26,7 +26,7 @@ def _cfg(**overrides):
         "timeframe_minutes": 5,
         "order_validity_policy": "session_end",
         "valid_from_policy": "signal_ts",
-        "stop_distance_cap_ticks": 4000,
+        "stop_cap_atr": 4000,
         "max_position_pct": 100.0,
         "max_pattern_age_candles": 12,
         "max_deviation_atr": None,
@@ -322,6 +322,7 @@ class TestSignalGeneration:
         """Should generate LONG signal on upside breakout."""
         config = _cfg(
             breakout_confirmation=True,
+            atr_period=1,
             min_mother_bar_size=0,
             risk_reward_ratio=2.0,
             session_timezone="UTC",
@@ -385,6 +386,7 @@ class TestSignalGeneration:
 
         config = _cfg(
             breakout_confirmation=True,
+            atr_period=1,
             min_mother_bar_size=0,
             risk_reward_ratio=2.0
         )

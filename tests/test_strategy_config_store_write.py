@@ -35,7 +35,7 @@ def temp_config_root(tmp_path, monkeypatch):
                     "timeframe_minutes": 5,
                     "valid_from_policy": "signal_ts",
                     "order_validity_policy": "session_end",
-                    "stop_distance_cap_ticks": 40,
+                    "stop_cap_atr": 40,
                     "max_position_pct": 100.0
                 },
                 "tunable": {

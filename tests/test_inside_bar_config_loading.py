@@ -35,7 +35,7 @@ def test_load_default_config_returns_dict():
         'atr_period',
         'risk_reward_ratio',
         'max_position_pct',
-        'stop_distance_cap_ticks'
+        'stop_cap_atr'
     ]
     for key in expected_keys:
         assert key in config, f"Expected key '{key}' not found in config"
@@ -48,7 +48,7 @@ def test_config_has_correct_defaults():
     # Verify some critical defaults
     assert config['atr_period'] == 15
     assert config['max_position_pct'] == 100.0
-    assert config['stop_distance_cap_ticks'] == 40
+    assert config['stop_cap_atr'] == 2.0
 
 
 def test_inside_bar_config_accepts_loaded_defaults():
@@ -61,7 +61,7 @@ def test_inside_bar_config_accepts_loaded_defaults():
     # Verify the instance has correct attributes
     assert config.atr_period == 15
     assert config.max_position_pct == 100.0
-    assert config.stop_distance_cap_ticks == 40
+    assert config.stop_cap_atr == 2.0
 
 
 def test_old_global_config_path_is_not_primary():
