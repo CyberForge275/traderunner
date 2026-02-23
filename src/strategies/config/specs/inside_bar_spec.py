@@ -154,10 +154,10 @@ class InsideBarSpec:
             if not isinstance(val, (int, float)) or val < 0:
                 raise ValueError(f"inside_bar v{version} invalid max_deviation_atr: {val} (must be float >= 0)")
 
-        # max_position_loss_pct_equity: float >= 0 and <= 1
+        # max_position_loss_pct_equity: float >= 0 and <= 1, or None (disabled)
         if "max_position_loss_pct_equity" in data:
             val = data["max_position_loss_pct_equity"]
-            if not isinstance(val, (int, float)) or val < 0 or val > 1:
+            if val is not None and (not isinstance(val, (int, float)) or val < 0 or val > 1):
                 raise ValueError(f"inside_bar v{version} invalid max_position_loss_pct_equity: {val} (must be float >= 0 and <= 1)")
 
         if "min_mother_body_fraction" in data:

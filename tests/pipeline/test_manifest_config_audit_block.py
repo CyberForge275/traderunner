@@ -25,6 +25,7 @@ def _make_bars(tmpdir: Path) -> Path:
 
 def test_pipeline_manifest_contains_config_audit_block(tmp_path: Path):
     out = tmp_path / "run"
+    out.mkdir(parents=True, exist_ok=True)
     bars = _make_bars(tmp_path)
     argv = [
         "--run-id",
@@ -69,6 +70,7 @@ def test_pipeline_manifest_contains_config_audit_block(tmp_path: Path):
 
 def test_pipeline_manifest_includes_base_config_metadata_when_provided(tmp_path: Path):
     out = tmp_path / "run_with_base"
+    out.mkdir(parents=True, exist_ok=True)
     bars = _make_bars(tmp_path)
     base_config = tmp_path / "base_config.yaml"
     base_config.write_text(
