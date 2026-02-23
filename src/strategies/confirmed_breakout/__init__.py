@@ -9,7 +9,12 @@ import pandas as pd
 
 from .core import InsideBarCore, InsideBarConfig
 from .models import RawSignal
-from .config import load_config, get_default_config_path, load_default_config
+from .config import (
+    build_inside_bar_config,
+    load_config,
+    get_default_config_path,
+    load_default_config,
+)
 
 from strategies.registry import register_strategy
 from .signal_schema import get_signal_frame_schema
@@ -24,47 +29,7 @@ _RANGE_RATIO_MAX = 0.912
 
 
 def _core_config_from_params(params: dict) -> InsideBarConfig:
-    # Keep mapping consistent with InsideBarStrategy.generate_signals()
-    if "inside_bar_definition_mode" not in params:
-        raise ValueError(
-            "inside_bar_definition_mode is required in params (no code default)"
-        )
-    if "timeframe_minutes" not in params:
-        raise ValueError("timeframe_minutes is required in params (SSOT, no code default)")
-    core_params = {
-        # Core
-        "inside_bar_definition_mode": params["inside_bar_definition_mode"],
-        "atr_period": params.get("atr_period", 14),
-        "risk_reward_ratio": params.get("risk_reward_ratio", 2.0),
-        "min_mother_bar_size": params.get("min_mother_bar_size", 0.5),
-        "breakout_confirmation": params.get("breakout_confirmation", True),
-        "inside_bar_mode": params.get("inside_bar_mode", "inclusive"),
-        # Session & TZ
-        "session_timezone": params.get("session_timezone", "Europe/Berlin"),
-        "session_windows": params.get("session_filter")
-            or params.get("session_windows", ["15:00-16:00", "16:00-17:00"]),
-        "max_trades_per_session": params.get("max_trades_per_session", 1),
-        # Order validity
-        "order_validity_policy": params.get("order_validity_policy", "session_end"),
-        "order_validity_minutes": params.get("validity_minutes")
-            or params.get("order_validity_minutes", 60),
-        "valid_from_policy": params.get("valid_from_policy", "signal_ts"),
-        # Entry/SL sizing
-        "entry_level_mode": params.get("entry_level_mode", "mother_bar"),
-        "stop_distance_cap_ticks": params.get("stop_distance_cap_ticks", 40),
-        "tick_size": params.get("tick_size", 0.01),
-        "timeframe_minutes": params["timeframe_minutes"],
-        # MVP: Trigger and Netting
-        "trigger_must_be_within_session": params.get("trigger_must_be_within_session", True),
-        "netting_mode": params.get("netting_mode", "one_position_per_symbol"),
-        # Trailing
-        "trailing_enabled": params.get("trailing_enabled", False),
-        "trailing_trigger_tp_pct": params.get("trailing_trigger_tp_pct", 0.70),
-        "trailing_risk_remaining_pct": params.get("trailing_risk_remaining_pct", 0.50),
-        "trailing_apply_mode": params.get("trailing_apply_mode", "next_bar"),
-        "max_position_pct": params.get("max_position_pct", 100.0),
-    }
-    return InsideBarConfig(**core_params)
+    return build_inside_bar_config(params)
 
 
 def extend_insidebar_signal_frame_from_core(

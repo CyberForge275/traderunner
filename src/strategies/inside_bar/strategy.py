@@ -15,6 +15,7 @@ from ..base import BaseStrategy, Signal
 from .core import InsideBarCore, InsideBarConfig
 from .models import RawSignal
 from .core import STRATEGY_VERSION as _IB_CORE_VERSION
+from .config import build_inside_bar_config
 
 
 class InsideBarStrategy(BaseStrategy):
@@ -122,52 +123,7 @@ class InsideBarStrategy(BaseStrategy):
         # Preprocess (ensure timestamp is datetime)
         df = self.preprocess_data(data.copy())
 
-        # Create InsideBarConfig from dict
-        # Extract only params supported by core
-        if "inside_bar_definition_mode" not in config:
-            raise ValueError("inside_bar_definition_mode is required (no code default)")
-        core_params = {
-            # Core
-            'inside_bar_definition_mode': config['inside_bar_definition_mode'],
-            'atr_period': config.get('atr_period', 14),
-            'risk_reward_ratio': config.get('risk_reward_ratio', 2.0),
-            'min_mother_bar_size': config.get('min_mother_bar_size', 0.5),
-            'breakout_confirmation': config.get('breakout_confirmation', True),
-            'inside_bar_mode': config.get('inside_bar_mode', 'inclusive'),
-
-            # Session & TZ
-            'session_timezone': config.get('session_timezone', 'Europe/Berlin'),
-            'session_windows': config.get('session_filter')
-                or config.get('session_windows', ['15:00-16:00', '16:00-17:00']),
-            'max_trades_per_session': config.get('max_trades_per_session', 1),
-
-            # Order validity
-            'order_validity_policy': config.get('order_validity_policy', 'session_end'),
-            'order_validity_minutes': config.get('validity_minutes')  # User-facing name
-                or config.get('order_validity_minutes', 60),  # Internal name fallback
-            'valid_from_policy': config.get('valid_from_policy', 'signal_ts'),
-
-            # Entry/SL sizing
-            'entry_level_mode': config.get('entry_level_mode', 'mother_bar'),
-            'stop_distance_cap_ticks': config.get('stop_distance_cap_ticks', 40),
-            'tick_size': config.get('tick_size', 0.01),
-            
-            # MVP: Trigger and Netting
-            'trigger_must_be_within_session': config.get('trigger_must_be_within_session', True),
-            'netting_mode': config.get('netting_mode', 'one_position_per_symbol'),
-
-            # Trailing (pass-through, defaults already validated)
-            'trailing_enabled': config.get('trailing_enabled', False),
-            'trailing_trigger_tp_pct': config.get('trailing_trigger_tp_pct', 0.70),
-            'trailing_risk_remaining_pct': config.get('trailing_risk_remaining_pct', 0.50),
-            'trailing_apply_mode': config.get('trailing_apply_mode', 'next_bar'),
-
-            'max_position_pct': config.get('max_position_pct', 100.0),
-            'min_mother_body_fraction': config.get('min_mother_body_fraction', 0.55),
-            'min_inside_body_fraction': config.get('min_inside_body_fraction', 0.40),
-        }
-
-        strategy_config = InsideBarConfig(**core_params)
+        strategy_config = build_inside_bar_config(config)
 
         # Delegate to core
         core = InsideBarCore(strategy_config)
