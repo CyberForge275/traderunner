@@ -19,7 +19,7 @@ versions:
       timeframe_minutes: 5
       valid_from_policy: signal_ts
       order_validity_policy: session_end
-      stop_distance_cap_ticks: 40
+      stop_cap_atr: 2.0
       max_position_pct: 100.0
     tunable:
       mother_range_ratio_min: 0.751
@@ -45,7 +45,7 @@ versions:
       timeframe_minutes: 5
       valid_from_policy: signal_ts
       order_validity_policy: session_end
-      stop_distance_cap_ticks: 40
+      stop_cap_atr: 2.0
       max_position_pct: 100.0
     tunable:
       mother_range_ratio_min: 0.751

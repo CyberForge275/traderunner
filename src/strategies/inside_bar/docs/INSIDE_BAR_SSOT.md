@@ -72,7 +72,7 @@ Ablauf:
   - LONG: SL = mother_low
   - SHORT: SL = mother_high
 - SL Cap:
-  - maximale Stop-Distanz = `stop_distance_cap_ticks * tick_size`
+  - maximale Stop-Distanz = `stop_cap_atr * tick_size`
   - falls initial risk > cap → SL wird Richtung Entry verschoben
 - TP:
   - `TP = entry ± (effective_risk * risk_reward_ratio)`

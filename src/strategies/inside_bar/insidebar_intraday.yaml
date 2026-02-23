@@ -19,7 +19,7 @@ versions:
       timeframe_minutes: 5
       valid_from_policy: signal_ts
       order_validity_policy: session_end
-      stop_distance_cap_ticks: 40
+      stop_cap_atr: 2.0
       max_position_pct: 100.0
     tunable:
       lookback_candles: 50
@@ -46,7 +46,7 @@ versions:
       timeframe_minutes: 5
       valid_from_policy: signal_ts
       order_validity_policy: session_end
-      stop_distance_cap_ticks: 40
+      stop_cap_atr: 2.0
       max_position_pct: 100.0
     tunable:
       lookback_candles: 50
@@ -73,7 +73,7 @@ versions:
       timeframe_minutes: 5
       valid_from_policy: signal_ts
       order_validity_policy: session_end
-      stop_distance_cap_ticks: 90
+      stop_cap_atr: 2.0
       max_position_pct: 100.0
     tunable:
       lookback_candles: 20
@@ -99,7 +99,7 @@ versions:
       timeframe_minutes: 5
       valid_from_policy: signal_ts
       order_validity_policy: session_end
-      stop_distance_cap_ticks: 40
+      stop_cap_atr: 2.0
       max_position_pct: 100.0
     tunable:
       lookback_candles: 50
@@ -125,7 +125,7 @@ versions:
       timeframe_minutes: 15
       valid_from_policy: signal_ts
       order_validity_policy: session_end
-      stop_distance_cap_ticks: 20
+      stop_cap_atr: 2.0
       max_position_pct: 100.0
     tunable:
       lookback_candles: 10

@@ -201,7 +201,7 @@ class InsideBarConfig:
     timeframe_minutes: int
     order_validity_policy: str
     valid_from_policy: str
-    stop_distance_cap_ticks: int
+    stop_cap_atr: float
     max_position_pct: float
     min_mother_body_fraction: float
     min_inside_body_fraction: float
@@ -211,8 +211,6 @@ class InsideBarConfig:
 
     # === Entry & Exit ===
     entry_level_mode: str = "mother_bar"  # or "inside_bar"
-    tick_size: float = 0.01
-
     # === Order Validity (Critical for Replay Fills) ===
     """Order validity policy. Determines when orders expire.
     
@@ -313,8 +311,7 @@ class InsideBarConfig:
         assert self.entry_level_mode in ["mother_bar", "inside_bar"], \
             f"Invalid entry_level_mode: {self.entry_level_mode}"
         assert self.max_trades_per_session > 0, "Max trades per session must be positive"
-        assert self.stop_distance_cap_ticks > 0, "SL cap ticks must be positive"
-        assert self.tick_size > 0, "Tick size must be positive"
+        assert self.stop_cap_atr > 0, "stop_cap_atr must be positive"
         assert self.timeframe_minutes in {1, 5, 15, 30, 60}, \
             f"Invalid timeframe_minutes: {self.timeframe_minutes} (allowed: 1, 5, 15, 30, 60)"
         assert 0.0 < self.max_position_pct <= 100.0, "max_position_pct must be in (0, 100]"
@@ -484,7 +481,7 @@ def build_inside_bar_config(params: dict) -> InsideBarConfig:
         "session_windows": session_windows,
         "order_validity_policy": _require_param(params, "order_validity_policy"),
         "valid_from_policy": _require_param(params, "valid_from_policy"),
-        "stop_distance_cap_ticks": _require_param(params, "stop_distance_cap_ticks"),
+        "stop_cap_atr": _require_param(params, "stop_cap_atr"),
         "timeframe_minutes": params["timeframe_minutes"],
         "min_mother_body_fraction": _require_param(params, "min_mother_body_fraction"),
         "min_inside_body_fraction": _require_param(params, "min_inside_body_fraction"),
@@ -506,7 +503,6 @@ def build_inside_bar_config(params: dict) -> InsideBarConfig:
 
     optional_passthrough = (
         "entry_level_mode",
-        "tick_size",
         "max_trades_per_session",
         "trigger_must_be_within_session",
         "netting_mode",

@@ -19,7 +19,7 @@ class InsideBarSpec:
         "timeframe_minutes",
         "valid_from_policy",
         "order_validity_policy",
-        "stop_distance_cap_ticks",
+        "stop_cap_atr",
         "max_position_pct",
     }
     
@@ -219,12 +219,12 @@ class InsideBarSpec:
                     f"inside_bar v{version} invalid session_mode: {val} (allowed: rth, raw)"
                 )
 
-        # stop_distance_cap_ticks: int > 0
-        if "stop_distance_cap_ticks" in data:
-            val = data["stop_distance_cap_ticks"]
-            if not isinstance(val, int) or val <= 0:
+        # stop_cap_atr: float > 0
+        if "stop_cap_atr" in data:
+            val = data["stop_cap_atr"]
+            if not isinstance(val, (int, float)) or float(val) <= 0:
                 raise ValueError(
-                    f"inside_bar v{version} invalid stop_distance_cap_ticks: {val} (must be int > 0)"
+                    f"inside_bar v{version} invalid stop_cap_atr: {val} (must be float > 0)"
                 )
 
         # max_position_pct: float > 0 and <= 100
@@ -266,7 +266,7 @@ class InsideBarSpec:
                     "options": list(self.ORDER_VALIDITY_POLICY_OPTIONS),
                     "required": True
                 },
-                "stop_distance_cap_ticks": {"kind": "int", "required": True, "min": 1},
+                "stop_cap_atr": {"kind": "float", "required": True, "min": 0.000001},
                 "max_position_pct": {"kind": "float", "required": True, "min": 0.0, "max": 100.0},
             },
             "tunable": {

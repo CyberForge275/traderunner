@@ -39,7 +39,7 @@ SL initial:
 - SHORT: SL = Mother High
 
 SL Cap:
-- stop_distance_cap_ticks default = 40
+- stop_cap_atr default = 40
 - tick_size default = 0.01
 MaxRisk = 40 * 0.01 = 0.40 (Price Units)
 Wenn Risk > MaxRisk → SL Richtung Entry verschieben (Risk = MaxRisk)

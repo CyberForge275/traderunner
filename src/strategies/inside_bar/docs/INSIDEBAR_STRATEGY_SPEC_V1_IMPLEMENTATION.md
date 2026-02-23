@@ -30,7 +30,7 @@ Eine Kerze ist Inside Bar (IB), wenn:
 
 ### SL Cap (Ticks)
 Die SL-Distanz wird begrenzt:
-- max_risk = stop_distance_cap_ticks * tick_size
+- max_risk = stop_cap_atr * tick_size
 Wenn risk > max_risk:
 - SL wird so verschoben, dass risk == max_risk
 - TP wird anhand des gecappten Risikos neu berechnet.
