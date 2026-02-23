@@ -1,15 +1,19 @@
-"""Helper wrapper for building broker-ready orders from strategy signals.
+"""DEPRECATED helper wrapper for building broker-ready orders from strategy signals.
 
 This module provides a thin, adapter-friendly wrapper around the canonical
 `_build_inside_bar_orders` function used by the CLI. It avoids pulling
 argparse/CLI concerns into higher layers and exposes a simple
 `build_orders_for_backtest` function for programmatic use.
+
+This module is kept for legacy compatibility only. New backtest flows should
+use the axiom_bt pipeline (`events_intent` -> `fill_model` -> `execution`).
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import warnings
 from typing import Dict, List, Optional
 
 import pandas as pd
@@ -171,6 +175,17 @@ def build_orders_for_backtest(
     are now filtered out to prevent zero-fill scenarios. This is critical for
     November parity.
     """
+    warnings.warn(
+        "trade.orders_builder.build_orders_for_backtest is deprecated; "
+        "use axiom_bt.pipeline.runner/run_pipeline artifacts instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    if "max_position_loss_pct_equity" not in strategy_params:
+        raise ValueError(
+            "max_position_loss_pct_equity must come from YAML/resolved params or be null explicitly"
+        )
+    max_position_loss_pct_equity = strategy_params.get("max_position_loss_pct_equity")
 
     # Short-circuit early for the empty-frame case but still delegate to
     # the canonical builder so that the column layout stays consistent.
@@ -218,6 +233,49 @@ def build_orders_for_backtest(
         orders_df = orders_df.copy()
         orders_df["valid_from"] = new_valid_from
         orders_df["valid_to"] = new_valid_to
+
+    if (
+        not orders_df.empty
+        and max_position_loss_pct_equity is not None
+        and {"entry_price", "stop_price", "qty"}.issubset(set(orders_df.columns))
+    ):
+        cap_pct = float(max_position_loss_pct_equity)
+        if cap_pct < 0 or cap_pct > 1:
+            raise ValueError(
+                f"max_position_loss_pct_equity must be in [0,1] or null; got {max_position_loss_pct_equity}"
+            )
+        equity = float(strategy_params.get("initial_cash", DEFAULT_INITIAL_CASH))
+        max_risk_cash = equity * cap_pct
+        capped_qty = []
+        keep_mask = []
+        rejected = 0
+        for _, row in orders_df.iterrows():
+            entry = row.get("entry_price")
+            stop = row.get("stop_price")
+            qty = row.get("qty")
+            if pd.isna(entry) or pd.isna(stop) or pd.isna(qty):
+                capped_qty.append(qty)
+                keep_mask.append(True)
+                continue
+            risk_per_share = abs(float(entry) - float(stop))
+            if risk_per_share <= 0:
+                rejected += 1
+                keep_mask.append(False)
+                capped_qty.append(0)
+                continue
+            qty_risk_cap = int(max_risk_cash // risk_per_share)
+            if qty_risk_cap <= 0:
+                rejected += 1
+                keep_mask.append(False)
+                capped_qty.append(0)
+                continue
+            capped_qty.append(min(int(qty), qty_risk_cap))
+            keep_mask.append(True)
+        orders_df = orders_df.copy()
+        orders_df["qty"] = capped_qty
+        orders_df = orders_df[pd.Series(keep_mask, index=orders_df.index)].copy()
+        if rejected:
+            logger.info("actions: risk_cap_qty_zero_rejected count=%s reason=RISK_CAP_QTY_ZERO", rejected)
 
     # Phase 5: Apply validity validation (CRITICAL for fills)
     if not orders_df.empty and 'valid_from' in orders_df.columns and 'valid_to' in orders_df.columns:
