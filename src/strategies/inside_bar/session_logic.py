@@ -209,17 +209,19 @@ def generate_signals(
                 short_dev_abs = abs(entry_short - reference_price)
                 long_dev_atr = float("inf")
                 short_dev_atr = float("inf")
-                if atr_for_deviation <= 0:
-                    allow_long = False
-                    allow_short = False
-                    emit({
-                        "event": "signal_rejected",
-                        "reason": "MAX_DEVIATION_ATR",
-                        "detail": "atr_non_positive",
-                        "idx": int(idx),
-                        "atr": atr_for_deviation,
-                    })
-                elif max_dev_atr is not None:
+                if max_dev_atr is not None:
+                    if atr_for_deviation <= 0:
+                        allow_long = False
+                        allow_short = False
+                        emit({
+                            "event": "signal_rejected",
+                            "reason": "MAX_DEVIATION_ATR",
+                            "detail": "atr_non_positive",
+                            "idx": int(idx),
+                            "atr": atr_for_deviation,
+                        })
+                        state["done"] = True
+                        continue
                     max_dev_abs = float(max_dev_atr) * atr_for_deviation
                     long_dev_atr = long_dev_abs / atr_for_deviation
                     short_dev_atr = short_dev_abs / atr_for_deviation

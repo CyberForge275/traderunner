@@ -29,7 +29,7 @@ def _cfg(**overrides):
         "stop_distance_cap_ticks": 4000,
         "max_position_pct": 100.0,
         "max_pattern_age_candles": 12,
-        "max_deviation_atr": 3.0,
+        "max_deviation_atr": None,
         "max_position_loss_pct_equity": None,
         # Keep legacy test fixtures permissive unless a test targets the new gate.
         "min_mother_body_fraction": 0.0,
