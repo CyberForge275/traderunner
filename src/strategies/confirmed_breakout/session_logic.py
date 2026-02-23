@@ -38,6 +38,25 @@ def generate_signals(
         if tracer is not None:
             tracer(event)
 
+    def _capped_risk(
+        *,
+        side: str,
+        entry: float,
+        structure_stop: float,
+        atr_value: float,
+    ) -> tuple[float, float, float, float, float, bool]:
+        risk_raw = (entry - structure_stop) if side == "BUY" else (structure_stop - entry)
+        if risk_raw <= 0:
+            raise ValueError("non_positive_risk")
+        risk_cap = float(config.stop_cap_atr) * float(atr_value)
+        if risk_cap <= 0:
+            raise ValueError("non_positive_risk_cap")
+        risk_eff = min(risk_raw, risk_cap)
+        sl_was_capped = risk_raw > risk_cap
+        stop_loss = entry - risk_eff if side == "BUY" else entry + risk_eff
+        take_profit = entry + (risk_eff * config.risk_reward_ratio) if side == "BUY" else entry - (risk_eff * config.risk_reward_ratio)
+        return stop_loss, take_profit, risk_raw, risk_cap, risk_eff, sl_was_capped
+
     def _session_key_for(ts: pd.Timestamp, session_idx: int) -> tuple:
         try:
             return session_filter.get_session_key(ts, session_tz)  # type: ignore[attr-defined]
@@ -98,9 +117,6 @@ def generate_signals(
 
     # Trigger policy
     trigger_must_be_in_session = getattr(config, 'trigger_must_be_within_session', True)
-
-    # Risk management
-    max_risk = getattr(config, 'stop_distance_cap_ticks', 40) * getattr(config, 'tick_size', 0.01)
 
     # Main loop
     for idx, current in df.iterrows():
@@ -249,51 +265,45 @@ def generate_signals(
                     state["done"] = True
                     continue
 
-                # Long leg SL/TP with cap
+                # Long leg SL/TP with ATR cap
                 if allow_long:
-                    sl_long = levels['mother_low']
-                    initial_risk_long = entry_long - sl_long
-                    if initial_risk_long <= 0:
+                    try:
+                        sl_long, tp_long, risk_raw_long, risk_cap_long, risk_eff_long, sl_was_capped_long = _capped_risk(
+                            side="BUY",
+                            entry=entry_long,
+                            structure_stop=levels['mother_low'],
+                            atr_value=levels['atr'],
+                        )
+                    except ValueError:
                         emit({
                             'event': 'signal_rejected',
                             'reason': 'non_positive_risk',
                             'idx': int(idx),
                             'entry': entry_long,
-                            'sl': sl_long,
+                            'sl': levels['mother_low'],
                             'side': 'BUY'
                         })
                         allow_long = False
-                    else:
-                        effective_risk_long = initial_risk_long
-                        stop_cap_applied_long = False
-                        if initial_risk_long > max_risk:
-                            sl_long = entry_long - max_risk
-                            effective_risk_long = max_risk
-                            stop_cap_applied_long = True
-                        tp_long = entry_long + (effective_risk_long * config.risk_reward_ratio)
 
-                # Short leg SL/TP with cap
+                # Short leg SL/TP with ATR cap
                 if allow_short:
-                    sl_short = levels['mother_high']
-                    initial_risk_short = sl_short - entry_short
-                    if initial_risk_short <= 0:
+                    try:
+                        sl_short, tp_short, risk_raw_short, risk_cap_short, risk_eff_short, sl_was_capped_short = _capped_risk(
+                            side="SELL",
+                            entry=entry_short,
+                            structure_stop=levels['mother_high'],
+                            atr_value=levels['atr'],
+                        )
+                    except ValueError:
                         emit({
                             'event': 'signal_rejected',
                             'reason': 'non_positive_risk',
                             'idx': int(idx),
                             'entry': entry_short,
-                            'sl': sl_short,
+                            'sl': levels['mother_high'],
                             'side': 'SELL'
                         })
                         allow_short = False
-                    else:
-                        effective_risk_short = initial_risk_short
-                        stop_cap_applied_short = False
-                        if initial_risk_short > max_risk:
-                            sl_short = entry_short + max_risk
-                            effective_risk_short = max_risk
-                            stop_cap_applied_short = True
-                        tp_short = entry_short - (effective_risk_short * config.risk_reward_ratio)
 
                 if not allow_long and not allow_short:
                     state["done"] = True
@@ -313,9 +323,14 @@ def generate_signals(
                                 'session_key': str(session_key),
                                 'ib_idx': state['ib_idx'],
                                 'entry_mode': entry_mode,
-                                'stop_cap_applied': stop_cap_applied_long,
-                                'initial_risk': initial_risk_long,
-                                'effective_risk': effective_risk_long,
+                                'stop_cap_applied': sl_was_capped_long,
+                                'initial_risk': risk_raw_long,
+                                'effective_risk': risk_eff_long,
+                                'risk_raw': risk_raw_long,
+                                'risk_cap': risk_cap_long,
+                                'risk_eff': risk_eff_long,
+                                'sl_was_capped': sl_was_capped_long,
+                                'cap_mode': 'atr',
                                 'mother_high': levels['mother_high'],
                                 'mother_low': levels['mother_low'],
                                 'atr': levels['atr'],
@@ -338,9 +353,14 @@ def generate_signals(
                                 'session_key': str(session_key),
                                 'ib_idx': state['ib_idx'],
                                 'entry_mode': entry_mode,
-                                'stop_cap_applied': stop_cap_applied_short,
-                                'initial_risk': initial_risk_short,
-                                'effective_risk': effective_risk_short,
+                                'stop_cap_applied': sl_was_capped_short,
+                                'initial_risk': risk_raw_short,
+                                'effective_risk': risk_eff_short,
+                                'risk_raw': risk_raw_short,
+                                'risk_cap': risk_cap_short,
+                                'risk_eff': risk_eff_short,
+                                'sl_was_capped': sl_was_capped_short,
+                                'cap_mode': 'atr',
                                 'mother_high': levels['mother_high'],
                                 'mother_low': levels['mother_low'],
                                 'atr': levels['atr'],
@@ -423,30 +443,23 @@ def generate_signals(
                             'side': 'BUY'
                         })
                         continue
-                # Calculate SL with cap
-                sl = levels['mother_low']
-                initial_risk = entry_long - sl
-
-                if initial_risk <= 0:
+                # Calculate SL/TP with ATR cap
+                try:
+                    sl, tp, risk_raw, risk_cap, risk_eff, sl_was_capped = _capped_risk(
+                        side="BUY",
+                        entry=entry_long,
+                        structure_stop=levels['mother_low'],
+                        atr_value=levels['atr'],
+                    )
+                except ValueError:
                     emit({
                         'event': 'signal_rejected',
                         'reason': 'non_positive_risk',
                         'idx': int(idx),
                         'entry': entry_long,
-                        'sl': sl
+                        'sl': levels['mother_low']
                     })
                     continue
-
-                # === SL CAP ===
-                effective_risk = initial_risk
-                stop_cap_applied = False
-
-                if initial_risk > max_risk:
-                    sl = entry_long - max_risk
-                    effective_risk = max_risk
-                    stop_cap_applied = True
-
-                tp = entry_long + (effective_risk * config.risk_reward_ratio)
 
                 signal = RawSignal(
                     timestamp=ts,
@@ -459,9 +472,14 @@ def generate_signals(
                         'session_key': str(session_key),
                         'ib_idx': state['ib_idx'],
                         'entry_mode': entry_mode,
-                        'stop_cap_applied': stop_cap_applied,
-                        'initial_risk': initial_risk,
-                        'effective_risk': effective_risk,
+                        'stop_cap_applied': sl_was_capped,
+                        'initial_risk': risk_raw,
+                        'effective_risk': risk_eff,
+                        'risk_raw': risk_raw,
+                        'risk_cap': risk_cap,
+                        'risk_eff': risk_eff,
+                        'sl_was_capped': sl_was_capped,
+                        'cap_mode': 'atr',
                         'mother_high': levels['mother_high'],
                         'mother_low': levels['mother_low'],
                         'atr': levels['atr'],
@@ -496,7 +514,7 @@ def generate_signals(
                     'entry': entry_long,
                     'sl': sl,
                     'tp': tp,
-                    'stop_cap_applied': stop_cap_applied
+                    'stop_cap_applied': sl_was_capped
                 })
 
             # Check SHORT breakout (intraday: trigger on low)
@@ -516,30 +534,23 @@ def generate_signals(
                             'side': 'SELL'
                         })
                         continue
-                # Calculate SL with cap
-                sl = levels['mother_high']
-                initial_risk = sl - entry_short
-
-                if initial_risk <= 0:
+                # Calculate SL/TP with ATR cap
+                try:
+                    sl, tp, risk_raw, risk_cap, risk_eff, sl_was_capped = _capped_risk(
+                        side="SELL",
+                        entry=entry_short,
+                        structure_stop=levels['mother_high'],
+                        atr_value=levels['atr'],
+                    )
+                except ValueError:
                     emit({
                         'event': 'signal_rejected',
                         'reason': 'non_positive_risk',
                         'idx': int(idx),
                         'entry': entry_short,
-                        'sl': sl
+                        'sl': levels['mother_high']
                     })
                     continue
-
-                # === SL CAP ===
-                effective_risk = initial_risk
-                stop_cap_applied = False
-
-                if initial_risk > max_risk:
-                    sl = entry_short + max_risk
-                    effective_risk = max_risk
-                    stop_cap_applied = True
-
-                tp = entry_short - (effective_risk * config.risk_reward_ratio)
 
                 signal = RawSignal(
                     timestamp=ts,
@@ -552,9 +563,14 @@ def generate_signals(
                         'session_key': str(session_key),
                         'ib_idx': state['ib_idx'],
                         'entry_mode': entry_mode,
-                        'stop_cap_applied': stop_cap_applied,
-                        'initial_risk': initial_risk,
-                        'effective_risk': effective_risk,
+                        'stop_cap_applied': sl_was_capped,
+                        'initial_risk': risk_raw,
+                        'effective_risk': risk_eff,
+                        'risk_raw': risk_raw,
+                        'risk_cap': risk_cap,
+                        'risk_eff': risk_eff,
+                        'sl_was_capped': sl_was_capped,
+                        'cap_mode': 'atr',
                         'mother_high': levels['mother_high'],
                         'mother_low': levels['mother_low'],
                         'atr': levels['atr'],
@@ -574,7 +590,7 @@ def generate_signals(
                     'entry': entry_short,
                     'sl': sl,
                     'tp': tp,
-                    'stop_cap_applied': stop_cap_applied
+                    'stop_cap_applied': sl_was_capped
                 })
 
     return signals
