@@ -7,6 +7,7 @@ import pandas as pd
 
 from .config import SessionFilter, InsideBarConfig
 from .models import RawSignal
+from .session_windows import compute_netting_open_until, session_key_for
 
 
 def generate_signals(
@@ -56,13 +57,6 @@ def generate_signals(
         stop_loss = entry - risk_eff if side == "BUY" else entry + risk_eff
         take_profit = entry + (risk_eff * config.risk_reward_ratio) if side == "BUY" else entry - (risk_eff * config.risk_reward_ratio)
         return stop_loss, take_profit, risk_raw, risk_cap, risk_eff, sl_was_capped
-
-    def _session_key_for(ts: pd.Timestamp, session_idx: int) -> tuple:
-        try:
-            return session_filter.get_session_key(ts, session_tz)  # type: ignore[attr-defined]
-        except AttributeError:
-            session_start = session_filter.get_session_start(ts, session_tz)
-            return (session_idx, session_start)
 
     # Get session configuration
     session_filter = config.session_filter
@@ -129,7 +123,7 @@ def generate_signals(
         # Skip if not in any session
         if session_idx is None:
             continue
-        session_key = _session_key_for(ts, session_idx)
+        session_key = session_key_for(session_filter, ts, session_tz, session_idx)
 
         # Initialize session state
         if session_key not in session_states:
@@ -497,21 +491,13 @@ def generate_signals(
                 signals_per_session[session_key] = signals_per_session.get(session_key, 0) + 1
 
                 # === NETTING: Calculate position open_until (conservative) ===
-                if validity_policy == 'session_end':
-                    netting_open_until = session_filter.get_session_end(ts, session_tz)
-                elif validity_policy == 'one_bar':
-                    # Assume M5 timeframe (5 minutes)
-                    # TODO: Make timeframe configurable if needed
-                    netting_open_until = ts + pd.Timedelta(minutes=5)
-                elif validity_policy == 'fixed_minutes':
-                    netting_open_until = ts + pd.Timedelta(minutes=validity_minutes)
-                    # Clamp to session_end (don't extend beyond session)
-                    session_end = session_filter.get_session_end(ts, session_tz)
-                    if session_end and netting_open_until > session_end:
-                        netting_open_until = session_end
-                else:
-                    # Fallback: session_end
-                    netting_open_until = session_filter.get_session_end(ts, session_tz)
+                netting_open_until = compute_netting_open_until(
+                    validity_policy=validity_policy,
+                    validity_minutes=validity_minutes,
+                    session_filter=session_filter,
+                    ts=ts,
+                    session_tz=session_tz,
+                )
 
                 emit({
                     'event': 'signal_generated',
