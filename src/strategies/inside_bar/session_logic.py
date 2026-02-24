@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional
 import pandas as pd
 
 from .config import SessionFilter, InsideBarConfig
+from .levels import capped_risk_levels, entry_levels
 from .models import RawSignal
 from .session_windows import compute_netting_open_until, session_key_for
 
@@ -38,25 +39,6 @@ def generate_signals(
     def emit(event: Dict[str, Any]) -> None:
         if tracer is not None:
             tracer(event)
-
-    def _capped_risk(
-        *,
-        side: str,
-        entry: float,
-        structure_stop: float,
-        atr_value: float,
-    ) -> tuple[float, float, float, float, float, bool]:
-        risk_raw = (entry - structure_stop) if side == "BUY" else (structure_stop - entry)
-        if risk_raw <= 0:
-            raise ValueError("non_positive_risk")
-        risk_cap = float(config.stop_cap_atr) * float(atr_value)
-        if risk_cap <= 0:
-            raise ValueError("non_positive_risk_cap")
-        risk_eff = min(risk_raw, risk_cap)
-        sl_was_capped = risk_raw > risk_cap
-        stop_loss = entry - risk_eff if side == "BUY" else entry + risk_eff
-        take_profit = entry + (risk_eff * config.risk_reward_ratio) if side == "BUY" else entry - (risk_eff * config.risk_reward_ratio)
-        return stop_loss, take_profit, risk_raw, risk_cap, risk_eff, sl_was_capped
 
     # Get session configuration
     session_filter = config.session_filter
@@ -191,12 +173,7 @@ def generate_signals(
                     )
                 timeframe_minutes = int(timeframe_minutes)
                 signal_ts = ts + pd.Timedelta(minutes=timeframe_minutes)
-                if entry_mode == "mother_bar":
-                    entry_long = levels['mother_high']
-                    entry_short = levels['mother_low']
-                else:  # inside_bar
-                    entry_long = levels['ib_high']
-                    entry_short = levels['ib_low']
+                entry_long, entry_short = entry_levels(entry_mode=entry_mode, levels=levels)
 
                 # === MAX TRADES CHECK (hard limit) ===
                 if signals_per_session.get(session_key, 0) >= max_trades:
@@ -264,11 +241,13 @@ def generate_signals(
                 # Long leg SL/TP with ATR cap
                 if allow_long:
                     try:
-                        sl_long, tp_long, risk_raw_long, risk_cap_long, risk_eff_long, sl_was_capped_long = _capped_risk(
+                        sl_long, tp_long, risk_raw_long, risk_cap_long, risk_eff_long, sl_was_capped_long = capped_risk_levels(
                             side="BUY",
                             entry=entry_long,
                             structure_stop=levels['mother_low'],
                             atr_value=levels['atr'],
+                            stop_cap_atr=config.stop_cap_atr,
+                            risk_reward_ratio=config.risk_reward_ratio,
                         )
                     except ValueError:
                         emit({
@@ -284,11 +263,13 @@ def generate_signals(
                 # Short leg SL/TP with ATR cap
                 if allow_short:
                     try:
-                        sl_short, tp_short, risk_raw_short, risk_cap_short, risk_eff_short, sl_was_capped_short = _capped_risk(
+                        sl_short, tp_short, risk_raw_short, risk_cap_short, risk_eff_short, sl_was_capped_short = capped_risk_levels(
                             side="SELL",
                             entry=entry_short,
                             structure_stop=levels['mother_high'],
                             atr_value=levels['atr'],
+                            stop_cap_atr=config.stop_cap_atr,
+                            risk_reward_ratio=config.risk_reward_ratio,
                         )
                     except ValueError:
                         emit({
@@ -392,12 +373,7 @@ def generate_signals(
             levels = state['levels']
 
             # Determine entry levels based on entry_level_mode
-            if entry_mode == "mother_bar":
-                entry_long = levels['mother_high']
-                entry_short = levels['mother_low']
-            else:  # inside_bar
-                entry_long = levels['ib_high']
-                entry_short = levels['ib_low']
+            entry_long, entry_short = entry_levels(entry_mode=entry_mode, levels=levels)
 
             # === MAX TRADES CHECK (hard limit) ===
             if signals_per_session.get(session_key, 0) >= max_trades:
@@ -445,11 +421,13 @@ def generate_signals(
                         continue
                 # Calculate SL/TP with ATR cap
                 try:
-                    sl, tp, risk_raw, risk_cap, risk_eff, sl_was_capped = _capped_risk(
+                    sl, tp, risk_raw, risk_cap, risk_eff, sl_was_capped = capped_risk_levels(
                         side="BUY",
                         entry=entry_long,
                         structure_stop=levels['mother_low'],
                         atr_value=levels['atr'],
+                        stop_cap_atr=config.stop_cap_atr,
+                        risk_reward_ratio=config.risk_reward_ratio,
                     )
                 except ValueError:
                     emit({
@@ -528,11 +506,13 @@ def generate_signals(
                         continue
                 # Calculate SL/TP with ATR cap
                 try:
-                    sl, tp, risk_raw, risk_cap, risk_eff, sl_was_capped = _capped_risk(
+                    sl, tp, risk_raw, risk_cap, risk_eff, sl_was_capped = capped_risk_levels(
                         side="SELL",
                         entry=entry_short,
                         structure_stop=levels['mother_high'],
                         atr_value=levels['atr'],
+                        stop_cap_atr=config.stop_cap_atr,
+                        risk_reward_ratio=config.risk_reward_ratio,
                     )
                 except ValueError:
                     emit({
