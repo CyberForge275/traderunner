@@ -74,7 +74,6 @@ def _load_intrabar_probe_bars_m1(
     bars: pd.DataFrame,
     session_timezone: str,
     session_mode: str,
-    session_filter: list[str] | None,
 ) -> Optional[pd.DataFrame]:
     if bars.empty or "timestamp" not in bars.columns:
         return None
@@ -103,7 +102,6 @@ def _load_intrabar_probe_bars_m1(
             end_date=dt.date.fromisoformat(str(end_date)),
             session_timezone=session_timezone,
             session_mode=session_mode,
-            session_filter=session_filter,
             data_root=str(data_root),
         )
         client.ensure_bars(req)
@@ -366,7 +364,6 @@ def run_pipeline(
             bars=bars,
             session_timezone=strategy_params.get("session_timezone"),
             session_mode=strategy_params.get("session_mode", "rth"),
-            session_filter=strategy_params.get("session_filter"),
         )
 
     # [Engine Layer]: Market Simulation: Match the intent stream against historical bars to generate discrete execution fills (STOP/LIMIT/MARKET).

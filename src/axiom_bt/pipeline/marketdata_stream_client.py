@@ -36,9 +36,8 @@ class EnsureBarsRequest:
     timeframe_minutes: int
     start_date: dt.date
     end_date: dt.date
-    session_timezone: str = "America/New_York"
-    session_mode: str = "rth"
-    session_filter: Optional[list[str]] = None
+    session_timezone: str
+    session_mode: str
     data_root: Optional[str] = None
 
     def to_json(self) -> Dict[str, Any]:
@@ -50,8 +49,6 @@ class EnsureBarsRequest:
             "session_timezone": self.session_timezone,
             "session_mode": self.session_mode,
         }
-        if self.session_filter is not None:
-            payload["session_filter"] = list(self.session_filter)
         if self.data_root:
             payload["data_root"] = self.data_root
         return payload
@@ -117,10 +114,9 @@ def build_ensure_request_for_pipeline(
     timeframe_minutes: int,
     start_date: Any,
     end_date: Any,
-    lookback_candles: int = 0,
-    session_timezone: str = "America/New_York",
-    session_mode: str = "rth",
-    session_filter: Optional[list[str]] = None,
+    session_timezone: str,
+    session_mode: str,
+    lookback_candles: int,
     data_root: Optional[str] = None,
 ) -> EnsureBarsRequest:
     """
@@ -140,6 +136,5 @@ def build_ensure_request_for_pipeline(
         end_date=e,
         session_timezone=session_timezone,
         session_mode=session_mode,
-        session_filter=session_filter,
         data_root=data_root or str(get_marketdata_data_root()),
     )

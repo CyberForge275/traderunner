@@ -220,18 +220,24 @@ class NewPipelineAdapter:
             ensure_req = None
             md_client = MarketdataStreamClient()
             if md_client.is_configured():
-                timeframe_minutes = int(strategy_params.get("timeframe_minutes", 5))
+                if "timeframe_minutes" not in strategy_params:
+                    raise ValueError("timeframe_minutes missing in resolved strategy config (SSOT required)")
+                if "session_mode" not in strategy_params:
+                    raise ValueError("session_mode missing in resolved strategy config (SSOT required)")
+                if "session_timezone" not in strategy_params:
+                    raise ValueError("session_timezone missing in resolved strategy config (SSOT required)")
+
+                timeframe_minutes = int(strategy_params["timeframe_minutes"])
                 lookback_candles = int(strategy_params.get("lookback_candles", 0))
-                session_mode = str(strategy_params.get("session_mode", "rth"))
+                session_mode = str(strategy_params["session_mode"])
                 ensure_req = build_ensure_request_for_pipeline(
                     symbol=symbol,
                     timeframe_minutes=timeframe_minutes,
                     start_date=start_date or requested_end,
                     end_date=requested_end,
                     lookback_candles=lookback_candles,
-                    session_timezone=str(strategy_params.get("session_timezone", "America/New_York")),
+                    session_timezone=str(strategy_params["session_timezone"]),
                     session_mode=session_mode,
-                    session_filter=strategy_params.get("session_filter"),
                     data_root=str(get_marketdata_data_root()),
                 )
                 logger.info(

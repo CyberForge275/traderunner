@@ -74,6 +74,7 @@ def test_adapter_preflight_ensure_bars_flag_on_calls_http(monkeypatch, tmp_path)
     from core.settings.runtime_config import reset_runtime_config_for_tests
 
     calls = {"ensure": 0, "run": 0}
+    captured_payload = {}
 
     cfg = tmp_path / "trading.yaml"
     cfg.write_text(
@@ -95,6 +96,7 @@ runtime:
 
     def _fake_ensure(self, req):
         calls["ensure"] += 1
+        captured_payload.update(req.to_json())
         return {"status": "ok", "gaps_before": [{"a": 1}], "gaps_after": []}
 
     def _fake_run_pipeline(**kwargs):
@@ -123,6 +125,10 @@ runtime:
 
     assert calls["ensure"] == 1
     assert calls["run"] == 1
+    assert captured_payload["session_mode"] == "rth"
+    assert captured_payload["session_timezone"] == "America/New_York"
+    assert "session_filter" not in captured_payload
+    assert "session_window" not in captured_payload
     assert result["status"] == "failed"
     assert "stop_after_run" in result.get("error", "")
 
