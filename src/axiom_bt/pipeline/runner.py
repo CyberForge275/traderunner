@@ -362,8 +362,8 @@ def run_pipeline(
         intrabar_probe_bars_m1 = _load_intrabar_probe_bars_m1(
             symbol=strategy_params.get("symbol", "UNKNOWN"),
             bars=bars,
-            session_timezone=strategy_params.get("session_timezone"),
-            session_mode=strategy_params.get("session_mode", "rth"),
+            session_timezone=market_tz,
+            session_mode=session_mode,
         )
 
     # [Engine Layer]: Market Simulation: Match the intent stream against historical bars to generate discrete execution fills (STOP/LIMIT/MARKET).
