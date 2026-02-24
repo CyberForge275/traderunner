@@ -6,7 +6,9 @@ from typing import Any, Callable, Dict, List, Optional
 import pandas as pd
 
 from .config import SessionFilter, InsideBarConfig
+from .gates import evaluate_deviation_gate
 from .levels import capped_risk_levels, entry_levels
+from .metadata import build_signal_metadata
 from .models import RawSignal
 from .session_windows import compute_netting_open_until, session_key_for
 
@@ -187,53 +189,27 @@ def generate_signals(
                     continue
 
             # Netting decision handled in fill_model; do not suppress here.
-                reference_price = float(current["close"])
-                atr_for_deviation = float(levels["atr"])
-                max_dev_atr = config.max_deviation_atr
-                allow_long = True
-                allow_short = True
-                long_dev_abs = abs(entry_long - reference_price)
-                short_dev_abs = abs(entry_short - reference_price)
-                long_dev_atr = float("inf")
-                short_dev_atr = float("inf")
-                if max_dev_atr is not None:
-                    if atr_for_deviation <= 0:
-                        allow_long = False
-                        allow_short = False
-                        emit({
-                            "event": "signal_rejected",
-                            "reason": "MAX_DEVIATION_ATR",
-                            "detail": "atr_non_positive",
-                            "idx": int(idx),
-                            "atr": atr_for_deviation,
-                        })
-                        state["done"] = True
-                        continue
-                    max_dev_abs = float(max_dev_atr) * atr_for_deviation
-                    long_dev_atr = long_dev_abs / atr_for_deviation
-                    short_dev_atr = short_dev_abs / atr_for_deviation
-                    if long_dev_abs > max_dev_abs:
-                        allow_long = False
-                        emit({
-                            "event": "signal_rejected",
-                            "reason": "MAX_DEVIATION_ATR",
-                            "side": "BUY",
-                            "idx": int(idx),
-                            "deviation_abs": long_dev_abs,
-                            "deviation_atr": long_dev_atr,
-                            "max_allowed_atr": float(max_dev_atr),
-                        })
-                    if short_dev_abs > max_dev_abs:
-                        allow_short = False
-                        emit({
-                            "event": "signal_rejected",
-                            "reason": "MAX_DEVIATION_ATR",
-                            "side": "SELL",
-                            "idx": int(idx),
-                            "deviation_abs": short_dev_abs,
-                            "deviation_atr": short_dev_atr,
-                            "max_allowed_atr": float(max_dev_atr),
-                        })
+                (
+                    allow_long,
+                    allow_short,
+                    long_dev_abs,
+                    short_dev_abs,
+                    long_dev_atr,
+                    short_dev_atr,
+                    reject_events,
+                ) = evaluate_deviation_gate(
+                    max_dev_atr=config.max_deviation_atr,
+                    atr_for_deviation=float(levels["atr"]),
+                    reference_price=float(current["close"]),
+                    entry_long=entry_long,
+                    entry_short=entry_short,
+                    idx=int(idx),
+                )
+                for event in reject_events:
+                    emit(event)
+                if reject_events and any(event.get("detail") == "atr_non_positive" for event in reject_events):
+                    state["done"] = True
+                    continue
                 if not allow_long and not allow_short:
                     state["done"] = True
                     continue
@@ -295,28 +271,23 @@ def generate_signals(
                             entry_price=entry_long,
                             stop_loss=sl_long,
                             take_profit=tp_long,
-                            metadata={
-                                'pattern': 'inside_bar_breakout',
-                                'session_key': str(session_key),
-                                'ib_idx': state['ib_idx'],
-                                'entry_mode': entry_mode,
-                                'stop_cap_applied': sl_was_capped_long,
-                                'initial_risk': risk_raw_long,
-                                'effective_risk': risk_eff_long,
-                                'risk_raw': risk_raw_long,
-                                'risk_cap': risk_cap_long,
-                                'risk_eff': risk_eff_long,
-                                'sl_was_capped': sl_was_capped_long,
-                                'cap_mode': 'atr',
-                                'mother_high': levels['mother_high'],
-                                'mother_low': levels['mother_low'],
-                                'mother_body_fraction': levels['mother_body_fraction'],
-                                'inside_body_fraction': levels['inside_body_fraction'],
-                                'atr': levels['atr'],
-                                'deviation_abs': long_dev_abs,
-                                'deviation_atr': long_dev_atr,
-                                'symbol': symbol
-                            }
+                            metadata=build_signal_metadata(
+                                session_key=session_key,
+                                ib_idx=state['ib_idx'],
+                                entry_mode=entry_mode,
+                                sl_was_capped=sl_was_capped_long,
+                                risk_raw=risk_raw_long,
+                                risk_cap=risk_cap_long,
+                                risk_eff=risk_eff_long,
+                                mother_high=levels['mother_high'],
+                                mother_low=levels['mother_low'],
+                                atr=levels['atr'],
+                                symbol=symbol,
+                                deviation_abs=long_dev_abs,
+                                deviation_atr=long_dev_atr,
+                                mother_body_fraction=levels.get('mother_body_fraction'),
+                                inside_body_fraction=levels.get('inside_body_fraction'),
+                            ),
                         )
                     )
                 if allow_short:
@@ -327,28 +298,23 @@ def generate_signals(
                             entry_price=entry_short,
                             stop_loss=sl_short,
                             take_profit=tp_short,
-                            metadata={
-                                'pattern': 'inside_bar_breakout',
-                                'session_key': str(session_key),
-                                'ib_idx': state['ib_idx'],
-                                'entry_mode': entry_mode,
-                                'stop_cap_applied': sl_was_capped_short,
-                                'initial_risk': risk_raw_short,
-                                'effective_risk': risk_eff_short,
-                                'risk_raw': risk_raw_short,
-                                'risk_cap': risk_cap_short,
-                                'risk_eff': risk_eff_short,
-                                'sl_was_capped': sl_was_capped_short,
-                                'cap_mode': 'atr',
-                                'mother_high': levels['mother_high'],
-                                'mother_low': levels['mother_low'],
-                                'mother_body_fraction': levels['mother_body_fraction'],
-                                'inside_body_fraction': levels['inside_body_fraction'],
-                                'atr': levels['atr'],
-                                'deviation_abs': short_dev_abs,
-                                'deviation_atr': short_dev_atr,
-                                'symbol': symbol
-                            }
+                            metadata=build_signal_metadata(
+                                session_key=session_key,
+                                ib_idx=state['ib_idx'],
+                                entry_mode=entry_mode,
+                                sl_was_capped=sl_was_capped_short,
+                                risk_raw=risk_raw_short,
+                                risk_cap=risk_cap_short,
+                                risk_eff=risk_eff_short,
+                                mother_high=levels['mother_high'],
+                                mother_low=levels['mother_low'],
+                                atr=levels['atr'],
+                                symbol=symbol,
+                                deviation_abs=short_dev_abs,
+                                deviation_atr=short_dev_atr,
+                                mother_body_fraction=levels.get('mother_body_fraction'),
+                                inside_body_fraction=levels.get('inside_body_fraction'),
+                            ),
                         )
                     )
                 state['done'] = True
@@ -445,24 +411,19 @@ def generate_signals(
                     entry_price=entry_long,
                     stop_loss=sl,
                     take_profit=tp,
-                    metadata={
-                        'pattern': 'inside_bar_breakout',
-                        'session_key': str(session_key),
-                        'ib_idx': state['ib_idx'],
-                        'entry_mode': entry_mode,
-                        'stop_cap_applied': sl_was_capped,
-                        'initial_risk': risk_raw,
-                        'effective_risk': risk_eff,
-                        'risk_raw': risk_raw,
-                        'risk_cap': risk_cap,
-                        'risk_eff': risk_eff,
-                        'sl_was_capped': sl_was_capped,
-                        'cap_mode': 'atr',
-                        'mother_high': levels['mother_high'],
-                        'mother_low': levels['mother_low'],
-                        'atr': levels['atr'],
-                        'symbol': symbol
-                    }
+                    metadata=build_signal_metadata(
+                        session_key=session_key,
+                        ib_idx=state['ib_idx'],
+                        entry_mode=entry_mode,
+                        sl_was_capped=sl_was_capped,
+                        risk_raw=risk_raw,
+                        risk_cap=risk_cap,
+                        risk_eff=risk_eff,
+                        mother_high=levels['mother_high'],
+                        mother_low=levels['mother_low'],
+                        atr=levels['atr'],
+                        symbol=symbol,
+                    ),
                 )
                 signals.append(signal)
                 state['done'] = True
@@ -530,24 +491,19 @@ def generate_signals(
                     entry_price=entry_short,
                     stop_loss=sl,
                     take_profit=tp,
-                    metadata={
-                        'pattern': 'inside_bar_breakout',
-                        'session_key': str(session_key),
-                        'ib_idx': state['ib_idx'],
-                        'entry_mode': entry_mode,
-                        'stop_cap_applied': sl_was_capped,
-                        'initial_risk': risk_raw,
-                        'effective_risk': risk_eff,
-                        'risk_raw': risk_raw,
-                        'risk_cap': risk_cap,
-                        'risk_eff': risk_eff,
-                        'sl_was_capped': sl_was_capped,
-                        'cap_mode': 'atr',
-                        'mother_high': levels['mother_high'],
-                        'mother_low': levels['mother_low'],
-                        'atr': levels['atr'],
-                        'symbol': symbol
-                    }
+                    metadata=build_signal_metadata(
+                        session_key=session_key,
+                        ib_idx=state['ib_idx'],
+                        entry_mode=entry_mode,
+                        sl_was_capped=sl_was_capped,
+                        risk_raw=risk_raw,
+                        risk_cap=risk_cap,
+                        risk_eff=risk_eff,
+                        mother_high=levels['mother_high'],
+                        mother_low=levels['mother_low'],
+                        atr=levels['atr'],
+                        symbol=symbol,
+                    ),
                 )
                 signals.append(signal)
                 state['done'] = True
