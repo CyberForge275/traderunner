@@ -126,7 +126,8 @@ def _build_args_from_params(strategy_params: Dict, market_tz: str) -> argparse.N
     elif isinstance(tf_param, (int, float)):
         timeframe_minutes = int(tf_param)
 
-    validity_minutes = int(strategy_params.get("validity_minutes", 60))
+    validity_minutes = int(strategy_params.get("order_validity_minutes", strategy_params.get("validity_minutes", 30)))
+    validity_bars = int(strategy_params.get("order_validity_bars", 1))
     valid_from_policy = str(strategy_params.get("valid_from_policy", "signal_ts"))
 
     args = argparse.Namespace(
@@ -136,6 +137,7 @@ def _build_args_from_params(strategy_params: Dict, market_tz: str) -> argparse.N
         expire_policy=expire_policy,
         validity_policy=expire_policy,
         validity_minutes=validity_minutes,
+        validity_bars=validity_bars,
         valid_from_policy=valid_from_policy,
         timeframe_minutes=timeframe_minutes,
         tif=str(strategy_params.get("tif", "DAY")),
@@ -200,12 +202,13 @@ def build_orders_for_backtest(
     orders_df = _build_inside_bar_orders(signals, ts_col, sessions, args)
 
     # Recompute validity windows using the canonical validity calculator so that
-    # policies like "one_bar" take effect even when expire_policy was not set.
+    # policies like "fixed_bars" take effect even when expire_policy was not set.
     if not orders_df.empty:
         session_filter = strategy_params.get("session_filter") or ["09:30-16:00"]
         session_timezone = strategy_params.get("session_timezone", market_tz)
         validity_policy = args.validity_policy
         validity_minutes = args.validity_minutes
+        validity_bars = args.validity_bars
         timeframe_minutes = args.timeframe_minutes
         valid_from_policy = args.valid_from_policy
 
@@ -225,6 +228,7 @@ def build_orders_for_backtest(
                 session_timezone=session_timezone,
                 validity_policy=validity_policy,
                 validity_minutes=validity_minutes,
+                validity_bars=validity_bars,
                 valid_from_policy=valid_from_policy,
             )
             new_valid_from.append(vf.isoformat())

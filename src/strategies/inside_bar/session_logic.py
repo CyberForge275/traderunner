@@ -13,6 +13,14 @@ from .models import RawSignal
 from .session_windows import compute_netting_open_until, session_key_for
 
 
+def _resolve_breakout_mode(config: InsideBarConfig) -> str:
+    mode = getattr(config, "breakout_confirmation_mode", None)
+    if mode:
+        return str(mode).lower()
+    # Legacy behavior stays touch-based unless explicitly enabled in config.
+    return "touch"
+
+
 def generate_signals(
     df: pd.DataFrame,
     symbol: str,
@@ -86,12 +94,13 @@ def generate_signals(
     # Entry level selection mode
     entry_mode = getattr(config, 'entry_level_mode', 'mother_bar')
 
-    # Breakout confirmation (optional; if True, only trigger if close confirms)
-    breakout_confirmation = getattr(config, 'breakout_confirmation', True)
+    breakout_mode = _resolve_breakout_mode(config)
+    max_breakout_range_bars = getattr(config, "max_breakout_range_bars", None)
 
     # Session / order validity
     validity_policy = getattr(config, 'order_validity_policy', 'session_end')
     validity_minutes = getattr(config, 'order_validity_minutes', 60)
+    validity_bars = getattr(config, 'order_validity_bars', 1)
 
     # Trigger policy
     trigger_must_be_in_session = getattr(config, 'trigger_must_be_within_session', True)
@@ -262,8 +271,51 @@ def generate_signals(
                     state["done"] = True
                     continue
 
-                # Emit two legs (BUY + SELL) for OCO
-                if allow_long:
+                # Optional close-confirmation gate (opt-in only).
+                confirmation_side: Optional[str] = None
+                confirmation_ts: Optional[pd.Timestamp] = None
+                confirmation_window_idx: Optional[int] = None
+                expire_reason: Optional[str] = None
+                if breakout_mode == "close":
+                    if max_breakout_range_bars is None:
+                        raise ValueError("max_breakout_range_bars required when breakout_confirmation_mode=close")
+                    window = int(max_breakout_range_bars)
+                    for w in range(1, window + 1):
+                        probe_idx = idx + w
+                        if probe_idx >= len(df):
+                            break
+                        probe = df.iloc[probe_idx]
+                        probe_ts = pd.to_datetime(probe["timestamp"], utc=True)
+                        probe_session_idx = session_filter.get_session_index(probe_ts, session_tz)
+                        if probe_session_idx != session_idx:
+                            break
+                        close_px = float(probe["close"])
+                        if allow_long and close_px > float(entry_long):
+                            confirmation_side = "BUY"
+                            confirmation_ts = probe_ts
+                            confirmation_window_idx = w
+                            break
+                        if allow_short and close_px < float(entry_short):
+                            confirmation_side = "SELL"
+                            confirmation_ts = probe_ts
+                            confirmation_window_idx = w
+                            break
+                    if confirmation_side is None:
+                        expire_reason = "max_breakout_range"
+                        emit(
+                            {
+                                "event": "setup_expired",
+                                "reason": expire_reason,
+                                "idx": int(idx),
+                                "window_bars": window,
+                            }
+                        )
+                        state["done"] = True
+                        continue
+                    signal_ts = confirmation_ts + pd.Timedelta(minutes=timeframe_minutes)
+
+                # Emit legs (legacy touch mode: OCO both sides; close mode: confirmed side only)
+                if allow_long and (breakout_mode != "close" or confirmation_side == "BUY"):
                     signals.append(
                         RawSignal(
                             timestamp=signal_ts,
@@ -287,10 +339,22 @@ def generate_signals(
                                 deviation_atr=long_dev_atr,
                                 mother_body_fraction=levels.get('mother_body_fraction'),
                                 inside_body_fraction=levels.get('inside_body_fraction'),
+                                extra={
+                                    "breakout_confirmation_mode": breakout_mode,
+                                    "breakout_long_close_confirmed": breakout_mode == "close" and confirmation_side == "BUY",
+                                    "breakout_short_close_confirmed": False,
+                                    "entry_long_effective": breakout_mode != "close" or confirmation_side == "BUY",
+                                    "entry_short_effective": False,
+                                    "setup_armed_ts": ts,
+                                    "confirm_ts": confirmation_ts,
+                                    "window_idx": confirmation_window_idx,
+                                    "entry_valid_from_ts": signal_ts,
+                                    "setup_expire_reason": expire_reason,
+                                },
                             ),
                         )
                     )
-                if allow_short:
+                if allow_short and (breakout_mode != "close" or confirmation_side == "SELL"):
                     signals.append(
                         RawSignal(
                             timestamp=signal_ts,
@@ -314,6 +378,18 @@ def generate_signals(
                                 deviation_atr=short_dev_atr,
                                 mother_body_fraction=levels.get('mother_body_fraction'),
                                 inside_body_fraction=levels.get('inside_body_fraction'),
+                                extra={
+                                    "breakout_confirmation_mode": breakout_mode,
+                                    "breakout_long_close_confirmed": False,
+                                    "breakout_short_close_confirmed": breakout_mode == "close" and confirmation_side == "SELL",
+                                    "entry_long_effective": False,
+                                    "entry_short_effective": breakout_mode != "close" or confirmation_side == "SELL",
+                                    "setup_armed_ts": ts,
+                                    "confirm_ts": confirmation_ts,
+                                    "window_idx": confirmation_window_idx,
+                                    "entry_valid_from_ts": signal_ts,
+                                    "setup_expire_reason": expire_reason,
+                                },
                             ),
                         )
                     )
@@ -433,6 +509,7 @@ def generate_signals(
                 netting_open_until = compute_netting_open_until(
                     validity_policy=validity_policy,
                     validity_minutes=validity_minutes,
+                    validity_bars=validity_bars,
                     session_filter=session_filter,
                     ts=ts,
                     session_tz=session_tz,

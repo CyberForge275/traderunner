@@ -42,7 +42,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--valid-from", required=False, help="Start date (ISO); if provided, lookback-days is derived")
     p.add_argument("--lookback-days", required=False, type=int, help="Lookback days (without warmup)")
     p.add_argument("--valid-from-policy", required=False, choices=["signal_ts", "next_bar"])
-    p.add_argument("--order-validity-policy", required=False, choices=["session_end", "fixed_minutes", "one_bar"])
+    p.add_argument(
+        "--order-validity-policy",
+        required=False,
+        choices=["session_end", "fixed_minutes", "fixed_bars"],
+    )
     p.add_argument("--compound-enabled", action="store_true")
     p.add_argument("--compound-equity-basis", default="cash_only")
     p.add_argument("--initial-cash", type=float, default=10000.0)

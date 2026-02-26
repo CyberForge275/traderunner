@@ -4,6 +4,7 @@ import logging
 from dash import Input, Output, State, html, dcc, ALL, no_update
 from dash.exceptions import PreventUpdate
 from trading_dashboard.config_store.strategy_config_store import StrategyConfigStore
+import src.strategies.config.managers  # noqa: F401 - trigger manager registration
 from trading_dashboard.ui_ids import SSOT
 
 logger = logging.getLogger(__name__)
@@ -11,6 +12,9 @@ logger = logging.getLogger(__name__)
 
 def _create_input_for_param(key, value, section, spec):
     """Create appropriate input component based on field spec."""
+    if key == "trailing" and isinstance(value, dict):
+        return _create_trailing_input(value, section)
+
     input_id = SSOT.PARAM_INPUT(section, key)
     kind = spec.get("kind")
     
@@ -75,6 +79,60 @@ def _create_input_for_param(key, value, section, spec):
                 style={"width": "100%", "marginBottom": "8px"},
             ),
         ])
+
+
+def _create_trailing_input(value: dict, section: str):
+    """Render trailing as a master/slave grouped input block."""
+    label_style = {"fontSize": "0.85em", "marginTop": "4px"}
+    enabled = bool(value.get("enabled", False))
+    trigger = value.get("trigger_tp_pct", "")
+    remaining = value.get("risk_remaining_pct", "")
+    apply_mode = value.get("apply_mode", "next_bar")
+
+    return html.Div(
+        [
+            html.Label("trailing", style={**label_style, "fontWeight": "600"}),
+            html.Div(
+                [
+                    html.Label("enabled", style=label_style),
+                    dcc.Checklist(
+                        id=SSOT.PARAM_INPUT(section, "trailing.enabled"),
+                        options=[{"label": "", "value": "true"}],
+                        value=["true"] if enabled else [],
+                        style={"marginBottom": "8px"},
+                    ),
+                    html.Label("trigger_tp_pct", style=label_style),
+                    dcc.Input(
+                        id=SSOT.PARAM_INPUT(section, "trailing.trigger_tp_pct"),
+                        type="text",
+                        value=str(trigger),
+                        style={"width": "100%", "marginBottom": "8px"},
+                    ),
+                    html.Label("risk_remaining_pct", style=label_style),
+                    dcc.Input(
+                        id=SSOT.PARAM_INPUT(section, "trailing.risk_remaining_pct"),
+                        type="text",
+                        value=str(remaining),
+                        style={"width": "100%", "marginBottom": "8px"},
+                    ),
+                    html.Label("apply_mode", style=label_style),
+                    dcc.Dropdown(
+                        id=SSOT.PARAM_INPUT(section, "trailing.apply_mode"),
+                        options=[{"label": opt, "value": opt} for opt in ["next_bar", "same_bar"]],
+                        value=apply_mode,
+                        clearable=False,
+                        style={"width": "100%", "marginBottom": "8px"},
+                    ),
+                ],
+                style={
+                    "padding": "8px",
+                    "border": "1px solid rgba(255,255,255,0.08)",
+                    "borderRadius": "4px",
+                    "backgroundColor": "rgba(255,255,255,0.02)",
+                },
+            ),
+        ]
+    )
 
 
 def _normalize_new_version_input(*, is_finalized, current_version, new_version):
@@ -234,24 +292,6 @@ def register_ssot_config_viewer_callback(app):
             core_params = defaults.get("core", {})
             tunable_params = defaults.get("tunable", {})
             is_finalized = defaults.get("strategy_finalized", False)
-            if "max_position_loss_pct_equity" in core_params:
-                val = core_params.get("max_position_loss_pct_equity")
-                logger.info(
-                    "actions: ui_loaded_default key=max_position_loss_pct_equity section=core val=%r type=%s strategy_id=%s version=%s",
-                    val,
-                    type(val).__name__,
-                    strategy_id,
-                    version,
-                )
-            if "max_position_loss_pct_equity" in tunable_params:
-                val = tunable_params.get("max_position_loss_pct_equity")
-                logger.info(
-                    "actions: ui_loaded_default key=max_position_loss_pct_equity section=tunable val=%r type=%s strategy_id=%s version=%s",
-                    val,
-                    type(val).__name__,
-                    strategy_id,
-                    version,
-                )
             
             logger.info(
                 f"actions: ui_config_loaded strategy_id={strategy_id} version={version} "
@@ -472,20 +512,16 @@ def _compute_overrides(loaded_defaults, edited_values, edited_ids):
     for value, id_dict in zip(edited_values, edited_ids):
         section = id_dict["section"]
         key = id_dict["key"]
-        if key == "max_position_loss_pct_equity":
-            logger.info(
-                "actions: ui_param_raw key=max_position_loss_pct_equity value_repr=%r value_type=%s",
-                value,
-                type(value).__name__,
-            )
-        
-        original = loaded_defaults[section][key]
-        if key == "max_position_loss_pct_equity":
-            logger.info(
-                "actions: ui_param_orig key=max_position_loss_pct_equity orig=%r orig_type=%s",
-                original,
-                type(original).__name__,
-            )
+        if "." in key:
+            parent, child = key.split(".", 1)
+            original_parent = loaded_defaults[section].get(parent, {})
+            if not isinstance(original_parent, dict):
+                raise ValueError(f"{parent} must be a mapping")
+            original = original_parent.get(child)
+        else:
+            original = loaded_defaults[section][key]
+
+        if key == "max_breakout_range_bars":
             if value in (None, ""):
                 continue
             if isinstance(value, list):
@@ -496,28 +532,28 @@ def _compute_overrides(loaded_defaults, edited_values, edited_ids):
                 value = value.strip()
                 if value == "":
                     continue
+                if value.lower() in {"none", "null"}:
+                    continue
                 value = value.replace(",", ".")
             try:
-                new_value = float(value)
+                float_val = float(value)
             except (TypeError, ValueError) as exc:
-                raise ValueError(
-                    f"Invalid max_position_loss_pct_equity value: {value!r}"
-                ) from exc
-            original_norm = float(original)
-            if new_value != original_norm:
+                raise ValueError(f"Invalid int value for {key}: {value!r}") from exc
+            if not float_val.is_integer():
+                raise ValueError(f"Invalid int value for {key}: {value!r}")
+            new_value = int(float_val)
+            if original in (None, ""):
+                has_changed = True
+            else:
+                has_changed = new_value != int(original)
+            if has_changed:
                 if section == "core":
                     core_overrides[key] = new_value
                 else:
                     tunable_overrides[key] = new_value
-                logger.info(
-                    "actions: ui_override_added key=%s new=%r orig=%r",
-                    key,
-                    new_value,
-                    original_norm,
-                )
             continue
 
-        if key == "risk_reward_ratio":
+        if key in {"risk_reward_ratio", "stop_cap_atr"}:
             if value in (None, ""):
                 continue
             if isinstance(value, list):
@@ -590,11 +626,40 @@ def _compute_overrides(loaded_defaults, edited_values, edited_ids):
                     new_value = [value] if value else []
             else:
                 new_value = value if isinstance(value, list) else [value]
+        elif isinstance(original, dict):
+            if isinstance(value, str):
+                import json
+                import ast
+
+                text = value.strip()
+                if not text:
+                    continue
+                try:
+                    new_value = json.loads(text)
+                except Exception:
+                    try:
+                        new_value = ast.literal_eval(text)
+                    except Exception as exc:
+                        raise ValueError(f"Invalid mapping value for {key}: {value!r}") from exc
+            else:
+                new_value = value
+            if not isinstance(new_value, dict):
+                raise ValueError(f"{key} must be a mapping")
         else:
             new_value = str(value)
         
         # Only include if changed
         if new_value != original:
+            if "." in key:
+                parent, child = key.split(".", 1)
+                target = core_overrides if section == "core" else tunable_overrides
+                parent_obj = target.get(parent)
+                if not isinstance(parent_obj, dict):
+                    base_parent = loaded_defaults[section].get(parent, {})
+                    parent_obj = dict(base_parent) if isinstance(base_parent, dict) else {}
+                    target[parent] = parent_obj
+                parent_obj[child] = new_value
+                continue
             if section == "core":
                 core_overrides[key] = new_value
             else:

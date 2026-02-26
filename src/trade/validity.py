@@ -46,6 +46,7 @@ def calculate_validity_window(
     session_timezone: str,
     validity_policy: str,
     validity_minutes: int = 60,
+    validity_bars: int = 1,
     valid_from_policy: str = "signal_ts",
 ) -> Tuple[pd.Timestamp, pd.Timestamp]:
     """
@@ -70,8 +71,9 @@ def calculate_validity_window(
         timeframe_minutes: Bar duration (e.g., 5 for M5)
         session_filter: SessionFilter instance
         session_timezone: Timezone for session checks (e.g., "Europe/Berlin")
-        validity_policy: "session_end" | "fixed_minutes" | "one_bar"
+        validity_policy: "session_end" | "fixed_minutes" | "fixed_bars"
         validity_minutes: Minutes for fixed_minutes policy
+        validity_bars: Number of bars for fixed_bars policy
         valid_from_policy: "signal_ts" | "next_bar"
 
     Returns:
@@ -114,11 +116,9 @@ def calculate_validity_window(
         )
 
     # Calculate valid_to based on validity_policy
-    if validity_policy == "one_bar":
-        # Order valid for one bar duration
-        # NOTE: Uses ONLY timeframe_minutes; validity_minutes parameter is IGNORED
-        # This ensures order expires after exactly one bar (e.g., 5 minutes for M5)
-        valid_to = valid_from + timedelta(minutes=timeframe_minutes)
+    if validity_policy == "fixed_bars":
+        # Order valid for N bars based on timeframe_minutes.
+        valid_to = valid_from + timedelta(minutes=timeframe_minutes * int(validity_bars))
 
     elif validity_policy == "session_end":
         # CRITICAL FIX: Use valid_from, not signal_ts
@@ -165,7 +165,7 @@ def calculate_validity_window(
     else:
         raise ValueError(
             f"Unknown validity_policy: {validity_policy}. "
-            "Must be 'session_end', 'fixed_minutes', or 'one_bar'."
+            "Must be 'session_end', 'fixed_minutes', or 'fixed_bars'."
         )
 
     # Final validation: ensure non-zero duration

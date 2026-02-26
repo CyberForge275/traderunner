@@ -2,15 +2,15 @@
 
 **Datum**: 2026-01-02  
 **Scope**: Order Validity / Exit Strategy Mechanik  
-**Ziel**: Vollständige Analyse der aktuellen "one_bar" Implementierung + Entwurf für 3 zusätzliche Optionen
+**Ziel**: Vollständige Analyse der aktuellen "fixed_bars" Implementierung + Entwurf für 3 zusätzliche Optionen
 
 ---
 
 ## Executive Summary
 
 **Aktuelle Situation**:
-- `order_validity_policy` ist bereits **parametrisiert** mit 3 Optionen: `one_bar`, `session_end`, `fixed_minutes`
-- `one_bar` ist **vollständig implementiert** in `trade/validity.py` (Lines 93-97)
+- `order_validity_policy` ist bereits **parametrisiert** mit 3 Optionen: `fixed_bars`, `session_end`, `fixed_minutes`
+- `fixed_bars` ist **vollständig implementiert** in `trade/validity.py` (Lines 93-97)
 - Exit erfolgt in `axiom_bt/engines/replay_engine.py::_exit_after_entry` über `valid_until` Parameter
 
 **Kritisches Architekturfinding**:
@@ -18,7 +18,7 @@
 - Dies verletzt Separation of Concerns und macht Validity-Modul abhängig von einer spezifischen Strategie
 
 **User-Request-Optionen**:
-1. ✅ **one_bar** (Status: IMPLEMENTED) - Order expires after 1 bar  
+1. ✅ **fixed_bars** (Status: IMPLEMENTED) - Order expires after 1 bar  
 2. ⚠️ **minute-based** (Status: IMPLEMENTED als `fixed_minutes`, aber UI/Doku nennt es anders)
 3. ✅ **session-end** (Status: IMPLEMENTED)
 4. ❓ **EOD** (Status: UNKLAR - ist das "end of data" oder "end of trading day"?)
@@ -55,12 +55,12 @@ axiom_bt/engines/replay_engine.simulate_insidebar_from_orders()
 
 ### 1.2 Implementierte Policies (Code-verifiziert)
 
-#### Policy 1: `one_bar` ✅
+#### Policy 1: `fixed_bars` ✅
 
 **Location**: `trade/validity.py` lines 93-97
 
 ```python
-if validity_policy == "one_bar":
+if validity_policy == "fixed_bars":
     # Order valid for one bar duration
     # NOTE: Uses ONLY timeframe_minutes; validity_minutes parameter is IGNORED
     valid_to = valid_from + timedelta(minutes=timeframe_minutes)
@@ -267,7 +267,7 @@ strategy_params.get("expire_policy", "session_end"),
 
 ## 3. User-Request: Neue Optionen Analyse
 
-### 3.1 Option 1: "one_bar" - STATUS: ✅ VOLLSTÄNDIG IMPLEMENTIERT
+### 3.1 Option 1: "fixed_bars" - STATUS: ✅ VOLLSTÄNDIG IMPLEMENTIERT
 
 **User-Request**: "aktuelle Implementierung"
 
@@ -482,14 +482,14 @@ if signal_ts.tz is None:
 ### 5.1 Sind die Namen konsistent?
 
 **Problem**:
-- Code nennt es: `one_bar`, `session_end`, `fixed_minutes`
-- User nennt es: `one_bar`, `minute-based`, `end of session window`, `EOD`
+- Code nennt es: `fixed_bars`, `session_end`, `fixed_minutes`
+- User nennt es: `fixed_bars`, `minute-based`, `end of session window`, `EOD`
 
 **Mapping-Vorschlag**:
 
 | User-Name | Code-Name (aktuell) | Status | Aktion |
 |-----------|---------------------|--------|--------|
-| `one_bar` | `one_bar` | ✅ Match | Keine |
+| `fixed_bars` | `fixed_bars` | ✅ Match | Keine |
 | `minute-based` | `fixed_minutes` | ⚠️ Verschieden | Umbenennen oder Klarstellen |
 | `end of session window` | `session_end` | ⚠️ Verschieden | Umbenennen oder Klarstellen |
 | `EOD` | - | ❌ Nicht impl | Neu implementieren (nach Klärung) |
@@ -502,7 +502,7 @@ if signal_ts.tz is None:
 
 **Frage**: Kann man neue Policies implementieren **OHNE** SessionFilter zu refactoren?
 
-**Antwort für one_bar**: ✅ Ja (braucht kein SessionFilter)
+**Antwort für fixed_bars**: ✅ Ja (braucht kein SessionFilter)
 
 **Antwort für EOD** (Definition A: Trading Day Ende):
 - Braucht **EOD-Zeitpunkt** → ähnlich wie SessionFilter
@@ -547,7 +547,7 @@ parser.add_argument("--expire-policy", choices=["session_end", "good_till_cancel
 |--------------|-------------|--------------|
 | minute-based | ✅ Implementiert | `fixed_minutes` |
 | end of session window | ✅ Implementiert | `session_end` |
-| one_bar | ✅ Implementiert | `one_bar` |
+| fixed_bars | ✅ Implementiert | `fixed_bars` |
 
 **→ 3 von 4 Optionen sind bereits fertig!**
 
@@ -582,7 +582,7 @@ parser.add_argument("--expire-policy", choices=["session_end", "good_till_cancel
 
 ### 6.4 Constraint-Matrix
 
-| Constraint | one_bar | session_end | fixed_minutes | EOD (proposed) |
+| Constraint | fixed_bars | session_end | fixed_minutes | EOD (proposed) |
 |------------|---------|-------------|---------------|----------------|
 | **Mehrere Positionen möglich** | Nein* | Nein* | Nein* | **Ja*** |
 | **Timezone-aware** | ✅ | ✅ | ✅ | ✅ (required) |

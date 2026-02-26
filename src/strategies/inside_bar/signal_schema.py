@@ -7,8 +7,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+from functools import lru_cache
+from pathlib import Path
 from dataclasses import asdict
-from typing import Dict, List
+from typing import Callable, Dict, List
+
+import yaml
 
 from axiom_bt.contracts.signal_frame_contract_v1 import ColumnSpec, SignalFrameSchemaV1
 
@@ -88,21 +92,61 @@ def _schema_v1_0_2() -> SignalFrameSchemaV1:
     )
 
 
-SCHEMAS: Dict[str, SignalFrameSchemaV1] = {
-    "1.0.0": _schema_v1_0_0(),
-    "1.0.1": _schema_v1_0_0(),  # Same schema, only tunable params differ
-    "1.0.2": _schema_v1_0_2(),  # OCO two-leg support (oco_group_id)
-    "1.0.3": _schema_v1_0_2(),  # Same signal-frame contract as v1.0.2
+SCHEMA_BUILDERS: Dict[str, Callable[[], SignalFrameSchemaV1]] = {
+    "v1_0_0": _schema_v1_0_0,
+    "v1_0_2": _schema_v1_0_2,
 }
 
 
+@lru_cache(maxsize=1)
+def _load_schema_refs_by_version() -> Dict[str, str]:
+    cfg_path = Path(__file__).resolve().parent / "insidebar_intraday.yaml"
+    return _load_schema_refs_from_yaml(cfg_path)
+
+
+def _load_schema_refs_from_yaml(cfg_path: Path) -> Dict[str, str]:
+    if not cfg_path.exists():
+        raise ValueError(f"inside_bar config missing: {cfg_path}")
+
+    with cfg_path.open("r", encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    versions = payload.get("versions")
+    if not isinstance(versions, dict) or not versions:
+        raise ValueError("insidebar_intraday.yaml missing 'versions' mapping")
+
+    refs: Dict[str, str] = {}
+    for version, node in versions.items():
+        if not isinstance(node, dict):
+            raise ValueError(f"invalid version node for {version}: expected mapping")
+        if "signal_schema_ref" not in node:
+            raise ValueError(
+                f"signal_schema_ref missing for version {version} (SSOT: set in YAML)"
+            )
+        ref = node["signal_schema_ref"]
+        if not isinstance(ref, str) or not ref.strip():
+            raise ValueError(
+                f"invalid signal_schema_ref for version {version}: expected non-empty string"
+            )
+        refs[str(version)] = ref.strip()
+    return refs
+
+
 def get_signal_frame_schema(strategy_version: str) -> SignalFrameSchemaV1:
-    """Return schema for a given strategy_version or raise ValueError."""
-    if strategy_version not in SCHEMAS:
+    """Resolve schema by strategy_version -> signal_schema_ref (YAML SSOT)."""
+    refs = _load_schema_refs_by_version()
+    version = str(strategy_version)
+    if version not in refs:
         raise ValueError(
-            f"Unknown insidebar schema version '{strategy_version}'. Available: {sorted(SCHEMAS.keys())}"
+            f"Unknown insidebar schema version '{strategy_version}'. Available: {sorted(refs.keys())}"
         )
-    return SCHEMAS[strategy_version]
+
+    ref = refs[version]
+    if ref not in SCHEMA_BUILDERS:
+        raise ValueError(
+            f"Unknown insidebar schema ref '{ref}' for version '{strategy_version}'. "
+            f"Available refs: {sorted(SCHEMA_BUILDERS.keys())}"
+        )
+    return SCHEMA_BUILDERS[ref]()
 
 
 def schema_fingerprint(schema: SignalFrameSchemaV1) -> str:

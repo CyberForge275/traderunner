@@ -33,7 +33,7 @@ session_windows = ["09:30-16:00"]  # Default for US markets
 
 ### Order Validity
 ```python
-order_validity_policy = "one_bar"
+order_validity_policy = "fixed_bars"
 valid_from_policy = "signal_ts"
 ```
 

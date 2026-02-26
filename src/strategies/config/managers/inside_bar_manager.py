@@ -15,6 +15,10 @@ class InsideBarConfigManager(StrategyConfigManagerBase):
         super().__init__(repository=repository)
         self.spec = InsideBarSpec()
 
+    def extra_allowed_version_keys(self) -> set[str]:
+        # Version-level schema ref is owned by insidebar YAML (SSOT).
+        return {"signal_schema_ref"}
+
 
 
     def get(self, version: str) -> Dict[str, Any]:

@@ -169,7 +169,7 @@ at line 223: raise ValueError(...)
 **Options:**
 1. ✅ **Increase lookback:** Use 10-15 days
 2. ✅ **Use recent date:** Use 2024-12-15 or 2024-12-17
-3. ✅ **Reuse existing run:** HOOD one_bar generated data successfully
+3. ✅ **Reuse existing run:** HOOD fixed_bars generated data successfully
 
 ---
 
@@ -203,7 +203,7 @@ lookback_days=15  # Should give >10 M5 bars
 
 **Option B:** Use successful HOOD run evidence
 ```bash
-# HOOD one_bar run succeeded earlier:
+# HOOD fixed_bars run succeeded earlier:
 AG_4C_HOOD_ONEBAR_20251218_234113
 - Status: SUCCESS
 - Orders: 10 lines
@@ -223,7 +223,7 @@ min_m1_rows=200   # Current
 1. **Full Smoke Matrix**
    - TSLA baseline (15 days, session_end)
    - TSLA shifted (15:30-16:30 sessions)
-   - HOOD baseline (compare with one_bar)
+   - HOOD baseline (compare with fixed_bars)
    - PLTR baseline
 
 2. **Generate Final Report**

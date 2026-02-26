@@ -95,7 +95,9 @@ def load_strategy_params_from_ssot(strategy_id: str, version: str) -> Dict:
         )
         raise StrategyConfigLoadError(msg) from exc
 
-    required_keys = ["required_warmup_bars", "core"]
+    required_keys = ["core"]
+    if mgr.requires_warmup_bars():
+        required_keys.insert(0, "required_warmup_bars")
     missing = [k for k in required_keys if k not in node]
     if missing:
         msg = f"strategy '{strategy_id}' version '{version}' missing keys: {missing}"
@@ -112,7 +114,7 @@ def load_strategy_params_from_ssot(strategy_id: str, version: str) -> Dict:
         "strategy_id": full_cfg.get("strategy_id", strategy_id),
         "canonical_name": full_cfg.get("canonical_name", strategy_id),
         "version": version,
-        "required_warmup_bars": node.get("required_warmup_bars"),
+        "required_warmup_bars": node.get("required_warmup_bars", 0),
         "strategy_finalized": node.get("strategy_finalized", False),
         "core": node.get("core", {}),
         "tunable": node.get("tunable", {}),

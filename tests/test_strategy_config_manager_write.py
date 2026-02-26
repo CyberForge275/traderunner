@@ -21,6 +21,7 @@ def temp_repo(tmp_path):
             "1.0.0": {
                 "required_warmup_bars": 200,
                 "core": {
+                    "inside_bar_definition_mode": "mb_range_hl__ib_hl",
                     "atr_period": 14,
                     "risk_reward_ratio": 2.0,
                     "min_mother_bar_size": 0.5,
@@ -32,6 +33,8 @@ def temp_repo(tmp_path):
                     "timeframe_minutes": 5,
                     "valid_from_policy": "signal_ts",
                     "order_validity_policy": "session_end",
+                    "order_validity_minutes": 30,
+                    "order_validity_bars": 1,
                     "stop_cap_atr": 40,
                     "max_position_pct": 100.0
                 },

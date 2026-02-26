@@ -213,7 +213,7 @@ class InsideBarConfig:
     """Order validity policy. Determines when orders expire.
     
     Options:
-    - "one_bar": Expires after 1 bar (uses timeframe_minutes, IGNORES order_validity_minutes)
+    - "fixed_bars": Expires after N bars (uses timeframe_minutes and order_validity_bars)
     - "fixed_minutes": Expires after N minutes (uses order_validity_minutes, IGNORES timeframe)
     - "session_end": Expires at session close (uses session_filter, IGNORES both)
     
@@ -224,12 +224,13 @@ class InsideBarConfig:
     """Duration in minutes for 'fixed_minutes' policy.
     
     IMPORTANT: This parameter is ONLY used when order_validity_policy="fixed_minutes".
-    It is IGNORED when policy is "one_bar" or "session_end".
+    It is IGNORED when policy is "fixed_bars" or "session_end".
     
     Example:
-        policy="one_bar" + validity_minutes=60 → order expires after 5 min (M5 timeframe)
+        policy="fixed_bars" + order_validity_bars=2 (M5) → order expires after 10 min
         policy="fixed_minutes" + validity_minutes=60 → order expires after 60 min
     """
+    order_validity_bars: int = 1
     
     # === MVP: Trigger and Netting Rules ===
     trigger_must_be_within_session: bool = True
@@ -311,13 +312,15 @@ class InsideBarConfig:
         assert 0.0 < self.max_position_pct <= 100.0, "max_position_pct must be in (0, 100]"
 
         # Order validity
-        assert self.order_validity_policy in ["session_end", "fixed_minutes", "one_bar"], \
+        assert self.order_validity_policy in ["session_end", "fixed_minutes", "fixed_bars"], \
             f"Invalid order_validity_policy: {self.order_validity_policy} " \
-            "('instant' removed - use 'one_bar' for single-bar validity)"
+            "('instant' removed - use 'fixed_bars' for bar-based validity)"
         assert self.valid_from_policy in ["signal_ts", "next_bar"], \
             f"Invalid valid_from_policy: {self.valid_from_policy}"
         if self.order_validity_policy == "fixed_minutes":
-            assert self.order_validity_minutes > 0, "order_validity_minutes must be positive"
+            assert 1 <= self.order_validity_minutes <= 60, "order_validity_minutes must be in [1,60]"
+        if self.order_validity_policy == "fixed_bars":
+            assert 1 <= self.order_validity_bars <= 10, "order_validity_bars must be in [1,10]"
         
         # MVP: Trigger and netting validations
         assert isinstance(self.trigger_must_be_within_session, bool), \
@@ -326,11 +329,11 @@ class InsideBarConfig:
             f"Invalid netting_mode: {self.netting_mode}. Only 'one_position_per_symbol' supported in MVP"
         
         # Warn if order_validity_minutes is set but will be ignored
-        if self.order_validity_policy == "one_bar" and self.order_validity_minutes != 60:
+        if self.order_validity_policy == "fixed_bars" and self.order_validity_minutes != 60:
             import logging
             logging.getLogger(__name__).warning(
                 f"order_validity_minutes={self.order_validity_minutes} will be IGNORED "
-                f"with policy='one_bar'. Orders will expire after 1 bar (timeframe duration)."
+                "with policy='fixed_bars'. Orders will expire after N bars (timeframe duration)."
             )
 
         # Trailing stop
@@ -474,24 +477,18 @@ def build_inside_bar_config(params: dict) -> InsideBarConfig:
         "session_timezone": _require_param(params, "session_timezone"),
         "session_windows": session_windows,
         "order_validity_policy": _require_param(params, "order_validity_policy"),
+        "order_validity_minutes": _require_param(params, "order_validity_minutes"),
+        "order_validity_bars": _require_param(params, "order_validity_bars"),
         "valid_from_policy": _require_param(params, "valid_from_policy"),
         "stop_cap_atr": _require_param(params, "stop_cap_atr"),
         "timeframe_minutes": params["timeframe_minutes"],
         "max_position_pct": _require_param(params, "max_position_pct"),
         "max_pattern_age_candles": _require_param(params, "max_pattern_age_candles"),
         "max_deviation_atr": _require_param(params, "max_deviation_atr"),
-        "max_position_loss_pct_equity": _require_param(params, "max_position_loss_pct_equity"),
     }
 
-    if core_params["order_validity_policy"] == "fixed_minutes":
-        if "validity_minutes" in params:
-            core_params["order_validity_minutes"] = params["validity_minutes"]
-        else:
-            core_params["order_validity_minutes"] = _require_param(params, "order_validity_minutes")
-    elif "validity_minutes" in params:
+    if "validity_minutes" in params:
         core_params["order_validity_minutes"] = params["validity_minutes"]
-    elif "order_validity_minutes" in params:
-        core_params["order_validity_minutes"] = params["order_validity_minutes"]
 
     optional_passthrough = (
         "entry_level_mode",

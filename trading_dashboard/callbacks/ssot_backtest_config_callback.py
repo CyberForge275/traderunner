@@ -5,6 +5,7 @@ from dash import Input, Output, State, html, dcc, ALL, MATCH, no_update
 from dash.exceptions import PreventUpdate
 from trading_dashboard.config_store.strategy_config_store import StrategyConfigStore
 from src.strategies.config.registry import config_manager_registry
+import src.strategies.config.managers  # noqa: F401 - trigger manager registration
 from trading_dashboard.strategy_configs.registry import get_registry
 from trading_dashboard.ui_ids import RUN  # Import RUN ID constants
 
@@ -132,4 +133,3 @@ def register_ssot_backtest_config_callback(app):
             return legacy_registry.render_config_for_strategy(strategy_id), None
             
         return [html.Div(f"No configuration found for {strategy_id}", style={"color": "#888"})], None
-

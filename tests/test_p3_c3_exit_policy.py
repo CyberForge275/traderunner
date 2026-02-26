@@ -206,7 +206,7 @@ def test_time_exit_shuffle_invariant():
         assert r1.exit_price == r2.exit_price
 
 
-def test_time_exit_none_bars_returns_unchanged():
+def test_time_exit_nfixed_barss_returns_unchanged():
     """P3-C3: None bars → templates unchanged (graceful)."""
     template = TradeTemplate(
         template_id="t1",

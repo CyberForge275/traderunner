@@ -74,6 +74,10 @@ def extend_insidebar_signal_frame_from_core(
     df["mother_low"] = np.nan
     df["breakout_long"] = False
     df["breakout_short"] = False
+    df["breakout_long_close_confirmed"] = False
+    df["breakout_short_close_confirmed"] = False
+    df["entry_long_effective"] = False
+    df["entry_short_effective"] = False
     # Debug-only columns (no behavior impact)
     df["mother_ts"] = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns, UTC]")
     df["inside_ts"] = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns, UTC]")
@@ -81,6 +85,11 @@ def extend_insidebar_signal_frame_from_core(
     df["breakout_level"] = np.nan
     df["order_expired"] = False
     df["order_expire_reason"] = pd.NA
+    df["setup_armed_ts"] = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns, UTC]")
+    df["confirm_ts"] = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns, UTC]")
+    df["entry_valid_from_ts"] = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns, UTC]")
+    df["window_idx"] = np.nan
+    df["setup_expire_reason"] = pd.NA
     df["mother_body_fraction"] = np.nan
     df["inside_body_fraction"] = np.nan
     df["inside_bar_reject_reason"] = pd.NA
@@ -146,9 +155,27 @@ def extend_insidebar_signal_frame_from_core(
         if sig.side == "BUY":
             row["breakout_long"] = True
             row["breakout_short"] = False
+            row["entry_long_effective"] = bool(meta.get("entry_long_effective", True))
+            row["entry_short_effective"] = bool(meta.get("entry_short_effective", False))
         else:
             row["breakout_long"] = False
             row["breakout_short"] = True
+            row["entry_long_effective"] = bool(meta.get("entry_long_effective", False))
+            row["entry_short_effective"] = bool(meta.get("entry_short_effective", True))
+        if "breakout_long_close_confirmed" in meta:
+            row["breakout_long_close_confirmed"] = bool(meta["breakout_long_close_confirmed"])
+        if "breakout_short_close_confirmed" in meta:
+            row["breakout_short_close_confirmed"] = bool(meta["breakout_short_close_confirmed"])
+        if "setup_armed_ts" in meta and pd.notna(meta["setup_armed_ts"]):
+            row["setup_armed_ts"] = pd.to_datetime(meta["setup_armed_ts"], utc=True)
+        if "confirm_ts" in meta and pd.notna(meta["confirm_ts"]):
+            row["confirm_ts"] = pd.to_datetime(meta["confirm_ts"], utc=True)
+        if "entry_valid_from_ts" in meta and pd.notna(meta["entry_valid_from_ts"]):
+            row["entry_valid_from_ts"] = pd.to_datetime(meta["entry_valid_from_ts"], utc=True)
+        if "window_idx" in meta and meta["window_idx"] is not None:
+            row["window_idx"] = float(meta["window_idx"])
+        if "setup_expire_reason" in meta and pd.notna(meta["setup_expire_reason"]):
+            row["setup_expire_reason"] = str(meta["setup_expire_reason"])
 
         if "mother_high" in meta:
             row["mother_high"] = meta["mother_high"]

@@ -14,7 +14,7 @@
 **Key Findings:**
 1. ✅ **artifacts_root blocker:** REAL but SIMPLE - parameter is required (not optional)
 2. ⚠️ **Pandas API issue:** `NDFrame.first()` signature changed - code incompatibility
-3. ✅ **HOOD zero-orders:** NOT a validity/session issue - **5 orders filtered**, run successful with `one_bar` policy
+3. ✅ **HOOD zero-orders:** NOT a validity/session issue - **5 orders filtered**, run successful with `fixed_bars` policy
 4. ✅ **V2 refs:** 0 in Python files, 1 doc mention (acceptable)
 
 **Decision:** Blockers are **environmental/API**, NOT strategy logic bugs.
@@ -121,7 +121,7 @@ TypeError: NDFrame.first() missing 1 required positional argument: 'offset'
 
 ---
 
-## CHECK 3: HOOD one_bar Policy Test ✅
+## CHECK 3: HOOD fixed_bars Policy Test ✅
 
 ### Command Executed
 ```python
@@ -133,7 +133,7 @@ TypeError: NDFrame.first() missing 1 required positional argument: 'offset'
     strategy_key="inside_bar",
     strategy_params={
         ...
-        "order_validity_policy": "one_bar",  # CHANGED FROM session_end
+        "order_validity_policy": "fixed_bars",  # CHANGED FROM session_end
         ...
     },
     artifacts_root=Path("/opt/trading/traderunner/artifacts/backtests"),
@@ -148,7 +148,7 @@ Coverage check SKIPPED via environment variable (INT runtime mode)
 Filtered 5 orders with invalid validity windows (valid_to <= valid_from).
 This prevents zero-fill scenarios and ensures November parity.
 
-Starting HOOD one_bar run: AG_4C_HOOD_ONEBAR_20251218_234113
+Starting HOOD fixed_bars run: AG_4C_HOOD_ONEBAR_20251218_234113
 [OK] HOOD: 1667 rows → artifacts/data_m5/HOOD.parquet
 
 === RESULT ===
@@ -193,13 +193,13 @@ cd artifacts/backtests/AG_4C_HOOD_ONEBAR_20251218_234113
 - **Filtered:** 5 orders (validity window issue)
 - **Valid orders output:** 3 orders in orders.csv
 
-**Key Finding:** HOOD with `one_bar` policy **DOES generate orders**!
+**Key Finding:** HOOD with `fixed_bars` policy **DOES generate orders**!
 
 **Comparison:**
 | Policy | Filtered | Valid Orders | Result |
 |--------|----------|--------------|--------|
 | `session_end` | ? | 0 or 1 | Flat equity (previous runs) |
-| `one_bar` | 5 | 3 | SUCCESS ✅ |
+| `fixed_bars` | 5 | 3 | SUCCESS ✅ |
 
 **Conclusion:** HOOD zero-orders WAS related to `session_end` boundary calculation, NOT signal generation.
 
@@ -411,7 +411,7 @@ PY
 **Blocker Root Cause:** Environmental (pandas API) + Documentation (artifacts_root)
 
 **Strategy Logic:** ✅ Working correctly
-- HOOD generates orders with one_bar policy
+- HOOD generates orders with fixed_bars policy
 - Filtering works (5 orders filtered as expected)
 - Phase 5 implementation proven functional
 

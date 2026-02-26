@@ -114,6 +114,7 @@ def generate_signals(
     # Session / order validity
     validity_policy = getattr(config, 'order_validity_policy', 'session_end')
     validity_minutes = getattr(config, 'order_validity_minutes', 60)
+    validity_bars = getattr(config, 'order_validity_bars', 1)
 
     # Trigger policy
     trigger_must_be_in_session = getattr(config, 'trigger_must_be_within_session', True)
@@ -493,10 +494,9 @@ def generate_signals(
                 # === NETTING: Calculate position open_until (conservative) ===
                 if validity_policy == 'session_end':
                     netting_open_until = session_filter.get_session_end(ts, session_tz)
-                elif validity_policy == 'one_bar':
-                    # Assume M5 timeframe (5 minutes)
-                    # TODO: Make timeframe configurable if needed
-                    netting_open_until = ts + pd.Timedelta(minutes=5)
+                elif validity_policy == 'fixed_bars':
+                    # Keep existing strategy path assumption of 5-minute bars.
+                    netting_open_until = ts + pd.Timedelta(minutes=5 * int(validity_bars))
                 elif validity_policy == 'fixed_minutes':
                     netting_open_until = ts + pd.Timedelta(minutes=validity_minutes)
                     # Clamp to session_end (don't extend beyond session)

@@ -210,7 +210,6 @@ def row_to_kv_sections_orders(
         "atr",
         "risk_reward_ratio",
         "stop_distance_cap_ticks",
-        "max_position_loss_pct_equity",
         "max_position_pct",
         "fees_bps",
         "slippage_bps",

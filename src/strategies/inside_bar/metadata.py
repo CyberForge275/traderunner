@@ -20,6 +20,7 @@ def build_signal_metadata(
     deviation_atr: float | None = None,
     mother_body_fraction: float | None = None,
     inside_body_fraction: float | None = None,
+    extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "pattern": "inside_bar_breakout",
@@ -47,4 +48,6 @@ def build_signal_metadata(
         metadata["mother_body_fraction"] = mother_body_fraction
     if inside_body_fraction is not None:
         metadata["inside_body_fraction"] = inside_body_fraction
+    if extra:
+        metadata.update(extra)
     return metadata

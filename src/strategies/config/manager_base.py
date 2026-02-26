@@ -12,6 +12,14 @@ class StrategyConfigManagerBase:
     """Base class for strategy configuration managers."""
     
     strategy_id: str = ""
+
+    def requires_warmup_bars(self) -> bool:
+        """Whether version nodes must include required_warmup_bars."""
+        return True
+
+    def extra_allowed_version_keys(self) -> set[str]:
+        """Hook for strategy-specific top-level version keys."""
+        return set()
     
     def __init__(self, repository: Optional[StrategyConfigRepository] = None):
         """
@@ -128,16 +136,17 @@ class StrategyConfigManagerBase:
 
     def _validate_common(self, version: str, node: Dict[str, Any]) -> None:
         """Validate common attributes present in all strategy configs."""
-        # 1. required_warmup_bars
-        if "required_warmup_bars" not in node:
-            raise ValueError(f"{self.strategy_id} v{version} missing: required_warmup_bars")
-            
-        warmup = node["required_warmup_bars"]
-        if not isinstance(warmup, int) or warmup < 0:
-            raise ValueError(
-                f"{self.strategy_id} v{version} invalid required_warmup_bars: "
-                f"{warmup} (must be int >= 0)"
-            )
+        # 1. required_warmup_bars (strategy-specific requirement)
+        if self.requires_warmup_bars():
+            if "required_warmup_bars" not in node:
+                raise ValueError(f"{self.strategy_id} v{version} missing: required_warmup_bars")
+
+            warmup = node["required_warmup_bars"]
+            if not isinstance(warmup, int) or warmup < 0:
+                raise ValueError(
+                    f"{self.strategy_id} v{version} invalid required_warmup_bars: "
+                    f"{warmup} (must be int >= 0)"
+                )
             
         # 2. core block must exist
         if "core" not in node:
@@ -151,7 +160,14 @@ class StrategyConfigManagerBase:
             raise ValueError(f"{self.strategy_id} v{version} tunable must be a dictionary")
             
         # 4. Strictness: No unknown top-level keys in version node
-        allowed_keys = {"required_warmup_bars", "core", "tunable", "strategy_finalized"}
+        allowed_keys = {
+            "core",
+            "tunable",
+            "strategy_finalized",
+            *self.extra_allowed_version_keys(),
+        }
+        if self.requires_warmup_bars():
+            allowed_keys.add("required_warmup_bars")
         unknown_keys = set(node.keys()) - allowed_keys
         if unknown_keys:
             raise ValueError(

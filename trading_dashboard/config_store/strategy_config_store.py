@@ -4,6 +4,7 @@ import logging
 from typing import Dict, Any, Optional
 from src.strategies.config.managers.inside_bar_manager import InsideBarConfigManager
 from src.strategies.config.managers.confirmed_breakout_manager import ConfirmedBreakoutConfigManager
+from src.strategies.config.managers.harami_break_manager import HaramiBreakConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ class StrategyConfigStore:
         return {
             "strategy": strategy_id,
             "version": version_clean,
-            "required_warmup_bars": config["required_warmup_bars"],
+            "required_warmup_bars": config.get("required_warmup_bars", 0),
             "core": config["core"],
             "tunable": config.get("tunable", {}),
             "schema": {}

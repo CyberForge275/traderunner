@@ -18,7 +18,7 @@ print(f"  Min:    {orders['duration_min'].min():.2f}")
 print(f"  Max:    {orders['duration_min'].max():.2f}")
 print(f"  Std:    {orders['duration_min'].std():.2f}\n")
 
-# Check for ~5 minute windows (one_bar policy)
+# Check for ~5 minute windows (fixed_bars policy)
 five_min_count = ((orders['duration_min'] >= 4.9) & (orders['duration_min'] <= 5.1)).sum()
 print(f"Orders with ~5 minute duration: {five_min_count}/{len(orders)} ({100*five_min_count/len(orders):.1f}%)\n")
 

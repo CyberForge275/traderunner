@@ -4,11 +4,11 @@ Executive Summary
 - Source-Time bleibt UTC, Market-Time pro Exchange/Instrument, Display-Time bleibt Europe/Berlin. Keine naive Datetimes. UTC-Persistenz + Meta (market_tz, display_tz) ist Standard; Market-Zeit wird nur mit klarer Meta gespeichert.
 - Sessions sind eindeutig: SessionSpec.mode = MARKET (Default, empfohlen), optional DISPLAY (bewusstes Opt-in). UI zeigt Berlin, Trading rechnet in Market.
 - Kernmodelle: InstrumentRegistry (market_tz, calendar_id, tick_size), TimeContext (canonical_tz=UTC, market_tz, display_tz, bar_spec, session_spec), BarSpec (label/closed/origin/offset), SessionSpec (windows, tz, mode), RequestedEndSpec (date-only → interpretiert als market-date, dann zu UTC normiert).
-- Zentraler Time-Service (axiom_bt/time/): Parsing EODHD→UTC, Konvertierungen (utc↔market↔display), Session-Resolution, Validity Calculator (one_bar, session_end, fixed_minutes), Bar-Timestamp-Semantik (bar-close), DST-handling inkl. ambiguous times.
+- Zentraler Time-Service (axiom_bt/time/): Parsing EODHD→UTC, Konvertierungen (utc↔market↔display), Session-Resolution, Validity Calculator (fixed_bars, session_end, fixed_minutes), Bar-Timestamp-Semantik (bar-close), DST-handling inkl. ambiguous times.
 - Resampling Standard: resample in market_tz, label=right, closed=right, origin=epoch, offset=0, strikt gegen off_step_count; DST-stabil über tz-aware Index.
 - CalendarProvider: Interface für trading day/open/close/early close; minimal stub jetzt, später echte Calendars.
 - Architektur-Mapping: IntradayStore/eodhd_fetch resample in market_tz; OrdersBuilder benutzt Time-Service Validity; Strategy nutzt bar-close ts; Replay Engine respektiert validity; FullBacktestRunner löst requested_end via RequestedEndSpec; Dashboard zeigt Display-TZ.
-- Migration in 3 Phasen (additiv → tightening → calendar-accurate), mit Tests: DST boundary, Multi-exchange (NYSE vs XETR), requested_end date-only, validity window one_bar, no-naive-datetime.
+- Migration in 3 Phasen (additiv → tightening → calendar-accurate), mit Tests: DST boundary, Multi-exchange (NYSE vs XETR), requested_end date-only, validity window fixed_bars, no-naive-datetime.
 
 
 1) Glossar & Invarianten (SSOT)
@@ -79,7 +79,7 @@ Modul-API (Signaturen skizziert):
   - nutzt CalendarProvider, fällt zurück auf SessionSpec.windows.
 
 - calculate_validity(signal_ts: pd.Timestamp, bar_spec: BarSpec, session_spec: SessionSpec, policy: str, validity_minutes: int = 60, valid_from_policy: str = "signal_ts") -> Tuple[valid_from, valid_to]
-  - policies: one_bar (valid_to = valid_from + tfm), session_end (bis session_end), fixed_minutes (clamp an session_end).
+  - policies: fixed_bars (valid_to = valid_from + tfm), session_end (bis session_end), fixed_minutes (clamp an session_end).
   - garantiert valid_to > valid_from; wirft ValueError sonst.
 
 - bar_timestamp_semantics(bar_ts: pd.Timestamp, bar_spec: BarSpec) -> pd.Timestamp
@@ -117,7 +117,7 @@ Modul-API (Signaturen skizziert):
 -----------------------------------------------
 
 - IntradayStore / eodhd_fetch: Nach Laden UTC→market_tz, resample in market_tz mit BarSpec-Parametern, zurück nach UTC speichern + Meta (market_tz, bar_spec).
-- OrdersBuilder: nutzt Time-Service.calculate_validity mit SessionSpec (mode=MARKET default), valid_from_policy, order_validity_policy (one_bar etc.). Kein Fallback auf Market-Close bei one_bar.
+- OrdersBuilder: nutzt Time-Service.calculate_validity mit SessionSpec (mode=MARKET default), valid_from_policy, order_validity_policy (fixed_bars etc.). Kein Fallback auf Market-Close bei fixed_bars.
 - Strategy: signal_ts ist bar-close (label/right). Tracer/Signals in market_tz, persistiert als UTC + Meta.
 - Replay Engine: interpretiert valid_from/valid_to in market_tz (oder UTC+meta) via Time-Service; Synthesezeiten ohne now().
 - FullBacktestRunner: RequestedEndSpec löst date-only in market date (session close) auf, dann zu UTC; TimeContext wird pro Run gesetzt.
@@ -129,9 +129,9 @@ Modul-API (Signaturen skizziert):
 
 - Phase 1 (additiv, sicher):
   - Add TimeContext, SessionSpec.mode, RequestedEndSpec (nur verdrahten, nicht erzwingen).
-  - Time-Service Modul mit Konvertierern + Validity Calculator; OrdersBuilder nutzt es hinter Feature-Flag (default ON für one_bar Fix, sonst identisch).
+  - Time-Service Modul mit Konvertierern + Validity Calculator; OrdersBuilder nutzt es hinter Feature-Flag (default ON für fixed_bars Fix, sonst identisch).
   - Diagnostics erweitern: speichern market_tz, display_tz, bar_spec, session_spec, requested_end_resolved.
-  - DoD: Tests grün, Debug-Runs zeigen unveränderte Ergebnisse außer one_bar-Fix.
+  - DoD: Tests grün, Debug-Runs zeigen unveränderte Ergebnisse außer fixed_bars-Fix.
   - Risiko: Gering (additiv). Rollback: Flag aus.
 
 - Phase 2 (resampling tightening):
@@ -153,7 +153,7 @@ Modul-API (Signaturen skizziert):
 - DST Boundary Test: NYSE M1→M5 über DST-Wechsel; off_step_count==0; session alignment korrekt; validity windows gültig.
 - Multi-Exchange Test: NYSE vs XETR (unterschiedliche market_tz, calendars) mit selben UTC-Daten; Sessions korrekt getrennt.
 - requested_end date-only: "2025-12-17" → resolved_utc = session_close(market_tz) in UTC; equity/trades vorhanden.
-- Validity Window Test: order_validity_policy=one_bar → (valid_to - valid_from) == timeframe_minutes.
+- Validity Window Test: order_validity_policy=fixed_bars → (valid_to - valid_from) == timeframe_minutes.
 - No-Naive-Datetime Test: alle öffentlichen APIs werfen auf naive ts.
 - Property-based Idee: für zufällige session_windows und tfm prüfen, dass calculate_validity immer valid_to > valid_from und innerhalb Session (für session_end).
 
@@ -162,7 +162,7 @@ Modul-API (Signaturen skizziert):
 ------------------------------------
 
 - Naive Datetimes in Pipelines oder Persistenz.
-- Session-Fenster ohne mode/tz; implizit Market-Close bei one_bar.
+- Session-Fenster ohne mode/tz; implizit Market-Close bei fixed_bars.
 - Resample ohne explizite label/closed/origin/offset; Resample in UTC ohne danach Meta/TZ klarzustellen.
 - requested_end als date-only ohne definierte Interpretation.
 - Timestamps aus Datenquelle als „Market-TZ“ behandeln.

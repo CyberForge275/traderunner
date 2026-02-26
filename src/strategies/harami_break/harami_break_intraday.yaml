@@ -1,0 +1,26 @@
+strategy_id: harami_break_intraday
+canonical_name: harami_break
+versions:
+  1.0.0:
+    signal_schema_ref: v1_0_0
+    strategy_finalized: false
+    core:
+      session_timezone: America/New_York
+      session_mode: rth
+      timeframe_minutes: 5
+      session_windows:
+      - 09:30-11:00
+      - 14:00-15:30
+      inside_bar_definition_mode: mb_high__ib_high_and_close_in_mb_range
+      strict_mode: false
+      entry_level_mode: mother_bar
+      max_trades_per_session_window: 1
+      order_validity_policy: session_end
+      order_validity_minutes: 30
+      order_validity_bars: 5
+      trailing:
+        enabled: false
+        trigger_tp_pct: 0.7
+        risk_remaining_pct: 0.5
+        apply_mode: next_bar
+    tunable: {}

@@ -9,7 +9,7 @@
 ## Zusammenfassung der Erkenntnisse
 
 **Ausgangslage** (aus Analyse):
-- 3 von 4 User-Optionen sind bereits **implementiert** (one_bar, session_end, fixed_minutes)
+- 3 von 4 User-Optionen sind bereits **implementiert** (fixed_bars, session_end, fixed_minutes)
 - Namen zwischen User-Request und Code **divergieren** (z.B. "minute-based" vs "fixed_minutes")
 - **Kritisches Architektur-Problem**: SessionFilter-Coupling (Framework ← Strategy)
 - **EOD** ist unklar definiert (erfordert User-Klärung)
@@ -456,7 +456,7 @@ elif validity_policy == "eod":
 else:
     raise ValueError(
         f"Unknown validity_policy: {validity_policy}. "
-        "Must be 'session_end', 'fixed_minutes', 'one_bar', or 'eod'."  # ← aktualisiert
+        "Must be 'session_end', 'fixed_minutes', 'fixed_bars', or 'eod'."  # ← aktualisiert
     )
 ```
 
@@ -464,10 +464,10 @@ else:
 
 ```python
 # VORHER:
-"Must be 'session_end', 'fixed_minutes', or 'one_bar'."
+"Must be 'session_end', 'fixed_minutes', or 'fixed_bars'."
 
 # NACHHER:
-"Must be 'session_end', 'fixed_minutes', 'one_bar', or 'eod'."
+"Must be 'session_end', 'fixed_minutes', 'fixed_bars', or 'eod'."
 ```
 
 **Effort**: 🟢 **LOW** (~30 Zeilen Code)
@@ -495,10 +495,10 @@ class InsideBarConfig(BaseModel):
         
         # Update valid policies
         assert self.order_validity_policy in [
-            "session_end", "fixed_minutes", "one_bar", "eod"  # ← eod hinzugefügt
+            "session_end", "fixed_minutes", "fixed_bars", "eod"  # ← eod hinzugefügt
         ], (
             f"Invalid order_validity_policy: {self.order_validity_policy} "
-            "('instant' removed - use 'one_bar' for single-bar validity)"
+            "('instant' removed - use 'fixed_bars' for single-bar validity)"
         )
 ```
 
@@ -547,10 +547,10 @@ valid_from, valid_to = calculate_validity_window(
 
 ```markdown
 # VORHER:
-- **Options**: `session_end`, `one_bar`, `fixed_minutes`
+- **Options**: `session_end`, `fixed_bars`, `fixed_minutes`
 
 # NACHHER:
-- **Options**: `session_end`, `one_bar`, `fixed_minutes`, `eod`
+- **Options**: `session_end`, `fixed_bars`, `fixed_minutes`, `eod`
 ```
 
 **Änderung nach Line 20** (neue Beschreibung):
@@ -591,7 +591,7 @@ valid_from, valid_to = calculate_validity_window(
 
 | User-Name | Code-Name | Action |
 |-----------|-----------|--------|
-| one_bar | one_bar | ✅ OK |
+| fixed_bars | fixed_bars | ✅ OK |
 | **minute-based** | **fixed_minutes** | ⚠️ Umbenennen? |
 | **end of session window** | **session_end** | ⚠️ Umbenennen? |
 | EOD | eod | ✅ OK |
@@ -636,7 +636,7 @@ policy = st.selectbox(
 # NACHHER:
 policy = st.selectbox(
     "Order Validity Policy",
-    options=["one_bar", "fixed_minutes", "session_end", "eod"],
+    options=["fixed_bars", "fixed_minutes", "session_end", "eod"],
     help="How long orders remain valid after signal"
 )
 ```

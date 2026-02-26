@@ -16,10 +16,10 @@ Sie gilt für **Backtest (Replay Engine)** und **Live-Ausführung**.
 - Entry Default: **mother_bar**
 - Trailing: implementiert, **Default OFF**, Apply-Mode: **next_bar**
 - Order Validity Policy: **Parameterized via `order_validity_policy`**
-  - **Options**: `session_end`, `one_bar`, `fixed_minutes` (NO other names - these are the exact policy identifiers)
+  - **Options**: `session_end`, `fixed_bars`, `fixed_minutes`
   - **Recommended for this strategy**: `session_end` (ensures positive order duration for Replay fills)
   - **Implementation status**: Policy logic implemented in `trade/validity.py` (lines 93-142), parameter wired in `InsideBarConfig` (line 208); UI configuration pending
-  - **Note**: When using `fixed_minutes`, the `validity_minutes` parameter (or `order_validity_minutes`) determines duration
+  - **Note**: `fixed_minutes` uses `order_validity_minutes` (1..60), `fixed_bars` uses `order_validity_bars` (1..10)
 - **MVP: Netting Assumption**: **One position per symbol** (enforced when `netting_mode='one_position_per_symbol'`, default). No multiple concurrent positions.
 - Max Trades per Session: **1** (Hard Limit)
 
@@ -89,7 +89,7 @@ Wichtig:
 Policies:
 - `session_end`
 - `fixed_minutes` (clamped auf session_end)
-- `one_bar`
+- `fixed_bars`
 
 ## OCO (Replay Engine)
 Wenn ein Order einer OCO-Gruppe filled:

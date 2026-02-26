@@ -22,15 +22,15 @@ def compute_netting_open_until(
     *,
     validity_policy: str,
     validity_minutes: int,
+    validity_bars: int,
     session_filter: Any,
     ts: pd.Timestamp,
     session_tz: str,
 ) -> pd.Timestamp | None:
     if validity_policy == "session_end":
         return session_filter.get_session_end(ts, session_tz)
-    if validity_policy == "one_bar":
-        # Keep existing behavior: one_bar assumes 5 minutes in this strategy path.
-        return ts + pd.Timedelta(minutes=5)
+    if validity_policy == "fixed_bars":
+        return ts + pd.Timedelta(minutes=5 * int(validity_bars))
     if validity_policy == "fixed_minutes":
         netting_open_until = ts + pd.Timedelta(minutes=validity_minutes)
         session_end = session_filter.get_session_end(ts, session_tz)

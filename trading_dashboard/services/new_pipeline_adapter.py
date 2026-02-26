@@ -209,7 +209,7 @@ class NewPipelineAdapter:
                         "session_mode", "session_filter", "timeframe_minutes",
                         "valid_from_policy", "order_validity_policy"]
             tunable_keys = ["lookback_candles", "max_pattern_age_candles", 
-                           "max_deviation_atr", "max_position_loss_pct_equity"]
+                           "max_deviation_atr"]
             
             core_config = {k: strategy_params[k] for k in core_keys if k in strategy_params}
             tunable_config = {k: strategy_params[k] for k in tunable_keys if k in strategy_params}

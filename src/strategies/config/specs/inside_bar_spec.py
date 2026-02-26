@@ -19,15 +19,20 @@ class InsideBarSpec:
         "timeframe_minutes",
         "valid_from_policy",
         "order_validity_policy",
+        "order_validity_minutes",
+        "order_validity_bars",
         "stop_cap_atr",
         "max_position_pct",
+    }
+    OPTIONAL_CORE_KEYS = {
+        "breakout_confirmation_mode",
+        "max_breakout_range_bars",
     }
     
     ALLOWED_TUNABLE_KEYS = {
         "lookback_candles",
         "max_pattern_age_candles",
         "max_deviation_atr",
-        "max_position_loss_pct_equity",
         "min_mother_body_fraction",
         "min_inside_body_fraction",
     }
@@ -40,7 +45,8 @@ class InsideBarSpec:
         "mb_high__ib_high_and_close_in_mb_range",
     }
     VALID_FROM_POLICY_OPTIONS = ("signal_ts", "next_bar")
-    ORDER_VALIDITY_POLICY_OPTIONS = ("session_end", "one_bar", "fixed_minutes")
+    ORDER_VALIDITY_POLICY_OPTIONS = ("session_end", "fixed_bars", "fixed_minutes")
+    SESSION_TIMEZONE_OPTIONS = ("America/New_York", "Europe/Berlin")
 
     def validate_top_level(self, config: Dict[str, Any]) -> None:
         """Validate top-level YAML structure."""
@@ -71,7 +77,7 @@ class InsideBarSpec:
             )
             
         # 2. Check unknown keys in core
-        unknown_keys = set(core.keys()) - self.REQUIRED_CORE_KEYS
+        unknown_keys = set(core.keys()) - (self.REQUIRED_CORE_KEYS | self.OPTIONAL_CORE_KEYS)
         if unknown_keys:
             raise ValueError(
                 f"inside_bar v{version} unknown core key: {', '.join(sorted(unknown_keys))}"
@@ -118,6 +124,13 @@ class InsideBarSpec:
             val = data["breakout_confirmation"]
             if not isinstance(val, bool):
                 raise ValueError(f"inside_bar v{version} invalid breakout_confirmation: {val} (must be bool)")
+        if "breakout_confirmation_mode" in data:
+            val = data["breakout_confirmation_mode"]
+            if val not in {"touch", "close"}:
+                raise ValueError(
+                    f"inside_bar v{version} invalid breakout_confirmation_mode: {val} "
+                    "(allowed: touch, close)"
+                )
 
         # inside_bar_mode: string in enum
         if "inside_bar_mode" in data:
@@ -154,12 +167,6 @@ class InsideBarSpec:
             if not isinstance(val, (int, float)) or val < 0:
                 raise ValueError(f"inside_bar v{version} invalid max_deviation_atr: {val} (must be float >= 0)")
 
-        # max_position_loss_pct_equity: float >= 0 and <= 1, or None (disabled)
-        if "max_position_loss_pct_equity" in data:
-            val = data["max_position_loss_pct_equity"]
-            if val is not None and (not isinstance(val, (int, float)) or val < 0 or val > 1):
-                raise ValueError(f"inside_bar v{version} invalid max_position_loss_pct_equity: {val} (must be float >= 0 and <= 1)")
-
         if "min_mother_body_fraction" in data:
             val = data["min_mother_body_fraction"]
             if not isinstance(val, (int, float)) or val < 0 or val > 1:
@@ -179,8 +186,11 @@ class InsideBarSpec:
         # session_timezone: str
         if "session_timezone" in data:
             val = data["session_timezone"]
-            if not isinstance(val, str):
-                raise ValueError(f"inside_bar v{version} invalid session_timezone: {val} (must be str)")
+            if val not in self.SESSION_TIMEZONE_OPTIONS:
+                raise ValueError(
+                    f"inside_bar v{version} invalid session_timezone: {val} "
+                    f"(allowed: {', '.join(self.SESSION_TIMEZONE_OPTIONS)})"
+                )
 
         # session_filter: list of strings
         if "session_filter" in data:
@@ -211,6 +221,18 @@ class InsideBarSpec:
                     f"inside_bar v{version} invalid order_validity_policy: '{val}' "
                     f"(allowed: {', '.join(self.ORDER_VALIDITY_POLICY_OPTIONS)})"
                 )
+        if "order_validity_minutes" in data:
+            val = data["order_validity_minutes"]
+            if not isinstance(val, int) or val < 1 or val > 60:
+                raise ValueError(
+                    f"inside_bar v{version} invalid order_validity_minutes: {val} (must be int in [1,60])"
+                )
+        if "order_validity_bars" in data:
+            val = data["order_validity_bars"]
+            if not isinstance(val, int) or val < 1 or val > 10:
+                raise ValueError(
+                    f"inside_bar v{version} invalid order_validity_bars: {val} (must be int in [1,10])"
+                )
 
         if "session_mode" in data:
             val = data["session_mode"]
@@ -234,6 +256,12 @@ class InsideBarSpec:
                 raise ValueError(
                     f"inside_bar v{version} invalid max_position_pct: {val} (must be float > 0 and <= 100)"
                 )
+        if "max_breakout_range_bars" in data:
+            val = data["max_breakout_range_bars"]
+            if val is not None and (not isinstance(val, int) or val < 1 or val > 4):
+                raise ValueError(
+                    f"inside_bar v{version} invalid max_breakout_range_bars: {val} (must be int in [1,4] or null)"
+                )
 
     def get_field_specs(self) -> Dict[str, Any]:
         """Return field specifications for UI rendering."""
@@ -243,6 +271,11 @@ class InsideBarSpec:
                 "risk_reward_ratio": {"kind": "float", "required": True, "min": 0.1},
                 "min_mother_bar_size": {"kind": "float", "required": True, "min": 0.0},
                 "breakout_confirmation": {"kind": "bool", "required": True},
+                "breakout_confirmation_mode": {
+                    "kind": "enum",
+                    "options": ["touch", "close"],
+                    "required": False,
+                },
                 "inside_bar_mode": {
                     "kind": "enum",
                     "options": list(self.ALLOWED_MODES),
@@ -253,9 +286,14 @@ class InsideBarSpec:
                     "options": list(self.ALLOWED_DEFINITION_MODES),
                     "required": True
                 },
-                "session_timezone": {"kind": "string", "required": True},
+                "session_timezone": {
+                    "kind": "enum",
+                    "options": list(self.SESSION_TIMEZONE_OPTIONS),
+                    "required": True,
+                },
                 "session_filter": {"kind": "string", "required": True},  # Rendered as string in UI
                 "timeframe_minutes": {"kind": "int", "required": True, "min": 1},
+                "max_breakout_range_bars": {"kind": "int", "required": False, "min": 1, "max": 4},
                 "valid_from_policy": {
                     "kind": "enum",
                     "options": list(self.VALID_FROM_POLICY_OPTIONS),
@@ -266,6 +304,8 @@ class InsideBarSpec:
                     "options": list(self.ORDER_VALIDITY_POLICY_OPTIONS),
                     "required": True
                 },
+                "order_validity_minutes": {"kind": "int", "required": True, "min": 1, "max": 60},
+                "order_validity_bars": {"kind": "int", "required": True, "min": 1, "max": 10},
                 "stop_cap_atr": {"kind": "float", "required": True, "min": 0.000001},
                 "max_position_pct": {"kind": "float", "required": True, "min": 0.0, "max": 100.0},
             },
@@ -273,7 +313,6 @@ class InsideBarSpec:
                 "lookback_candles": {"kind": "int", "required": True, "min": 1},
                 "max_pattern_age_candles": {"kind": "int", "required": True, "min": 1},
                 "max_deviation_atr": {"kind": "float", "required": True, "min": 0.0},
-                "max_position_loss_pct_equity": {"kind": "float", "required": False, "min": 0.0, "max": 1.0},
                 "min_mother_body_fraction": {"kind": "float", "required": True, "min": 0.0, "max": 1.0},
                 "min_inside_body_fraction": {"kind": "float", "required": True, "min": 0.0, "max": 1.0},
             }
