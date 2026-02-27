@@ -164,3 +164,25 @@ def test_build_config_params_from_snapshot_supports_confirmed_breakout():
     assert cfg["atr_period"] == 8
     assert cfg["lookback_candles"] == 50
     assert cfg["strategy_version"] == "1.0.0"
+
+
+def test_build_config_params_from_snapshot_injects_pipeline_costs_from_base_yaml(monkeypatch):
+    monkeypatch.setattr(
+        "trading_dashboard.services.backtest_ui.config_snapshot_service.load_base_config",
+        lambda _path: {"costs": {"commission_bps": 2.0, "slippage_bps": 1.0}},
+    )
+    monkeypatch.setattr(
+        "trading_dashboard.services.backtest_ui.config_snapshot_service.resolve_config",
+        lambda **_kwargs: type("R", (), {"resolved": {"costs": {"commission_bps": 2.0, "slippage_bps": 1.0}}})(),
+    )
+
+    cfg = build_config_params_from_snapshot(
+        strategy="harami_break_intraday",
+        version_to_use="1.0.0",
+        snapshot={"core": {"timeframe_minutes": 5}, "tunable": {}},
+        compound_toggle_val=[],
+        equity_basis_val="cash_only",
+    )
+
+    assert cfg["fees_bps"] == 2.0
+    assert cfg["slippage_bps"] == 1.0

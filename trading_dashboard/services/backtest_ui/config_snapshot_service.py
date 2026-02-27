@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any, Dict, Optional
 
+from axiom_bt.pipeline.config_resolver import load_base_config, resolve_config
 from trading_dashboard.config_store.strategy_config_store import StrategyConfigStore
 
 logger = logging.getLogger(__name__)
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_BASE_CONFIG_PATH = _REPO_ROOT / "configs" / "runs" / "backtest_pipeline_defaults.yaml"
 
 
 class SnapshotValidationError(ValueError):
@@ -62,6 +66,16 @@ def build_config_params_from_snapshot(
 
     config_params: Dict[str, Any] = {**core, **tunable}
     config_params["strategy_version"] = version_to_use
+
+    base_cfg = load_base_config(_BASE_CONFIG_PATH)
+    resolved_base = resolve_config(base=base_cfg, overrides=None, defaults={}).resolved
+    costs = resolved_base.get("costs", {})
+    if not isinstance(costs, dict):
+        costs = {}
+    if "commission_bps" in costs:
+        config_params["fees_bps"] = float(costs["commission_bps"])
+    if "slippage_bps" in costs:
+        config_params["slippage_bps"] = float(costs["slippage_bps"])
 
     compound_enabled = "enabled" in (compound_toggle_val or [])
     if compound_enabled:
