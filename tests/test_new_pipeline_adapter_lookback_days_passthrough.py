@@ -32,6 +32,8 @@ def test_execute_backtest_passes_ui_lookback_days_to_pipeline(monkeypatch):
             "session_mode": "rth",
             "session_filter": ["09:30-11:00", "14:00-15:00"],
             "timeframe_minutes": 5,
+            "fees_bps": 2.0,
+            "slippage_bps": 1.0,
         },
     )
 
@@ -41,5 +43,81 @@ def test_execute_backtest_passes_ui_lookback_days_to_pipeline(monkeypatch):
     assert captured["strategy_params"]["lookback_days"] != 1
     assert captured.get("base_config_path") is not None
     assert str(captured["base_config_path"]).endswith("configs/runs/backtest_pipeline_defaults.yaml")
-    assert captured["fees_bps"] == 0.0
-    assert captured["slippage_bps"] == 0.0
+    assert captured["fees_bps"] == 2.0
+    assert captured["slippage_bps"] == 1.0
+
+
+def test_execute_backtest_fails_when_costs_not_explicit_in_config_params(monkeypatch):
+    def _fake_run_pipeline(**kwargs):
+        raise RuntimeError("should_not_be_called")
+
+    monkeypatch.setattr(
+        "trading_dashboard.services.new_pipeline_adapter.run_pipeline",
+        _fake_run_pipeline,
+    )
+    monkeypatch.setattr(
+        "trading_dashboard.services.new_pipeline_adapter.MarketdataStreamClient.is_configured",
+        lambda self: False,
+    )
+    adapter = NewPipelineAdapter(progress_callback=lambda _: None)
+    result = adapter.execute_backtest(
+        run_name="missing_costs",
+        strategy="insidebar_intraday",
+        symbols=["SOUN"],
+        timeframe="M5",
+        start_date="2026-02-10",
+        end_date="2026-02-11",
+        config_params={
+            "strategy_version": "1.0.1",
+            "lookback_days": 30,
+            "session_timezone": "America/New_York",
+            "session_mode": "rth",
+            "session_filter": ["09:30-11:00", "14:00-15:00"],
+            "timeframe_minutes": 5,
+        },
+    )
+
+    assert result["status"] == "failed"
+    assert "fees_bps missing" in result.get("error", "")
+
+
+def test_execute_backtest_accepts_decimal_string_costs(monkeypatch):
+    captured = {}
+
+    def _fake_run_pipeline(**kwargs):
+        captured.update(kwargs)
+        raise RuntimeError("stop_after_capture")
+
+    monkeypatch.setattr(
+        "trading_dashboard.services.new_pipeline_adapter.run_pipeline",
+        _fake_run_pipeline,
+    )
+    monkeypatch.setattr(
+        "trading_dashboard.services.new_pipeline_adapter.MarketdataStreamClient.is_configured",
+        lambda self: False,
+    )
+
+    adapter = NewPipelineAdapter(progress_callback=lambda _: None)
+    result = adapter.execute_backtest(
+        run_name="decimal_costs",
+        strategy="insidebar_intraday",
+        symbols=["SOUN"],
+        timeframe="M5",
+        start_date="2026-02-10",
+        end_date="2026-02-11",
+        config_params={
+            "strategy_version": "1.0.1",
+            "lookback_days": 30,
+            "session_timezone": "America/New_York",
+            "session_mode": "rth",
+            "session_filter": ["09:30-11:00", "14:00-15:00"],
+            "timeframe_minutes": 5,
+            "fees_bps": "0.93",
+            "slippage_bps": "0.75",
+        },
+    )
+
+    assert result["status"] == "failed"
+    assert "stop_after_capture" in result.get("error", "")
+    assert captured["fees_bps"] == 0.93
+    assert captured["slippage_bps"] == 0.75

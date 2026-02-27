@@ -15,17 +15,8 @@ from trading_dashboard.services.new_pipeline_adapter import NewPipelineAdapter
 
 def test_missing_data_raises_and_never_calls_fetch(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
-        "axiom_bt.pipeline.data_fetcher.check_local_m1_coverage",
-        lambda **_: {
-            "has_gap": True,
-            "gaps": [
-                {
-                    "gap_start": "2025-01-01",
-                    "gap_end": "2025-01-31",
-                    "gap_days": 31,
-                }
-            ],
-        },
+        "axiom_bt.pipeline.data_fetcher.get_marketdata_data_root",
+        lambda: tmp_path / "md_root",
     )
 
     fetch_called = {"value": False}
@@ -60,6 +51,10 @@ def test_dashboard_adapter_raises_domain_missing_data_error(monkeypatch) -> None
         "trading_dashboard.services.new_pipeline_adapter.run_pipeline",
         _raise_pipeline_missing,
     )
+    monkeypatch.setattr(
+        "trading_dashboard.services.new_pipeline_adapter.MarketdataStreamClient.is_configured",
+        lambda self: False,
+    )
 
     adapter = NewPipelineAdapter(progress_callback=lambda _msg: None)
 
@@ -71,7 +66,14 @@ def test_dashboard_adapter_raises_domain_missing_data_error(monkeypatch) -> None
             timeframe="M5",
             start_date="2025-01-01",
             end_date="2025-01-31",
-            config_params={"strategy_version": "1.0.1"},
+            config_params={
+                "strategy_version": "1.0.1",
+                "timeframe_minutes": 5,
+                "session_mode": "rth",
+                "session_timezone": "America/New_York",
+                "fees_bps": 2.0,
+                "slippage_bps": 1.0,
+            },
         )
 
     assert "Backfill required" in str(exc.value)

@@ -339,6 +339,7 @@ _PLUGINS: Dict[str, StrategyPlugin] = {}
 _AUTO_IMPORTS: Dict[str, str] = {
     "insidebar_intraday": "strategies.inside_bar",
     "confirmed_breakout_intraday": "strategies.confirmed_breakout",
+    "harami_break_intraday": "strategies.harami_break",
 }
 
 

@@ -53,6 +53,18 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return value.strip().lower() in ("1", "true", "yes", "y", "on")
 
 
+def _parse_bps_value(raw: object, field_name: str) -> float:
+    """Parse bps values from UI payload (accept float/int and numeric strings)."""
+    if isinstance(raw, str):
+        normalized = raw.strip().replace(",", ".")
+    else:
+        normalized = raw
+    try:
+        return float(normalized)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be numeric (e.g. 0.93)") from exc
+
+
 class NewPipelineAdapter:
     """
     Adapter for NEW MODULAR PIPELINE (CORRECT SSOT).
@@ -137,6 +149,16 @@ class NewPipelineAdapter:
 
             # Parse config params
             strategy_params = config_params or {}
+            if "fees_bps" not in strategy_params:
+                raise ValueError(
+                    "fees_bps missing in config_params (SSOT required; no hardcoded fallback)"
+                )
+            if "slippage_bps" not in strategy_params:
+                raise ValueError(
+                    "slippage_bps missing in config_params (SSOT required; no hardcoded fallback)"
+                )
+            fees_bps = _parse_bps_value(strategy_params["fees_bps"], "fees_bps")
+            slippage_bps = _parse_bps_value(strategy_params["slippage_bps"], "slippage_bps")
             from axiom_bt.utils.trace import trace_ui
             trace_ui(
                 step="adapter_execute_backtest_start",
@@ -319,9 +341,9 @@ class NewPipelineAdapter:
                         compound_enabled=compound_enabled,
                         compound_equity_basis=compound_equity_basis,
                         initial_cash=DEFAULT_INITIAL_CASH,
-                        # Costs are resolved from YAML/overrides in pipeline resolver (SSOT).
-                        fees_bps=0.0,
-                        slippage_bps=0.0,
+                        # Pass-through for audit parity; runner resolves effective costs from config resolver.
+                        fees_bps=fees_bps,
+                        slippage_bps=slippage_bps,
                         base_config_path=BASE_CONFIG if BASE_CONFIG.exists() else None,
                     )
                     break

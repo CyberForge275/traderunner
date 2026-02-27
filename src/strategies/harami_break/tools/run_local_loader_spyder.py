@@ -9,17 +9,29 @@ from __future__ import annotations
 
 import datetime as dt
 import sys
+import importlib
 from pathlib import Path
 
 import pandas as pd
 from IPython.display import display
 
-REPO_ROOT = Path("/home/mirko/data/workspace/droid/traderunner")
+REPO_ROOT = Path(__file__).resolve().parents[4]
+# Remove competing workspace repo source paths that can shadow traderunner modules.
+sys.path = [p for p in sys.path if "marketdata-monorepo/src" not in str(p)]
 for p in (str(REPO_ROOT / "src"), str(REPO_ROOT)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+# Spyder kernels may already have `trade` loaded from another repo path
+# (e.g. marketdata-monorepo). Purge cached modules so imports resolve from
+# traderunner/src according to the path order above.
+for mod in ("trade.session_windows", "trade"):
+    if mod in sys.modules:
+        del sys.modules[mod]
+importlib.invalidate_caches()
+
 from strategies.harami_break.pattern_detection import enrich_inside_pattern_frame
+from strategies.harami_break.session_logic import apply_signal_validity
 from strategies.harami_break.local_loader_cli import (
     build_ensure_request,
     load_local_dataframe,
@@ -34,7 +46,7 @@ ENRICHED_DF: pd.DataFrame | None = None
 
 
 def main() -> int:
-    #repo_root = Path("/home/mirko/data/workspace/droid/traderunner")
+    
 
     end_date = dt.date.today()
     start_date = end_date - dt.timedelta(days=30)
@@ -82,6 +94,15 @@ def main() -> int:
         strict=bool(core["strict_mode"]),
         session_windows=list(core.get("session_windows", [])),
         session_timezone=str(core["session_timezone"]),
+    )
+    enriched = apply_signal_validity(
+        enriched,
+        timeframe_minutes=int(core["timeframe_minutes"]),
+        session_windows=list(core["session_windows"]),
+        session_timezone=str(core["session_timezone"]),
+        order_validity_policy=str(core["order_validity_policy"]),
+        order_validity_minutes=int(core["order_validity_minutes"]),
+        order_validity_bars=int(core["order_validity_bars"]),
     )
     if "is_inside_bar" in enriched.columns:
         enriched["long_trigger_price"] = enriched["mother_bar_high"].where(enriched["is_inside_bar"])

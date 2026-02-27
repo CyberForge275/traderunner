@@ -51,6 +51,8 @@ runtime:
             "session_mode": "rth",
             "session_filter": ["09:30-11:00", "14:00-15:00"],
             "timeframe_minutes": 5,
+            "fees_bps": 2.0,
+            "slippage_bps": 1.0,
         },
     )
 
@@ -98,6 +100,8 @@ def test_execute_backtest_defers_stream_url_resolution_to_client(monkeypatch):
             "session_mode": "rth",
             "session_filter": ["09:30-11:00", "14:00-15:00"],
             "timeframe_minutes": 5,
+            "fees_bps": 2.0,
+            "slippage_bps": 1.0,
         },
     )
 

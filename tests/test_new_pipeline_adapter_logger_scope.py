@@ -22,4 +22,4 @@ def test_execute_backtest_no_unboundlocalerror_on_logger(monkeypatch):
 
     assert result["status"] == "failed"
     assert "UnboundLocalError" not in result.get("error", "")
-    assert "RuntimeError" in result.get("traceback", "")
+    assert "ValueError" in result.get("traceback", "")

@@ -13,3 +13,8 @@ def test_config_registry_includes_confirmed_breakout():
     assert StrategyConfigStore is not None
     strategies = config_manager_registry.list_strategies()
     assert "confirmed_breakout_intraday" in strategies
+
+
+def test_strategy_discovery_includes_harami_break():
+    plugin = get_strategy("harami_break_intraday")
+    assert plugin.strategy_id == "harami_break_intraday"

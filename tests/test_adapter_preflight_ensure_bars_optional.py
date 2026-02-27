@@ -10,6 +10,8 @@ def _base_params():
         "session_filter": ["09:30-11:00", "14:00-15:00"],
         "timeframe_minutes": 5,
         "lookback_candles": 50,
+        "fees_bps": 2.0,
+        "slippage_bps": 1.0,
     }
 
 
