@@ -13,6 +13,9 @@ class HaramiBreakSpec:
         "session_windows",
         "inside_bar_definition_mode",
         "strict_mode",
+        "min_mother_body_fraction",
+        "max_mother_body_fraction",
+        "regime_filter",
         "entry_level_mode",
         "max_trades_per_session_window",
         "order_validity_policy",
@@ -97,6 +100,43 @@ class HaramiBreakSpec:
         strict_mode = data["strict_mode"]
         if not isinstance(strict_mode, bool):
             raise ValueError(f"harami_break v{version} invalid strict_mode: {strict_mode!r} (must be bool)")
+        min_mother_body_fraction = data["min_mother_body_fraction"]
+        if not isinstance(min_mother_body_fraction, (int, float)) or not (
+            0.0 <= float(min_mother_body_fraction) <= 1.0
+        ):
+            raise ValueError(
+                f"harami_break v{version} invalid min_mother_body_fraction: {min_mother_body_fraction!r} "
+                f"(must be float in [0,1])"
+            )
+        max_mother_body_fraction = data["max_mother_body_fraction"]
+        if not isinstance(max_mother_body_fraction, (int, float)) or not (
+            0.0 <= float(max_mother_body_fraction) <= 1.0
+        ):
+            raise ValueError(
+                f"harami_break v{version} invalid max_mother_body_fraction: {max_mother_body_fraction!r} "
+                f"(must be float in [0,1])"
+            )
+        if float(min_mother_body_fraction) > float(max_mother_body_fraction):
+            raise ValueError(
+                f"harami_break v{version} invalid mother body fraction band: "
+                f"min_mother_body_fraction={min_mother_body_fraction!r} must be <= "
+                f"max_mother_body_fraction={max_mother_body_fraction!r}"
+            )
+
+        regime_filter = data["regime_filter"]
+        if not isinstance(regime_filter, dict):
+            raise ValueError(f"harami_break v{version} regime_filter must be a mapping")
+        required_regime_filter = {"enabled", "allow_gg_short", "allow_mixed_short"}
+        missing_regime_filter = required_regime_filter - set(regime_filter.keys())
+        if missing_regime_filter:
+            raise ValueError(
+                f"harami_break v{version} regime_filter missing key: {', '.join(sorted(missing_regime_filter))}"
+            )
+        for key in sorted(required_regime_filter):
+            if not isinstance(regime_filter[key], bool):
+                raise ValueError(
+                    f"harami_break v{version} regime_filter.{key} must be bool"
+                )
 
         entry_level_mode = data["entry_level_mode"]
         if entry_level_mode not in self.ALLOWED_ENTRY_LEVEL_MODES:
@@ -182,6 +222,9 @@ class HaramiBreakSpec:
                     "options": sorted(self.ALLOWED_DEFINITION_MODES),
                 },
                 "strict_mode": {"kind": "bool", "required": True},
+                "min_mother_body_fraction": {"kind": "float", "required": True, "min": 0.0, "max": 1.0},
+                "max_mother_body_fraction": {"kind": "float", "required": True, "min": 0.0, "max": 1.0},
+                "regime_filter": {"kind": "json", "required": True},
                 "entry_level_mode": {
                     "kind": "enum",
                     "required": True,

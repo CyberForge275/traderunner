@@ -43,6 +43,8 @@ def enrich_inside_pattern_frame(
     *,
     definition_mode: str,
     strict: bool,
+    min_mother_body_fraction: float,
+    max_mother_body_fraction: float,
     session_windows: list[str] | None = None,
     session_timezone: str | None = None,
 ) -> pd.DataFrame:
@@ -89,14 +91,22 @@ def enrich_inside_pattern_frame(
     out["prev_low"] = out["low"].shift(1)
     out["prev_open"] = out["open"].shift(1)
     out["prev_close"] = out["close"].shift(1)
+    mother_range = (out["prev_high"] - out["prev_low"]).abs()
+    mother_body = (out["prev_close"] - out["prev_open"]).abs()
+    out["mother_body_fraction"] = (mother_body / mother_range.where(mother_range > 0)).fillna(0.0)
+    out["mother_body_ok"] = (
+        (out["mother_body_fraction"] >= float(min_mother_body_fraction))
+        & (out["mother_body_fraction"] <= float(max_mother_body_fraction))
+    )
     if "timestamp" in out.columns:
         out["mother_bar_ts"] = pd.to_datetime(out["timestamp"], utc=True, errors="coerce").shift(1)
     else:
         out["mother_bar_ts"] = pd.NaT
 
     inside_mask = detect_inside_pattern(out, definition_mode=definition_mode, strict=strict).fillna(False)
+    filtered_inside_mask = inside_mask & out["mother_body_ok"].fillna(False).astype(bool)
     out["is_inside_bar"] = inside_mask
-    out["is_motherbar"] = inside_mask.shift(-1, fill_value=False).astype(bool)
+    out["is_motherbar"] = filtered_inside_mask.shift(-1, fill_value=False).astype(bool)
     if session_windows and session_timezone and "timestamp" in out.columns:
         windows = parse_session_filter(session_windows)
         ts_local = pd.to_datetime(out["timestamp"], utc=True, errors="coerce").dt.tz_convert(session_timezone)
@@ -104,9 +114,9 @@ def enrich_inside_pattern_frame(
         in_window = pd.Series(False, index=out.index)
         for w in windows:
             in_window |= (local_t >= w.start) & (local_t <= w.end)
-        out["armed"] = (inside_mask & in_window.fillna(False)).astype(bool)
+        out["armed"] = (filtered_inside_mask & in_window.fillna(False)).astype(bool)
     else:
-        out["armed"] = inside_mask.astype(bool)
-    out["mother_bar_high"] = out["prev_high"].where(inside_mask)
-    out["mother_bar_low"] = out["prev_low"].where(inside_mask)
+        out["armed"] = filtered_inside_mask.astype(bool)
+    out["mother_bar_high"] = out["prev_high"].where(filtered_inside_mask)
+    out["mother_bar_low"] = out["prev_low"].where(filtered_inside_mask)
     return out

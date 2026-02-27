@@ -32,6 +32,8 @@ def _schema_v1_0_0() -> SignalFrameSchemaV1:
         ColumnSpec("prev_low", "float64", True, "indicator"),
         ColumnSpec("prev_open", "float64", True, "indicator"),
         ColumnSpec("prev_close", "float64", True, "indicator"),
+        ColumnSpec("mother_body_fraction", "float64", False, "indicator"),
+        ColumnSpec("mother_body_ok", "bool", False, "indicator"),
         ColumnSpec("mother_bar_ts", "datetime64[ns, UTC]", True, "indicator"),
         ColumnSpec("is_inside_bar", "bool", False, "indicator"),
         ColumnSpec("is_motherbar", "bool", False, "indicator"),

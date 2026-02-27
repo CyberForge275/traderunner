@@ -17,6 +17,8 @@ def extend_harami_signal_frame(bars: pd.DataFrame, params: dict) -> pd.DataFrame
     required = [
         "inside_bar_definition_mode",
         "strict_mode",
+        "min_mother_body_fraction",
+        "max_mother_body_fraction",
         "session_windows",
         "session_timezone",
         "timeframe_minutes",
@@ -45,6 +47,8 @@ def extend_harami_signal_frame(bars: pd.DataFrame, params: dict) -> pd.DataFrame
         df,
         definition_mode=str(params["inside_bar_definition_mode"]),
         strict=bool(params["strict_mode"]),
+        min_mother_body_fraction=float(params["min_mother_body_fraction"]),
+        max_mother_body_fraction=float(params["max_mother_body_fraction"]),
         session_windows=list(params["session_windows"]),
         session_timezone=str(params["session_timezone"]),
     )

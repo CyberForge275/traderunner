@@ -13,6 +13,12 @@ versions:
       - 14:00-15:30
       inside_bar_definition_mode: mb_high__ib_high_and_close_in_mb_range
       strict_mode: false
+      min_mother_body_fraction: 0.3
+      max_mother_body_fraction: 0.75
+      regime_filter:
+        enabled: true
+        allow_gg_short: false
+        allow_mixed_short: false
       entry_level_mode: mother_bar
       max_trades_per_session_window: 1
       order_validity_policy: session_end

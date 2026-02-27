@@ -144,6 +144,13 @@ def test_store_handles_strategy_without_required_warmup_bars(temp_config_root):
                     "session_windows": ["15:00-16:00", "16:00-17:00"],
                     "inside_bar_definition_mode": "mb_range_hl__ib_hl",
                     "strict_mode": False,
+                    "min_mother_body_fraction": 0.3,
+                    "max_mother_body_fraction": 0.75,
+                    "regime_filter": {
+                        "enabled": True,
+                        "allow_gg_short": False,
+                        "allow_mixed_short": False,
+                    },
                     "entry_level_mode": "mother_bar",
                     "max_trades_per_session_window": 1,
                     "order_validity_policy": "session_end",

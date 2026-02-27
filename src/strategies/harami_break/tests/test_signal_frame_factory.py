@@ -29,6 +29,8 @@ def test_harami_signal_frame_builds_via_registry_plugin():
             "timeframe": "M5",
             "inside_bar_definition_mode": "mb_range_hl__ib_hl",
             "strict_mode": False,
+            "min_mother_body_fraction": 0.0,
+            "max_mother_body_fraction": 1.0,
             "session_windows": ["09:30-11:00", "14:00-15:30"],
             "session_timezone": "America/New_York",
             "timeframe_minutes": 5,
@@ -40,4 +42,6 @@ def test_harami_signal_frame_builds_via_registry_plugin():
     assert not df.empty
     assert schema.strategy_id == "harami_break_intraday"
     assert "is_inside_bar" in df.columns
+    assert "mother_body_fraction" in df.columns
+    assert "mother_body_ok" in df.columns
     assert "armed_from_ts" in df.columns

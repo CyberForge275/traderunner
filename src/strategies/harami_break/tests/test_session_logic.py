@@ -17,6 +17,8 @@ def _build_enriched_frame() -> pd.DataFrame:
         df,
         definition_mode="mb_range_hl__ib_hl",
         strict=False,
+        min_mother_body_fraction=0.0,
+        max_mother_body_fraction=1.0,
         session_windows=["14:30-14:45"],
         session_timezone="UTC",
     )
