@@ -50,6 +50,40 @@ def _load_costs_from_base(base_config_path: Path) -> tuple[float, float]:
     return float(costs["commission_bps"]), float(costs["slippage_bps"])
 
 
+def _assemble_strategy_params(
+    *,
+    core: dict,
+    tunable: dict,
+    strategy_version: str,
+    symbol: str,
+    timeframe: str,
+    requested_end: str,
+    lookback_days: int,
+    commission_bps: float,
+    slippage_bps: float,
+) -> dict:
+    """Build strategy params payload for a local run.
+
+    Local Spyder pipeline runs should mirror UI behavior for sizing:
+    compounding is explicitly enabled unless changed intentionally in this tool.
+    """
+    return {
+        **core,
+        **tunable,
+        "strategy_version": strategy_version,
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "requested_end": requested_end,
+        "lookback_days": lookback_days,
+        "fees_bps": commission_bps,
+        "slippage_bps": slippage_bps,
+        "backtesting": {
+            "compound_sizing": True,
+            "compound_equity_basis": "cash_only",
+        },
+    }
+
+
 def main() -> int:
     strategy_id = "harami_break_intraday"
     strategy_version = "1.0.0"
@@ -69,17 +103,20 @@ def main() -> int:
     core = dict(version_node.get("core", {}))
     tunable = dict(version_node.get("tunable", {}))
 
-    strategy_params = {
-        **core,
-        **tunable,
-        "strategy_version": strategy_version,
-        "symbol": symbol,
-        "timeframe": timeframe,
-        "requested_end": requested_end,
-        "lookback_days": lookback_days,
-        "fees_bps": commission_bps,
-        "slippage_bps": slippage_bps,
-    }
+    strategy_params = _assemble_strategy_params(
+        core=core,
+        tunable=tunable,
+        strategy_version=strategy_version,
+        symbol=symbol,
+        timeframe=timeframe,
+        requested_end=requested_end,
+        lookback_days=lookback_days,
+        commission_bps=commission_bps,
+        slippage_bps=slippage_bps,
+    )
+    backtesting = strategy_params["backtesting"]
+    compound_enabled = bool(backtesting.get("compound_sizing", False))
+    compound_equity_basis = str(backtesting.get("compound_equity_basis", "cash_only"))
 
     run_dir = get_backtest_run_dir(run_id)
     bars_path = run_dir / "bars_snapshot.parquet"
@@ -103,8 +140,8 @@ def main() -> int:
             "tunable": tunable,
             "required_warmup_bars": version_node.get("required_warmup_bars", 0),
         },
-        compound_enabled=False,
-        compound_equity_basis="cash_only",
+        compound_enabled=compound_enabled,
+        compound_equity_basis=compound_equity_basis,
         initial_cash=10_000.0,
         fees_bps=commission_bps,
         slippage_bps=slippage_bps,
