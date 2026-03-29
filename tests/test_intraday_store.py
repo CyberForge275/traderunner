@@ -25,9 +25,10 @@ def test_intraday_store_normalizes_frame(tmp_path: Path, monkeypatch) -> None:
     df.to_parquet(path)
 
     # Patch DATA_M5 location to our tmp_path
-    import axiom_bt.fs as fs
+    # We must patch the reference in axiom_bt.intraday because it imports DATA_M5 directly
+    import axiom_bt.intraday as intraday_module
 
-    monkeypatch.setattr(fs, "DATA_M5", tmp_path)
+    monkeypatch.setattr(intraday_module, "DATA_M5", tmp_path)
 
     store = IntradayStore(default_tz="America/New_York")
     frame = store.load("aapl", timeframe=Timeframe.M5)
