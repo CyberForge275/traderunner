@@ -39,12 +39,12 @@ DEFAULT_BUSINESS_DAYS = 5
 # - set SPYDER_DEBUG_ENABLED = True
 # - adjust SPYDER_DEBUG_ARGS / STAGES / SYMBOL / DATE
 # - then run the file in Spyder without passing extra CLI args
-SPYDER_DEBUG_ENABLED = True
+SPYDER_DEBUG_ENABLED = False
 SPYDER_DEBUG_RESET_ENV = True
-SPYDER_DEBUG_ARGS: list[str] = ["vf:2026-06-24", "vt:2026-06-26", "mode:match"]
-SPYDER_DEBUG_STAGES = "request_window,fetch_request,fetch_data,coverage,prefilter,slope,reference,match,summary,cli_state"
-SPYDER_DEBUG_SYMBOL = "AXTI"
-SPYDER_DEBUG_DATE = "2026-06-26"
+SPYDER_DEBUG_ARGS: list[str] = []
+SPYDER_DEBUG_STAGES = ""
+SPYDER_DEBUG_SYMBOL = ""
+SPYDER_DEBUG_DATE = ""
 
 
 @dataclass
