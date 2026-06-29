@@ -943,37 +943,47 @@ def create_backtests_layout():
             ], style={"display": "flex", "alignItems": "center"}),
 
             # Symbols input with cached selector
-            html.Label("Symbols (comma-separated)", style={"fontWeight": "bold", "marginTop": "8px"}),
-            html.Div([
-                dcc.Dropdown(
-                    id=RUN.SYMBOL_SELECTOR_CACHED,
-                    options=[],  # Will be populated by callback based on timeframe
-                    multi=True,
-                    placeholder="Select from cached symbols...",
-                    style={"marginBottom": "4px", "color": "#fff"},
-                ),
-                dcc.Input(
-                    id=RUN.SYMBOL_INPUT,
-                    type="text",
-                    placeholder="Or type: TSLA,AAPL,PLTR,HOOD",
-                    value="",  # Empty by default
-                    style={"width": "100%", "marginBottom": "8px"},
-                ),
-            ]),
+            html.Div(
+                id=RUN.SYMBOLS_CONTAINER,
+                children=[
+                    html.Label("Symbols (comma-separated)", style={"fontWeight": "bold", "marginTop": "8px"}),
+                    html.Div([
+                        dcc.Dropdown(
+                            id=RUN.SYMBOL_SELECTOR_CACHED,
+                            options=[],  # Will be populated by callback based on timeframe
+                            multi=True,
+                            placeholder="Select from cached symbols...",
+                            style={"marginBottom": "4px", "color": "#fff"},
+                        ),
+                        dcc.Input(
+                            id=RUN.SYMBOL_INPUT,
+                            type="text",
+                            placeholder="Or type: TSLA,AAPL,PLTR,HOOD",
+                            value="",  # Empty by default
+                            style={"width": "100%", "marginBottom": "8px"},
+                        ),
+                    ]),
+                ],
+            ),
 
             # Timeframe selector
-            html.Label("Timeframe", style={"fontWeight": "bold", "marginTop": "8px"}),
-            dcc.Dropdown(
-                id=RUN.TIMEFRAME_DROPDOWN,
-                options=[
-                    {"label": "5 Min (M5)", "value": "M5"},
-                    {"label": "15 Min (M15)", "value": "M15"},
-                    {"label": "1 Hour (H1)", "value": "H1"},
-                    {"label": "1 Day (D1)", "value": "D1"},
+            html.Div(
+                id=RUN.TIMEFRAME_CONTAINER,
+                children=[
+                    html.Label("Timeframe", style={"fontWeight": "bold", "marginTop": "8px"}),
+                    dcc.Dropdown(
+                        id=RUN.TIMEFRAME_DROPDOWN,
+                        options=[
+                            {"label": "5 Min (M5)", "value": "M5"},
+                            {"label": "15 Min (M15)", "value": "M15"},
+                            {"label": "1 Hour (H1)", "value": "H1"},
+                            {"label": "1 Day (D1)", "value": "D1"},
+                        ],
+                        value="M5",
+                        clearable=False,
+                        style={"color": "#fff", "marginBottom": "8px"},
+                    ),
                 ],
-                value="M5",
-                clearable=False,
-                style={"color": "#fff", "marginBottom": "8px"},
             ),
 
 

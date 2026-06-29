@@ -92,6 +92,8 @@ def main() -> int:
         df,
         definition_mode=str(core["inside_bar_definition_mode"]),
         strict=bool(core["strict_mode"]),
+        min_mother_body_fraction=float(core["min_mother_body_fraction"]),
+        max_mother_body_fraction=float(core["max_mother_body_fraction"]),
         session_windows=list(core.get("session_windows", [])),
         session_timezone=str(core["session_timezone"]),
     )

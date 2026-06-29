@@ -340,6 +340,8 @@ _AUTO_IMPORTS: Dict[str, str] = {
     "insidebar_intraday": "strategies.inside_bar",
     "confirmed_breakout_intraday": "strategies.confirmed_breakout",
     "harami_break_intraday": "strategies.harami_break",
+    "ndx_momentum_rotation": "strategies.ndx_momentum_rotation",
+    "perlentaucher_daily_scan": "strategies.perlentaucher_daily_scan",
 }
 
 

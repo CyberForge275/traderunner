@@ -114,8 +114,27 @@ class NewPipelineAdapter:
             - error: Error message if failed (optional)
             - traceback: Full stacktrace if failed (optional)
         """
-        # UI/Spyder parity for multi-symbol behavior: run once per symbol.
-        if isinstance(symbols, (list, tuple)) and len(symbols) > 1:
+        strategy_params = config_params or {}
+        is_ndx_daily = strategy == "ndx_momentum_rotation" and str(timeframe).upper() == "D1"
+        if is_ndx_daily:
+            # SSOT guard: these keys must come from strategy YAML via snapshot/config params.
+            required_daily_keys = {"daily_universe", "daily_symbol_scope"}
+            missing_daily = sorted(required_daily_keys - set(strategy_params.keys()))
+            if missing_daily:
+                raise ValueError(
+                    "ndx_momentum_rotation daily run missing SSOT keys: "
+                    + ", ".join(missing_daily)
+                )
+            if str(strategy_params["daily_symbol_scope"]).upper() != "ALL":
+                raise ValueError(
+                    "ndx_momentum_rotation currently supports only daily_symbol_scope=ALL "
+                    "for /daily/mysql/dataframe contract"
+                )
+        daily_universe_mode = bool(is_ndx_daily)
+
+        # UI/Spyder parity for intraday behavior: run once per symbol.
+        # Daily universe mode stays a single cross-sectional run.
+        if isinstance(symbols, (list, tuple)) and len(symbols) > 1 and not daily_universe_mode:
             import copy
 
             last_result = None
@@ -145,10 +164,9 @@ class NewPipelineAdapter:
                     "run_dir": str(run_dir)
                 }
 
-            symbol = symbols[0]  # Single symbol for now
+            symbol = "ALL" if daily_universe_mode else symbols[0]
 
             # Parse config params
-            strategy_params = config_params or {}
             if "fees_bps" not in strategy_params:
                 raise ValueError(
                     "fees_bps missing in config_params (SSOT required; no hardcoded fallback)"
@@ -223,25 +241,41 @@ class NewPipelineAdapter:
                 "timeframe": timeframe,
                 "consumer_only": consumer_only,
             }
+            if daily_universe_mode:
+                strategy_params_with_meta["daily_universe"] = str(
+                    strategy_params["daily_universe"]
+                ).upper()
+                strategy_params_with_meta["daily_symbol_scope"] = str(
+                    strategy_params["daily_symbol_scope"]
+                ).upper()
+                strategy_params_with_meta["symbols"] = list(symbols)
             
             # Extract core and tunable for SSOT structure
             # Pipeline expects strategy_meta with "core" and "tunable" sections
             core_keys = ["atr_period", "risk_reward_ratio", "min_mother_bar_size", 
                         "breakout_confirmation", "inside_bar_mode", "session_timezone",
                         "session_mode", "session_filter", "timeframe_minutes",
-                        "valid_from_policy", "order_validity_policy"]
+                        "valid_from_policy", "order_validity_policy",
+                        "topk", "windows_months", "score_type", "momentum_skip_mode",
+                        "skip_last_n_weeks", "rebalance_equal_weight", "rebalance_frequency",
+                        "regime_filter", "risk_off_mode", "survivorship_mode",
+                        "min_history_months", "missing_data_policy", "sizing_mode",
+                        "cash_policy_on_gate_only"]
             tunable_keys = ["lookback_candles", "max_pattern_age_candles", 
                            "max_deviation_atr"]
             
             core_config = {k: strategy_params[k] for k in core_keys if k in strategy_params}
             tunable_config = {k: strategy_params[k] for k in tunable_keys if k in strategy_params}
+            if daily_universe_mode:
+                core_config["daily_universe"] = strategy_params_with_meta["daily_universe"]
+                core_config["daily_symbol_scope"] = strategy_params_with_meta["daily_symbol_scope"]
             
             self.progress_callback("⚙️ Executing modular pipeline stages...")
 
             # Optional ensure/backfill via marketdata-service before pipeline run.
             ensure_req = None
             md_client = MarketdataStreamClient()
-            if md_client.is_configured():
+            if md_client.is_configured() and not daily_universe_mode:
                 if "timeframe_minutes" not in strategy_params:
                     raise ValueError("timeframe_minutes missing in resolved strategy config (SSOT required)")
                 if "session_mode" not in strategy_params:

@@ -32,6 +32,17 @@ except ModuleNotFoundError:
         return None
 
 
+def resolve_strategy_run_inputs(
+    strategy: str | None,
+    symbols_str: str | None,
+    timeframe: str | None,
+) -> tuple[str, str]:
+    strategy_norm = (strategy or "").strip()
+    if strategy_norm == "perlentaucher_daily_scan":
+        return "ALL", "D1"
+    return symbols_str or "", timeframe or ""
+
+
 def register_run_backtest_callback(app):
     """Register callback for running backtests from the UI.
 
@@ -148,6 +159,8 @@ def register_run_backtest_callback(app):
             )
 
         # Validate inputs
+        symbols_str, timeframe = resolve_strategy_run_inputs(strategy, symbols_str, timeframe)
+
         if not strategy or not symbols_str or not timeframe:
             return html.Div("❌ Please select strategy, symbols, and timeframe", style={"color": "red"}), run_name, {"bt_job_running": False}, "", None, ""
 

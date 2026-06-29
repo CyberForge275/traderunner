@@ -138,3 +138,35 @@ def test_entry_fill_buy_gap_uses_open():
     fills = generate_fills(intent, bars).fills
     entry = fills[fills["reason"] == "signal_fill"].iloc[0]
     assert float(entry["fill_price"]) == 64.80
+
+
+def test_entry_respects_order_valid_from_ts_over_signal_ts():
+    t0 = pd.Timestamp("2025-05-30 13:55:00", tz="UTC")
+    t1 = pd.Timestamp("2025-05-30 14:00:00", tz="UTC")
+    trigger = 64.62
+    bars = _bars(
+        [t0, t1],
+        opens=[64.40, 64.50],
+        highs=[64.80, 64.80],
+        lows=[64.30, 64.40],
+        closes=[64.55, 64.60],
+    )
+    intent = pd.DataFrame(
+        [
+            {
+                "template_id": "hb_valid_from",
+                "signal_ts": t0,
+                "order_valid_from_ts": t1,
+                "symbol": "HOOD",
+                "side": "BUY",
+                "entry_price": trigger,
+                "stop_price": 64.20,
+                "take_profit_price": 65.20,
+                "order_valid_to_ts": t1,
+                "strategy_id": "harami_break_intraday",
+            }
+        ]
+    )
+    fills = generate_fills(intent, bars).fills
+    entry = fills[fills["reason"] == "signal_fill"].iloc[0]
+    assert entry["fill_ts"] == t1

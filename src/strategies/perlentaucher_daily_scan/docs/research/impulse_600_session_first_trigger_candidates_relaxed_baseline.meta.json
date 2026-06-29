@@ -1,0 +1,88 @@
+{
+  "criteria": {
+    "dataset_path": "/var/lib/trading/marketdata/mysql_daily/exports/stock_all_2024-01-01_2026-05-15.parquet",
+    "available_sessions": 600,
+    "session_min": "2024-01-01",
+    "session_max": "2026-05-07",
+    "pre_window": 30,
+    "confirm_offset": 1,
+    "cold_phase_price_min": 2.0,
+    "cold_phase_price_max": 9.0,
+    "cold_phase_mean_volume_min": 100000.0,
+    "cold_phase_mean_volume_max": 1500000.0,
+    "cold_phase_median_volume_min": 80000.0,
+    "cold_phase_median_volume_max": 1200000.0,
+    "min_price_lr_trimmed": -0.1,
+    "min_vol_lr_trimmed": -100000.0,
+    "min_price_ratio_prev_to_breakout": 1.172897,
+    "min_volume_ratio_prev_to_breakout": 19.617994,
+    "min_price_ratio_prev_to_confirm": 1.158879,
+    "min_volume_ratio_prev_to_confirm": 3.01405,
+    "require_breakout_green": false,
+    "min_confirm_close_vs_breakout_close": 0.9,
+    "min_confirm_close_position_in_range": 0.5,
+    "min_pre_max_drawdown": -0.6,
+    "max_pre_gap_down_count": 8,
+    "first_trigger_definition": "precondition_passed and prewindow_path_passed and breakout_passed and breakout_bar_passed",
+    "final_trigger_definition": "trigger_passed == True",
+    "anchor_reference_symbols": [
+      "AXTI",
+      "IONQ",
+      "MRAM",
+      "SOUN"
+    ]
+  },
+  "summary": {
+    "dataset_path": "/var/lib/trading/marketdata/mysql_daily/exports/stock_all_2024-01-01_2026-05-15.parquet",
+    "available_sessions": 600,
+    "session_min": "2024-01-01",
+    "session_max": "2026-05-07",
+    "first_trigger_candidates": 156,
+    "final_trigger_candidates": 65,
+    "anchor_reference_symbols": [
+      "AXTI",
+      "IONQ",
+      "MRAM",
+      "SOUN"
+    ],
+    "csv_path": "src/strategies/perlentaucher_daily_scan/docs/research/impulse_600_session_first_trigger_candidates_relaxed_baseline.csv",
+    "excluded_invalid_symbols": [
+      "ITI",
+      "TERN",
+      "RGTIW"
+    ]
+  },
+  "invalid_symbols": [
+    {
+      "symbol": "ITI",
+      "status": "invalid_excluded",
+      "reason": "source_data_identity_or_stitching_issue",
+      "details": "Removed from research export after detecting an invalid post-2024-11-01 price regime inconsistent with Iteris acquisition at $7.20 cash/share.",
+      "removed_rows": 2,
+      "removed_breakout_sessions": [
+        "2024-08-08",
+        "2024-11-04"
+      ]
+    },
+    {
+      "symbol": "TERN",
+      "status": "invalid_excluded",
+      "reason": "source_data_tail_regime_issue",
+      "details": "Removed after local May 2026 tail collapsed to sub-$1 prices inconsistent with Yahoo Finance for Terns Pharmaceuticals.",
+      "removed_rows": 1,
+      "removed_breakout_sessions": [
+        "2025-11-02"
+      ]
+    },
+    {
+      "symbol": "RGTIW",
+      "status": "invalid_excluded",
+      "reason": "non_common_stock_warrant",
+      "details": "Removed because RGTIW is a warrant, not common stock, and should not be part of the common-stock baseline basket.",
+      "removed_rows": 1,
+      "removed_breakout_sessions": [
+        "2025-07-15"
+      ]
+    }
+  ]
+}

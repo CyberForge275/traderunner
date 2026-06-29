@@ -25,6 +25,7 @@ INTENT_ALLOWED_COLUMNS: set[str] = {
     "strategy_version",
     "oco_group_id",
     "breakout_confirmation",
+    "order_valid_from_ts",
     "order_valid_to_ts",
     "order_valid_to_reason",
     "dbg_signal_ts_ny",
@@ -70,6 +71,7 @@ INTENT_ALLOWED_PREFIXES: tuple[str, ...] = (
 # Allowed scheduled validity fields for timestamp purity checks
 INTENT_ALLOWED_SCHEDULED_VALIDITY: set[str] = {
     "order_valid_to_ts",
+    "order_valid_from_ts",
     "dbg_valid_to_ts_utc",
     "dbg_valid_to_ts_ny",
     "dbg_valid_to_ts",

@@ -22,6 +22,10 @@ Current strategy/version:
   - `mb_body_oc__ib_body`
   - `mb_range_hl__ib_hl`
   - `mb_high__ib_high_and_close_in_mb_range`
+- `regime_filter` (mapping):
+  - `enabled` (bool)
+  - `allow_gg_short` (bool)
+  - `allow_mixed_short` (bool)
 - `entry_level_mode` (enum):
   - `mother_bar`
   - `inside_bar`
@@ -44,6 +48,35 @@ Current strategy/version:
 - `inside_bar_mode` is intentionally omitted for this strategy version.
 - `tunable` is currently empty in v1.0.0.
 - Strategy runtime implementation is still placeholder (`strategy.py` raises `NotImplementedError`).
+
+## Regime Filter Semantics
+
+When `regime_filter.enabled=true`, short intents are gated by candle-color regime:
+- `GG` (green mother + green inside): short only if `allow_gg_short=true`
+- `mixed` (green/red or red/green): short only if `allow_mixed_short=true`
+- other regimes (`RR`, doji/unknown): unchanged
+
+Long intents are not filtered by this gate.
+
+## events_intent Reporting Fields (additive)
+
+Harami now writes full level snapshots per intent row (no execution logic change):
+- `sig_LONG_entry_price`, `sig_LONG_stop_price`, `sig_LONG_take_profit_price`
+- `sig_SHORT_entry_price`, `sig_SHORT_stop_price`, `sig_SHORT_take_profit_price`
+
+Pattern context for inspector/audit:
+- `dbg_mother_ts`, `dbg_inside_ts`
+- `dbg_mother_high`, `dbg_mother_low`, `dbg_mother_range`
+
+## Rollback Procedure (explicit)
+
+If performance degrades, rollback is deterministic:
+1. Revert configuration toggle only:
+   - set `regime_filter.enabled: false` in `harami_break_intraday.yaml`
+   - keep code unchanged, rerun regression.
+2. If full rollback is required:
+   - checkout tag `stable-20260227-1129-pre-regime-filter`
+   - rerun the same backtests for parity verification.
 
 ## UI Behavior
 

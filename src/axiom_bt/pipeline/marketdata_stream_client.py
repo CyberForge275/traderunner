@@ -54,6 +54,52 @@ class EnsureBarsRequest:
         return payload
 
 
+@dataclass(frozen=True)
+class DailyDataFrameRequest:
+    universe: str
+    symbol: str
+    valid_from: dt.date
+    valid_to: dt.date
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            "universe": self.universe,
+            "symbol": self.symbol,
+            "valid_from": self.valid_from.isoformat(),
+            "valid_to": self.valid_to.isoformat(),
+        }
+
+
+@dataclass(frozen=True)
+class UniverseMembersRequest:
+    universe: str
+    as_of_date: dt.date
+    survivorship_mode: str = "current_members"
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            "universe": str(self.universe).strip().upper(),
+            "as_of_date": self.as_of_date.isoformat(),
+            "survivorship_mode": str(self.survivorship_mode).strip().lower(),
+        }
+
+
+@dataclass(frozen=True)
+class UniverseMembersRangeRequest:
+    universe: str
+    valid_from: dt.date
+    valid_to: dt.date
+    survivorship_mode: str = "current_members"
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            "universe": str(self.universe).strip().upper(),
+            "valid_from": self.valid_from.isoformat(),
+            "valid_to": self.valid_to.isoformat(),
+            "survivorship_mode": str(self.survivorship_mode).strip().lower(),
+        }
+
+
 class MarketdataStreamClient:
     """
     Optional helper: UI/CLI can ask marketdata-stream to ensure/backfill range.
@@ -106,6 +152,54 @@ class MarketdataStreamClient:
         ok = status in {"ok", "backfilled"} or bool(data.get("ok", False))
         if r.status_code >= 400 or not ok:
             raise RuntimeError(f"marketdata-stream ensure_bars failed: status={r.status_code} body={data}")
+        return data
+
+    def fetch_daily_dataframe(self, req: DailyDataFrameRequest) -> Dict[str, Any]:
+        if not self.base_url:
+            raise RuntimeError("marketdata-stream URL not configured")
+
+        url = f"{self.base_url}/daily/mysql/dataframe"
+        r = requests.post(url, json=req.to_json(), timeout=max(self.timeout_sec, 600))
+        try:
+            data = r.json()
+        except Exception:
+            data = {"ok": False, "status_code": r.status_code, "text": r.text}
+        if r.status_code >= 400 or str(data.get("status", "")).lower() != "ok":
+            raise RuntimeError(
+                f"marketdata-stream daily_dataframe failed: status={r.status_code} body={data}"
+            )
+        return data
+
+    def fetch_universe_members(self, req: UniverseMembersRequest) -> Dict[str, Any]:
+        if not self.base_url:
+            raise RuntimeError("marketdata-stream URL not configured")
+
+        url = f"{self.base_url}/universe/members"
+        r = requests.post(url, json=req.to_json(), timeout=self.timeout_sec)
+        try:
+            data = r.json()
+        except Exception:
+            data = {"ok": False, "status_code": r.status_code, "text": r.text}
+        if r.status_code >= 400 or str(data.get("status", "")).lower() != "ok":
+            raise RuntimeError(
+                f"marketdata-stream universe_members failed: status={r.status_code} body={data}"
+            )
+        return data
+
+    def fetch_universe_members_range(self, req: UniverseMembersRangeRequest) -> Dict[str, Any]:
+        if not self.base_url:
+            raise RuntimeError("marketdata-stream URL not configured")
+
+        url = f"{self.base_url}/universe/members/range"
+        r = requests.post(url, json=req.to_json(), timeout=self.timeout_sec)
+        try:
+            data = r.json()
+        except Exception:
+            data = {"ok": False, "status_code": r.status_code, "text": r.text}
+        if r.status_code >= 400 or str(data.get("status", "")).lower() != "ok":
+            raise RuntimeError(
+                f"marketdata-stream universe_members_range failed: status={r.status_code} body={data}"
+            )
         return data
 
 

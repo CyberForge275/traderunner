@@ -12,6 +12,29 @@ from trading_dashboard.ui_ids import RUN  # Import RUN ID constants
 logger = logging.getLogger(__name__)
 
 
+def resolve_run_control_policy(strategy_id: str | None) -> dict:
+    strategy_norm = (strategy_id or "").strip()
+    default_style = {"display": "block"}
+    hidden_style = {"display": "none"}
+
+    if strategy_norm == "perlentaucher_daily_scan":
+        return {
+            "symbols_style": hidden_style,
+            "timeframe_style": hidden_style,
+            "symbol_input_value": "ALL",
+            "symbol_selector_value": [],
+            "timeframe_value": "D1",
+        }
+
+    return {
+        "symbols_style": default_style,
+        "timeframe_style": default_style,
+        "symbol_input_value": None,
+        "symbol_selector_value": [],
+        "timeframe_value": None,
+    }
+
+
 def register_ssot_backtest_config_callback(app):
     """Register callbacks for dynamic SSOT-driven backtest configuration."""
 
@@ -60,6 +83,25 @@ def register_ssot_backtest_config_callback(app):
         except Exception as e:
             logger.error(f"actions: ui_backtest_versions_failed strategy_id={strategy_id} exc={type(e).__name__} msg='{str(e)}'")
             return [], None
+
+    @app.callback(
+        Output(RUN.SYMBOLS_CONTAINER, "style"),
+        Output(RUN.TIMEFRAME_CONTAINER, "style"),
+        Output(RUN.SYMBOL_INPUT, "value"),
+        Output(RUN.SYMBOL_SELECTOR_CACHED, "value"),
+        Output(RUN.TIMEFRAME_DROPDOWN, "value"),
+        Input(RUN.STRATEGY_DROPDOWN, "value"),
+        prevent_initial_call=False,
+    )
+    def update_strategy_run_controls(strategy_id):
+        policy = resolve_run_control_policy(strategy_id)
+        return (
+            policy["symbols_style"],
+            policy["timeframe_style"],
+            policy["symbol_input_value"],
+            policy["symbol_selector_value"],
+            policy["timeframe_value"],
+        )
 
 
     @app.callback(

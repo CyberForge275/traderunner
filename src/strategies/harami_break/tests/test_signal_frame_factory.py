@@ -45,3 +45,10 @@ def test_harami_signal_frame_builds_via_registry_plugin():
     assert "mother_body_fraction" in df.columns
     assert "mother_body_ok" in df.columns
     assert "armed_from_ts" in df.columns
+    assert "adx_14" in df.columns
+    assert "dbg_adx_14" in df.columns
+    assert "adx_7" in df.columns
+    assert "dbg_adx_7" in df.columns
+    assert "rvol_20" in df.columns
+    assert "ema_7" in df.columns
+    assert "ema_15" in df.columns

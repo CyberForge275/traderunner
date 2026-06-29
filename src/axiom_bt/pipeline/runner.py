@@ -266,6 +266,8 @@ def run_pipeline(
                     allow_legacy_http_backfill=bool(
                         strategy_params.get("allow_legacy_http_backfill", False)
                     ),
+                    daily_universe=strategy_params.get("daily_universe"),
+                    daily_symbol_scope=strategy_params.get("daily_symbol_scope"),
                 )
                 snapshot_path = Path(snap_info["exec_path"])
                 bars_hash = snap_info["bars_hash"]

@@ -10,11 +10,11 @@ versions:
       timeframe_minutes: 5
       session_windows:
       - 09:30-11:00
-      - 14:00-15:30
+      - 14:00-15:00
       inside_bar_definition_mode: mb_high__ib_high_and_close_in_mb_range
       strict_mode: false
-      min_mother_body_fraction: 0.3
-      max_mother_body_fraction: 0.75
+      min_mother_body_fraction: 0.7
+      max_mother_body_fraction: 0.85
       regime_filter:
         enabled: true
         allow_gg_short: false

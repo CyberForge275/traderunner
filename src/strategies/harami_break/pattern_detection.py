@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import talib
 
 from trade.session_windows import parse_session_filter
 from .rules import eval_vectorized
@@ -119,4 +120,30 @@ def enrich_inside_pattern_frame(
         out["armed"] = filtered_inside_mask.astype(bool)
     out["mother_bar_high"] = out["prev_high"].where(filtered_inside_mask)
     out["mother_bar_low"] = out["prev_low"].where(filtered_inside_mask)
+    adx_14 = talib.ADX(
+        out["high"].astype("float64").to_numpy(),
+        out["low"].astype("float64").to_numpy(),
+        out["close"].astype("float64").to_numpy(),
+        timeperiod=14,
+    )
+    out["adx_14"] = pd.Series(adx_14, index=out.index)
+    out["dbg_adx_14"] = out["adx_14"]
+
+    adx_7 = talib.ADX(
+        out["high"].astype("float64").to_numpy(),
+        out["low"].astype("float64").to_numpy(),
+        out["close"].astype("float64").to_numpy(),
+        timeperiod=7,
+    )
+    out["adx_7"] = pd.Series(adx_7, index=out.index)
+    out["dbg_adx_7"] = out["adx_7"]
+
+    ema_7 = talib.EMA(out["close"].astype("float64").to_numpy(), timeperiod=7)
+    ema_15 = talib.EMA(out["close"].astype("float64").to_numpy(), timeperiod=15)
+    out["ema_7"] = pd.Series(ema_7, index=out.index)
+    out["ema_15"] = pd.Series(ema_15, index=out.index)
+
+    vol = out["volume"].astype("float64")
+    vol_ma_20 = vol.rolling(window=20, min_periods=20).mean()
+    out["rvol_20"] = (vol / vol_ma_20).where(vol_ma_20 > 0)
     return out

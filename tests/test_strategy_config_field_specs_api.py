@@ -51,3 +51,17 @@ def test_inside_bar_order_validity_policy_values():
     specs = StrategyConfigStore.get_field_specs("insidebar_intraday")
     validity_spec = specs["core"]["order_validity_policy"]
     assert sorted(validity_spec["options"]) == ["fixed_bars", "fixed_minutes", "session_end"]
+
+
+def test_ndx_momentum_daily_scope_fields_present():
+    specs = StrategyConfigStore.get_field_specs("ndx_momentum_rotation")
+    assert "daily_universe" in specs["core"]
+    assert "daily_symbol_scope" in specs["core"]
+
+
+def test_perlentaucher_daily_scan_field_specs_present():
+    specs = StrategyConfigStore.get_field_specs("perlentaucher_daily_scan")
+    assert "match_mode" in specs["core"]
+    assert "use_volume_prefilter" in specs["core"]
+    assert "reference_set" in specs["core"]
+    assert "max_candidates" in specs["core"]

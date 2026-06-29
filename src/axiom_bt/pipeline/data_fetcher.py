@@ -15,6 +15,7 @@ from core.settings.runtime_config import (
     get_marketdata_data_root,
 )
 from axiom_bt.fs import DATA_D1
+from .marketdata_stream_client import DailyDataFrameRequest, MarketdataStreamClient
 from .data_prep import _sha256_file
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,8 @@ def ensure_and_snapshot_bars(
     force: bool = False,
     auto_fill_gaps: bool = True,
     allow_legacy_http_backfill: bool = False,
+    daily_universe: str | None = None,
+    daily_symbol_scope: str | None = None,
 ) -> Dict[str, str]:
     """Load producer-built bars and write per-run snapshots.
 
@@ -72,6 +75,81 @@ def ensure_and_snapshot_bars(
 
     tf_upper = timeframe.upper()
     if tf_upper == "D1":
+        # Daily universe mode: fetch cross-sectional bars via marketdata-stream
+        # contract endpoint /daily/mysql/dataframe.
+        if str(symbol).upper() == "ALL" or daily_universe:
+            end_ts = pd.Timestamp(requested_end)
+            if end_ts.tz is None:
+                end_ts = end_ts.tz_localize("UTC")
+            else:
+                end_ts = end_ts.tz_convert("UTC")
+            warmup_days_calc = max(0, int(warmup_days or 0))
+            requested_start = (end_ts - pd.Timedelta(days=int(lookback_days))).normalize()
+            effective_start = (
+                requested_start - pd.Timedelta(days=warmup_days_calc)
+            ).normalize()
+
+            client = MarketdataStreamClient()
+            universe = str(daily_universe or "US").upper()
+            symbol_scope = str(daily_symbol_scope or symbol or "ALL").upper()
+            payload = DailyDataFrameRequest(
+                universe=universe,
+                symbol=symbol_scope,
+                valid_from=effective_start.date(),
+                valid_to=end_ts.date(),
+            )
+            body = client.fetch_daily_dataframe(payload)
+            records = body.get("data", [])
+            df = pd.DataFrame(records)
+            required_cols = {
+                "date",
+                "symbol",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+            }
+            missing = sorted(required_cols - set(df.columns))
+            if missing:
+                raise DataFetcherError(
+                    "daily dataframe missing required columns from marketdata-stream: "
+                    + ", ".join(missing)
+                )
+            if df.empty:
+                raise DataFetcherError("daily dataframe returned no rows")
+
+            df = df.rename(columns={"date": "timestamp", "adj_close": "adj_close"})
+            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+            if df["timestamp"].isna().any():
+                raise DataFetcherError("daily dataframe contains invalid date values")
+            df = df.sort_values(["timestamp", "symbol"]).reset_index(drop=True)
+
+            target_exec = bars_dir / f"bars_exec_{tf_upper}.parquet"
+            df.to_parquet(target_exec, index=False)
+            bars_hash = _sha256_file(target_exec)
+            meta = {
+                "market_tz": market_tz,
+                "timeframe": tf_upper,
+                "warmup_days": warmup_days,
+                "lookback_days": lookback_days,
+                "exec_bars": target_exec.name,
+                "signal_bars": None,
+                "session_mode": session_mode,
+                "rth_only": session_mode == "rth",
+                "daily_universe": universe,
+                "daily_symbol_scope": symbol_scope,
+                "daily_rows": int(len(df)),
+            }
+            meta_path = bars_dir / "bars_slice_meta.json"
+            meta_path.write_text(json.dumps(meta, indent=2))
+            return {
+                "exec_path": str(target_exec),
+                "signal_path": None,
+                "bars_hash": bars_hash,
+                "meta_path": str(meta_path),
+            }
+
         source_path = DATA_D1 / f"{symbol}.parquet"
         if not source_path.exists():
             raise DataFetcherError(f"daily bars not found: {source_path}")

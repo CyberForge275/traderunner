@@ -199,6 +199,11 @@ def generate_fills(
             )
         return session_end_for_day(signal_ts, session_filter, session_timezone)
 
+    def _valid_from_for(intent_row: pd.Series, signal_ts: pd.Timestamp) -> pd.Timestamp:
+        if pd.notna(intent_row.get("order_valid_from_ts")):
+            return pd.to_datetime(intent_row["order_valid_from_ts"], utc=True)
+        return signal_ts
+
     def _find_trigger_bar(intent_row: pd.Series, start_ts: pd.Timestamp, end_ts: pd.Timestamp) -> pd.Series | None:
         side = str(intent_row.get("side", "")).upper()
         entry_px = intent_row.get("entry_price")
@@ -228,8 +233,9 @@ def generate_fills(
         group_triggers = []
         for _, intent in group.iterrows():
             signal_ts = pd.to_datetime(intent["signal_ts"], utc=True)
+            valid_from = _valid_from_for(intent, signal_ts)
             valid_to = _valid_to_for(intent, signal_ts)
-            trigger_bar = _find_trigger_bar(intent, signal_ts, valid_to)
+            trigger_bar = _find_trigger_bar(intent, valid_from, valid_to)
             if trigger_bar is not None:
                 group_triggers.append((intent, trigger_bar, signal_ts))
 

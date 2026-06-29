@@ -18,3 +18,26 @@ def test_config_registry_includes_confirmed_breakout():
 def test_strategy_discovery_includes_harami_break():
     plugin = get_strategy("harami_break_intraday")
     assert plugin.strategy_id == "harami_break_intraday"
+
+
+def test_strategy_discovery_includes_ndx_momentum_rotation():
+    plugin = get_strategy("ndx_momentum_rotation")
+    assert plugin.strategy_id == "ndx_momentum_rotation"
+
+
+def test_config_registry_keeps_existing_and_adds_ndx():
+    strategies = set(config_manager_registry.list_strategies())
+    assert "insidebar_intraday" in strategies
+    assert "confirmed_breakout_intraday" in strategies
+    assert "harami_break_intraday" in strategies
+    assert "ndx_momentum_rotation" in strategies
+
+
+def test_strategy_discovery_includes_perlentaucher_daily_scan():
+    plugin = get_strategy("perlentaucher_daily_scan")
+    assert plugin.strategy_id == "perlentaucher_daily_scan"
+
+
+def test_config_registry_includes_perlentaucher_daily_scan():
+    strategies = set(config_manager_registry.list_strategies())
+    assert "perlentaucher_daily_scan" in strategies
