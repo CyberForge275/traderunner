@@ -1,0 +1,18 @@
+strategy_id: perlentaucher_daily_scan
+canonical_name: perlentaucher_daily_scan
+versions:
+  1.0.0:
+    strategy_finalized: false
+    core:
+      enabled: true
+      timeframe_minutes: 1440
+      match_mode: price_vol
+      use_volume_prefilter: true
+      reference_set: default
+      min_history_days: 107
+      max_candidates: 25
+    tunable: {}
+# Sweet-spot setup suggestions are kept in:
+#   src/strategies/perlentaucher_daily_scan/data/sweet_spot_config.commented.yaml
+# Active runtime config is kept in:
+#   src/strategies/perlentaucher_daily_scan/data/sweet_spot_config.json
